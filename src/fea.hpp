@@ -1,0 +1,235 @@
+#pragma once
+#include "fea_types.hpp"
+#include "elements.hpp"
+#include "sparse.hpp"
+#include "solver.hpp"
+#include "mesh.hpp"
+#include "postprocess.hpp"
+#include <vector>
+#include <chrono>
+#include <iostream>
+#include <iomanip>
+
+// ==========================================================================
+// FEA SOLVER CORE -- Assembly, solve, post-process
+// ==========================================================================
+
+namespace fea {
+
+// ------------------------------------------------------------------
+// Assemble global stiffness matrix (COO format)
+// ------------------------------------------------------------------
+inline COOMatrix assemble(const Mesh& m) {
+    int ndof = m.num_dofs();
+    COOMatrix K(ndof, ndof);
+
+    // Assemble Q4 elements
+    #pragma omp parallel
+    {
+        COOMatrix K_local(ndof, ndof);
+
+        #pragma omp for nowait
+        for (int e = 0; e < m.num_quads(); ++e) {
+            const auto& elem = m.quad_elements[e];
+            std::array<Node, 4> elem_nodes;
+            for (int i = 0; i < 4; ++i) {
+                elem_nodes[i] = m.nodes[elem[i]];
+            }
+
+            auto Ke = elements::Q4Element::stiffness(elem_nodes, m.mat, m.plane);
+            auto dof_idx = elements::Q4Element::dof_indices(elem);
+
+            for (int i = 0; i < 8; ++i) {
+                for (int j = 0; j < 8; ++j) {
+                    K_local.add(dof_idx[i], dof_idx[j], Ke[i][j]);
+                }
+            }
+        }
+
+        // Assemble bar elements
+        #pragma omp for nowait
+        for (int e = 0; e < m.num_bars(); ++e) {
+            const auto& bar = m.bar_elements[e];
+            const auto& n1 = m.nodes[bar[0]];
+            const auto& n2 = m.nodes[bar[1]];
+            double A = m.bar_areas[e];
+
+            auto Ke = elements::BarElement::stiffness(n1, n2, A, m.mat);
+            auto dof_idx = elements::BarElement::dof_indices(bar[0], bar[1]);
+
+            for (int i = 0; i < 4; ++i) {
+                for (int j = 0; j < 4; ++j) {
+                    K_local.add(dof_idx[i], dof_idx[j], Ke[i][j]);
+                }
+            }
+        }
+
+        #pragma omp critical
+        {
+            for (size_t k = 0; k < K_local.val.size(); ++k) {
+                K.add(K_local.row[k], K_local.col[k], K_local.val[k]);
+            }
+        }
+    }
+
+    return K;
+}
+
+// ------------------------------------------------------------------
+// Compute penalty value from assembled stiffness matrix
+// Must be called BEFORE adding penalty to the matrix
+// ------------------------------------------------------------------
+inline double compute_penalty(const COOMatrix& K) {
+    double K_max = 0.0;
+    for (size_t k = 0; k < K.val.size(); ++k) {
+        if (K.row[k] == K.col[k]) {
+            K_max = std::max(K_max, std::abs(K.val[k]));
+        }
+    }
+    // 1e4 * K_max -- large enough to enforce BC, small enough to avoid conditioning issues
+    double penalty = K_max * 1e4;
+    if (penalty < 1e8) penalty = 1e8;
+    return penalty;
+}
+
+// ------------------------------------------------------------------
+// Apply penalty method for Dirichlet BCs to stiffness matrix
+// ------------------------------------------------------------------
+inline void apply_dirichlet_penalty(COOMatrix& K, const Mesh& m, double penalty) {
+    for (const auto& bc : m.dirichlet) {
+        int dof = dof_index(bc.node, bc.dof);
+        K.add(dof, dof, penalty);
+    }
+}
+
+// ------------------------------------------------------------------
+// Build RHS vector from Neumann BCs
+// ------------------------------------------------------------------
+inline std::vector<double> build_rhs(const Mesh& m) {
+    std::vector<double> f(m.num_dofs(), 0.0);
+    for (const auto& bc : m.neumann) {
+        f[dof_index(bc.node, bc.dof)] += bc.value;
+    }
+    return f;
+}
+
+// ------------------------------------------------------------------
+// Modify RHS for Dirichlet BCs (penalty method)
+// f[dof] += penalty * prescribed_value
+// ------------------------------------------------------------------
+inline void modify_rhs_dirichlet(std::vector<double>& f, const Mesh& m, double penalty) {
+    for (const auto& bc : m.dirichlet) {
+        int dof = dof_index(bc.node, bc.dof);
+        f[dof] += penalty * bc.value;
+    }
+}
+
+// ------------------------------------------------------------------
+// Full solve: assemble, apply BCs, solve
+// ------------------------------------------------------------------
+struct SolveResult {
+    std::vector<double> displacement;
+    std::vector<postprocess::ElementStress> stresses;
+    int cg_iterations = 0;
+    double solve_time_ms = 0.0;
+    bool cg_converged = false;
+};
+
+inline SolveResult solve(Mesh& m, bool use_cg = false) {
+    auto t_start = std::chrono::high_resolution_clock::now();
+
+    // 1. Assemble
+    std::cout << "Assembling global stiffness matrix..." << std::endl;
+    auto K_coo = assemble(m);
+    std::cout << "  COO entries: " << K_coo.val.size() << std::endl;
+
+    // 2. Compute penalty BEFORE modifying matrix
+    double penalty = compute_penalty(K_coo);
+
+    // 3. Apply Dirichlet BCs (penalty method)
+    apply_dirichlet_penalty(K_coo, m, penalty);
+
+    // 4. Convert to CSR
+    auto K_csr = K_coo.to_csr();
+    std::cout << "  CSR non-zeros: " << K_csr.values.size() << std::endl;
+
+    // 5. Build RHS and apply Dirichlet penalty
+    auto f = build_rhs(m);
+    modify_rhs_dirichlet(f, m, penalty);
+
+    // 6. Solve
+    std::vector<double> u;
+    int cg_iters = 0;
+    bool cg_conv = false;
+
+    if (use_cg) {
+        std::cout << "Solving with Conjugate Gradient..." << std::endl;
+        CGSolver cg(10000, 1e-10);
+        auto result = cg.solve(K_csr, f);
+        u = result.x;
+        cg_iters = result.iterations;
+        cg_conv = result.converged;
+        std::cout << "  CG iterations: " << cg_iters
+                  << ", residual: " << std::scientific << std::setprecision(2)
+                  << result.residual_norm
+                  << (cg_conv ? " (converged)" : " (DID NOT converge)")
+                  << std::endl;
+    } else {
+        std::cout << "Solving with Cholesky..." << std::endl;
+        auto K_dense = DenseMatrix::from_csr(K_csr);
+        CholeskySolver chol;
+        chol.factor(K_dense);
+        u = chol.solve(f);
+    }
+
+    // 7. Post-process
+    std::cout << "Computing stresses..." << std::endl;
+    auto stresses = postprocess::compute_all_stresses(m, u);
+
+    auto t_end = std::chrono::high_resolution_clock::now();
+    double solve_time = std::chrono::duration<double, std::milli>(t_end - t_start).count();
+
+    // Report
+    double max_disp = 0.0;
+    for (int i = 0; i < m.num_nodes(); ++i) {
+        double ux = u[dof_index(i, 0)];
+        double uy = u[dof_index(i, 1)];
+        double d = std::sqrt(ux * ux + uy * uy);
+        if (d > max_disp) max_disp = d;
+    }
+
+    double max_stress = 0.0;
+    for (const auto& s : stresses) {
+        if (s.von_mises > max_stress) max_stress = s.von_mises;
+    }
+
+    std::cout << "  Max displacement: " << std::scientific << std::setprecision(4)
+              << max_disp << " m" << std::endl;
+    std::cout << "  Max von Mises stress: " << max_stress << " Pa" << std::endl;
+    std::cout << "  Solve time: " << std::fixed << std::setprecision(1)
+              << solve_time << " ms" << std::endl;
+
+    return { u, stresses, cg_iters, solve_time, cg_conv };
+}
+
+// ------------------------------------------------------------------
+// Energy balance check: 0.5 * u^T * K * u == 0.5 * u^T * f
+// ------------------------------------------------------------------
+inline double compute_strain_energy(const CSRMatrix& K, const std::vector<double>& u) {
+    auto Ku = K * u;
+    double energy = 0.0;
+    for (size_t i = 0; i < u.size(); ++i) {
+        energy += u[i] * Ku[i];
+    }
+    return 0.5 * energy;
+}
+
+inline double compute_work_done(const std::vector<double>& f, const std::vector<double>& u) {
+    double work = 0.0;
+    for (size_t i = 0; i < u.size(); ++i) {
+        work += f[i] * u[i];
+    }
+    return 0.5 * work;
+}
+
+}  // namespace fea
