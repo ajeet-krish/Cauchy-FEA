@@ -130,6 +130,8 @@ inline void modify_rhs_dirichlet(std::vector<double>& f, const Mesh& m, double p
 struct SolveResult {
     std::vector<double> displacement;
     std::vector<postprocess::ElementStress> stresses;
+    CSRMatrix K_csr;
+    std::vector<double> f;
     int cg_iterations = 0;
     double solve_time_ms = 0.0;
     bool cg_converged = false;
@@ -137,6 +139,12 @@ struct SolveResult {
 
 inline SolveResult solve(Mesh& m, bool use_cg = false) {
     auto t_start = std::chrono::high_resolution_clock::now();
+
+    // Auto-switch to CG for large systems (Cholesky is O(n^3) with dense matrix)
+    if (!use_cg && m.num_dofs() > 2000) {
+        std::cout << "Auto-switching to CG (DOFs=" << m.num_dofs() << " > 2000)" << std::endl;
+        use_cg = true;
+    }
 
     // 1. Assemble
     std::cout << "Assembling global stiffness matrix..." << std::endl;
@@ -209,7 +217,7 @@ inline SolveResult solve(Mesh& m, bool use_cg = false) {
     std::cout << "  Solve time: " << std::fixed << std::setprecision(1)
               << solve_time << " ms" << std::endl;
 
-    return { u, stresses, cg_iters, solve_time, cg_conv };
+    return { u, stresses, K_csr, f, cg_iters, solve_time, cg_conv };
 }
 
 // ------------------------------------------------------------------

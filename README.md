@@ -1,4 +1,4 @@
-# FEA-2D: 2D Finite Element Structural Solver
+# Cauchy: 2D Finite Element Structural Solver
 
 A header-only C++20 2D finite element solver implementing bar and bilinear quad
 (Q4) elements with COO/CSR sparse assembly, Cholesky direct and Conjugate
@@ -18,18 +18,24 @@ dedicated pages and comparison sliders).
 cmake -B build && cmake --build build -j$(sysctl -n hw.ncpu)
 
 # Validation cases
-./build/FEA_Cantilever 32         # Cantilever beam (32x32 mesh)
+./build/FEA_Cantilever 32         # Cantilever beam (32x8 mesh)
 ./build/FEA_Michell              # Michell truss
 ./build/FEA_Cook 32              # Cook's membrane (32x32 mesh)
-./build/FEA_LBracket 64          # L-bracket (64x64 mesh)
+./build/FEA_LBracket 32          # L-bracket (32x32 mesh)
 ./build/FEA_Patch                # Patch test (4x4 mesh)
-./build/FEA_PlateHole 64         # Plate with hole (64x64 mesh)
+./build/FEA_PlateHole 16         # Plate with hole (16x16 mesh)
+
+# Run with CG solver (auto-switches for large meshes)
+./build/FEA_LBracket 64 --cg
+
+# Run convergence study
+./build/FEA_Cantilever 32 --convergence
 
 # Run tests
 ./build/FEA_Tests
 
 # Post-process
-python3 scripts/postprocess.py output/cantilever/
+python3 scripts/postprocess.py output/cantilever/ --all
 
 # Preview website
 python3 -m http.server -d docs 8765
@@ -67,8 +73,7 @@ open http://localhost:8765
 ```
 fea-2d/
 ├── README.md
-├── TECHNICAL_REPORT.md
-├── simulation_parameters.md
+├── AGENTS.md
 ├── CMakeLists.txt
 ├── .gitignore
 ├── .github/workflows/ci.yml
@@ -81,6 +86,7 @@ fea-2d/
 │   ├── solver.hpp                 # Cholesky + Conjugate Gradient
 │   ├── postprocess.hpp            # Stress recovery, Von Mises, contour data
 │   ├── mesh.hpp                   # Structured quad mesher + JSON input
+│   ├── convergence.hpp            # GCI computation, h-refinement wrapper
 │   │
 │   ├── main_cantilever.cpp        # Case 1: Cantilever beam
 │   ├── main_michell.cpp           # Case 2: Michell truss
@@ -112,12 +118,6 @@ fea-2d/
 ├── output/                        # Simulation output (gitignored)
 └── build/                         # CMake build (gitignored)
 ```
-
-## Simulation Parameters
-
-See [simulation_parameters.md](simulation_parameters.md) for the complete
-single-source-of-truth reference: mesh sizes, material properties, boundary
-conditions, and load magnitudes for all 6 validation cases.
 
 ## Build Requirements
 

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>L-Bracket -- Cauchy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+  <div class="sidebar">
+    <div class="sidebar-brand"><a href="index.html">Cauchy</a></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section"><div class="nav-heading">Project</div><a href="index.html" class="nav-item">Home</a></div>
+      <div class="nav-section">
+        <div class="nav-heading">Validation Cases</div>
+        <a href="cantilever.html" class="nav-item">Cantilever Beam</a>
+        <a href="cook.html" class="nav-item">Cook's Membrane</a>
+        <a href="patch.html" class="nav-item">Patch Test</a>
+        <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
+        <a href="lbracket.html" class="nav-item active">L-Bracket</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Reference</div>
+        <a href="theory.html" class="nav-item">Theory</a>
+        <a href="implementation.html" class="nav-item">Implementation</a>
+        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub &nearr;</a>
+      </div>
+    </nav>
+  </div>
+  <div class="main-content">
+    <h1>L-Bracket Stress Concentration</h1>
+    <p class="section-intro">
+      An L-shaped bracket with a re-entrant corner that produces a
+      stress concentration. This case demonstrates the need for mesh
+      refinement toward high-stress regions and the behavior of
+      singular stress fields.
+    </p>
+
+    <h2>Problem Setup</h2>
+    <table>
+      <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Domain</td><td>[0, 2] x [0, 2]</td></tr>
+        <tr><td>Cutout</td><td>[1, 2] x [0, 1] (bottom-right removed)</td></tr>
+        <tr><td>Material</td><td>Steel: E=200 GPa, nu=0.3, t=0.01m</td></tr>
+        <tr><td>Top edge (y=2)</td><td>uy=0 (fixed)</td></tr>
+        <tr><td>Left edge (x=0)</td><td>ux=0 (fixed)</td></tr>
+        <tr><td>Left-bottom load</td><td>-1000N distributed on left edge below corner</td></tr>
+        <tr><td>Mesh</td><td>32x32 structured with L-bracket cutout</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Discussion</h2>
+    <p class="section-intro">
+      The re-entrant corner at (1, 1) produces a theoretical stress
+      singularity: the stress approaches infinity as the mesh is refined.
+      This means the maximum stress does NOT converge with h-refinement,
+      which is expected behavior for singular geometries. The L-bracket
+      case demonstrates why mesh convergence studies must be interpreted
+      carefully -- a diverging stress does not indicate a bug, but rather
+      a fundamental limitation of linear elasticity at sharp corners.
+    </p>
+    <p class="section-intro">
+      In practice, real brackets have fillets at re-entrant corners. The
+      stress concentration factor depends on the fillet radius. This case
+      uses a sharp corner to exercise the solver's behavior near singularities.
+    </p>
+
+    <div class="site-footer"><p>Cauchy -- 2D Finite Element Structural Solver</p></div>
+  </div>
+  <script>
+    document.getElementById('sidebarToggle').addEventListener('click', function() {
+      document.querySelector('.sidebar').classList.toggle('open');
+      document.body.classList.toggle('sidebar-open');
+    });
+  </script>
+</body>
+</html>

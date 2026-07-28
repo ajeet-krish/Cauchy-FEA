@@ -276,6 +276,103 @@ TEST(PatchTest, ConstantStressRecovery) {
 }
 
 // ==========================================================================
+// ENERGY BALANCE TESTS
+// ==========================================================================
+
+TEST(EnergyBalanceTest, CantileverEnergyBalance) {
+    int nx = 16, ny = 4;
+    double L = 1.0, H = 0.25, P = -1000.0, t = 0.01;
+    auto m = mesh::generate_structured_quad(L, H, nx, ny);
+    m.mat = Material::steel();
+    m.mat.t = t;
+    m.plane = PlaneType::STRESS;
+
+    for (int j = 0; j <= ny; ++j) {
+        int node = j * (nx + 1);
+        m.dirichlet.push_back({node, 0, 0.0});
+        m.dirichlet.push_back({node, 1, 0.0});
+    }
+    int tip_node = ny * (nx + 1) + nx;
+    m.neumann.push_back({tip_node, 1, P});
+
+    auto result = fea::solve(m, false);
+
+    double U = fea::compute_strain_energy(result.K_csr, result.displacement);
+    double W = fea::compute_work_done(result.f, result.displacement);
+    EXPECT_NEAR(U, W, 1e-6 * std::abs(W) + 1e-12);
+}
+
+// ==========================================================================
+// SOLVER COMPARISON TEST
+// ==========================================================================
+
+TEST(SolverComparisonTest, CholeskyVsCG) {
+    int nx = 8, ny = 2;
+    double L = 1.0, H = 0.25, P = -1000.0, t = 0.01;
+    auto m1 = mesh::generate_structured_quad(L, H, nx, ny);
+    m1.mat = Material::steel();
+    m1.mat.t = t;
+    m1.plane = PlaneType::STRESS;
+    for (int j = 0; j <= ny; ++j) {
+        int node = j * (nx + 1);
+        m1.dirichlet.push_back({node, 0, 0.0});
+        m1.dirichlet.push_back({node, 1, 0.0});
+    }
+    int tip_node = ny * (nx + 1) + nx;
+    m1.neumann.push_back({tip_node, 1, P});
+
+    auto m2 = m1;
+    auto chol_result = fea::solve(m1, false);
+    auto cg_result = fea::solve(m2, true);
+
+    for (size_t i = 0; i < chol_result.displacement.size(); ++i) {
+        EXPECT_NEAR(chol_result.displacement[i], cg_result.displacement[i],
+                    1e-6 * (std::abs(chol_result.displacement[i]) + 1e-12));
+    }
+}
+
+// ==========================================================================
+// CG CONVERGENCE ON FE SYSTEM
+// ==========================================================================
+
+TEST(CGTest, ConvergenceOnFEASystem) {
+    int nx = 8, ny = 2;
+    double L = 1.0, H = 0.25, P = -1000.0, t = 0.01;
+    auto m = mesh::generate_structured_quad(L, H, nx, ny);
+    m.mat = Material::steel();
+    m.mat.t = t;
+    m.plane = PlaneType::STRESS;
+    for (int j = 0; j <= ny; ++j) {
+        int node = j * (nx + 1);
+        m.dirichlet.push_back({node, 0, 0.0});
+        m.dirichlet.push_back({node, 1, 0.0});
+    }
+    int tip_node = ny * (nx + 1) + nx;
+    m.neumann.push_back({tip_node, 1, P});
+
+    auto result = fea::solve(m, true);
+
+    EXPECT_TRUE(result.cg_converged);
+    EXPECT_LT(result.cg_iterations, 1000);
+}
+
+// ==========================================================================
+// NEGATIVE JACOBIAN DETECTION
+// ==========================================================================
+
+TEST(Q4ElementTest, NegativeJacobianDetection) {
+    Material mat = Material::steel();
+    // Bowtie element (inverted -- nodes crossed)
+    std::array<Node, 4> bad_nodes = {
+        Node{0.0, 0.0}, Node{1.0, 1.0},
+        Node{1.0, 0.0}, Node{0.0, 1.0}
+    };
+
+    EXPECT_THROW(elements::Q4Element::stiffness(bad_nodes, mat, PlaneType::STRESS),
+                 std::runtime_error);
+}
+
+// ==========================================================================
 // MAIN
 // ==========================================================================
 int main(int argc, char** argv) {

@@ -18,8 +18,12 @@
 
 int main(int argc, char* argv[]) {
     int nx = 32, ny = 32;
+    bool use_cg = false;
     if (argc > 1) nx = std::atoi(argv[1]);
     ny = nx;
+    for (int i = 2; i < argc; ++i) {
+        if (std::string(argv[i]) == "--cg") use_cg = true;
+    }
 
     std::cout << "=== FEA-2D: Cook's Membrane ===" << std::endl;
     std::cout << "Mesh: " << nx << "x" << ny << std::endl;
@@ -80,31 +84,31 @@ int main(int argc, char* argv[]) {
     }
 
     // Apply distributed shear load on right edge
-    // Uniform traction: q = 1/16 N/mm, total = q * h_right * t = 3.75 N
-    double total_load = (1.0 / 16.0) * h_right * t;
-    // Each node gets load proportional to its tributary length
-    double dy = h_right / ny;  // approximate element height at right edge
+    // Standard Cook's membrane: total shear load = 1.0 N
+    // For a uniform traction, distribute total load equally to all edge nodes
+    double total_load = 1.0;
+    int num_edge_nodes = ny + 1;
     for (int j = 0; j <= ny; ++j) {
         int node = j * num_nodes_x + nx;
-        double nodal_load;
-        if (j == 0 || j == ny) {
-            nodal_load = total_load * (dy / 2.0) / h_right;
-        } else {
-            nodal_load = total_load * dy / h_right;
-        }
-        m.neumann.push_back({node, 1, nodal_load});
+        m.neumann.push_back({node, 1, total_load / num_edge_nodes});
     }
 
-    // Solve with Cholesky
-    auto result = fea::solve(m, false);
+    // Solve
+    auto result = fea::solve(m, use_cg);
 
     // Find tip displacement (midpoint of right edge)
     int mid_node = (ny / 2) * num_nodes_x + nx;
     double tip_disp = result.displacement[dof_index(mid_node, 1)];
 
     std::cout << "\nTip displacement (right edge midpoint): " << tip_disp << " mm" << std::endl;
-    std::cout << "Reference value: ~13.68 mm" << std::endl;
+    std::cout << "Reference value: ~13.68 mm (for T=1/16 N/mm per unit area)" << std::endl;
     std::cout << "Ratio to reference: " << tip_disp / 13.68 << std::endl;
+
+    // Energy balance
+    double U = fea::compute_strain_energy(result.K_csr, result.displacement);
+    double W = fea::compute_work_done(result.f, result.displacement);
+    std::cout << "Energy balance: U=" << U << ", W=" << W
+              << ", error=" << std::abs(U - W) / (std::abs(W) + 1e-30) * 100.0 << "%" << std::endl;
 
     // Write output
     std::string outdir = "output/cook_" + std::to_string(nx);

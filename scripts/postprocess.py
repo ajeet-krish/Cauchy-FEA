@@ -113,6 +113,45 @@ def plot_stress_contour(outdir, meta):
     print(f'  Saved stress_contour.png')
 
 
+def plot_convergence(outdir):
+    conv_file = os.path.join(outdir, 'convergence.json')
+    if not os.path.exists(conv_file):
+        print(f'  No convergence.json found in {outdir}')
+        return
+
+    with open(conv_file) as f:
+        data = json.load(f)
+
+    h = [s['h'] for s in data['samples']]
+    values = [s['value'] for s in data['samples']]
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.loglog(h, values, 'bo-', label='FEA', linewidth=2, markersize=8)
+
+    if data.get('analytical'):
+        ax.axhline(data['analytical'], color='r', linestyle='--',
+                   label=f'Analytical ({data["analytical"]:.4e})', linewidth=1.5)
+
+    gci = data.get('gci', {})
+    if gci.get('extrapolated_value'):
+        ax.axhline(gci['extrapolated_value'], color='green', linestyle=':',
+                   label=f'Richardson ({gci["extrapolated_value"]:.4e})', linewidth=1.5)
+
+    ax.set_xlabel('Element size h', fontsize=12)
+    ax.set_ylabel(data.get('quantity', 'Value'), fontsize=12)
+    title = f'{data["case"]} Mesh Convergence'
+    if gci.get('observed_order'):
+        title += f' (p={gci["observed_order"]:.2f})'
+    ax.set_title(title, fontsize=14)
+    ax.legend(fontsize=10)
+    ax.grid(True, which='both', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(outdir, 'convergence.png'), dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f'  Saved convergence.png')
+
+
 def print_summary(outdir):
     meta = load_meta(outdir)
     print(f'\n  Nodes: {meta["num_nodes"]}, Elements: {meta["num_elements"]}, DOFs: {meta["num_dofs"]}')
@@ -130,6 +169,7 @@ def main():
     parser.add_argument('--all', action='store_true', help='Generate all plots')
     parser.add_argument('--displacement', action='store_true', help='Displacement contour only')
     parser.add_argument('--stress', action='store_true', help='Stress contour only')
+    parser.add_argument('--convergence', action='store_true', help='Convergence plot')
     args = parser.parse_args()
 
     if not os.path.exists(os.path.join(args.outdir, 'meta.json')):
@@ -138,13 +178,15 @@ def main():
 
     print_summary(args.outdir)
 
+    if args.all or args.convergence:
+        plot_convergence(args.outdir)
     if args.all or args.displacement:
         plot_displacement_contour(args.outdir, load_meta(args.outdir))
     if args.all or args.stress:
         plot_stress_contour(args.outdir, load_meta(args.outdir))
 
-    if not (args.all or args.displacement or args.stress):
-        print('\n  Use --all, --displacement, or --stress to generate plots')
+    if not (args.all or args.displacement or args.stress or args.convergence):
+        print('\n  Use --all, --displacement, --stress, or --convergence to generate plots')
 
 
 if __name__ == '__main__':

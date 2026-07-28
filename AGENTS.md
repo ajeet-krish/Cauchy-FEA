@@ -1,4 +1,4 @@
-# Project Context, FEA-2D: 2D Finite Element Structural Solver
+# Project Context, Cauchy: 2D Finite Element Structural Solver
 
 ## Style Rules
 - **No em dashes** in any file. Use two regular hyphens (--) instead of ---, &mdash;, &ndash;, or literal Unicode em dash.
@@ -19,10 +19,10 @@ Mechanical/aerospace hiring managers at SpaceX, Lockheed Martin, Northrop Grumma
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 1 | Project setup (CMake, types, sparse matrix), bar element | In progress |
-| 2 | Q4 element, assembly, Cholesky solver | Pending |
-| 3 | CG solver, BC enforcement, all 6 validation cases | Pending |
-| 4 | Python postprocessor, JSON output, mesh convergence | Pending |
+| 1 | Project setup (CMake, types, sparse matrix), bar element | Complete |
+| 2 | Q4 element, assembly, Cholesky solver | Complete |
+| 3 | CG solver, BC enforcement, all 6 validation cases | Complete |
+| 4 | Python postprocessor, JSON output, mesh convergence | In progress |
 | 5 | Portfolio site (6 case pages + theory + implementation) | Pending |
 
 ## Architecture Decisions
@@ -43,7 +43,7 @@ Mechanical/aerospace hiring managers at SpaceX, Lockheed Martin, Northrop Grumma
 
 Before declaring the solver "done," each must pass:
 - [ ] Patch test: constant stress exactly recovered for any mesh
-- [ ] Cantilever tip deflection matches PL^3/(3EI) within 1% (32x32 mesh)
+- [ ] Cantilever tip deflection matches PL^3/(3EI) within 1% (32x8 mesh)
 - [ ] Cantilever max stress matches My/I within 5%
 - [ ] Cook's membrane tip displacement matches ~13.68 mm (plane stress)
 - [ ] Plate with hole max stress matches 3*sigma_inf at hole edge (within 10%)

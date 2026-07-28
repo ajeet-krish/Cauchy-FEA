@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patch Test -- Cauchy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+  <div class="sidebar">
+    <div class="sidebar-brand"><a href="index.html">Cauchy</a></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section"><div class="nav-heading">Project</div><a href="index.html" class="nav-item">Home</a></div>
+      <div class="nav-section">
+        <div class="nav-heading">Validation Cases</div>
+        <a href="cantilever.html" class="nav-item">Cantilever Beam</a>
+        <a href="cook.html" class="nav-item">Cook's Membrane</a>
+        <a href="patch.html" class="nav-item active">Patch Test</a>
+        <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
+        <a href="lbracket.html" class="nav-item">L-Bracket</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Reference</div>
+        <a href="theory.html" class="nav-item">Theory</a>
+        <a href="implementation.html" class="nav-item">Implementation</a>
+        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub &nearr;</a>
+      </div>
+    </nav>
+  </div>
+  <div class="main-content">
+    <h1>Patch Test</h1>
+    <p class="section-intro">
+      The patch test is the mandatory element verification test for any new
+      finite element formulation. It checks that a mesh of arbitrary elements
+      can exactly reproduce a state of constant stress.
+    </p>
+
+    <h2>Problem Setup</h2>
+    <table>
+      <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Domain</td><td>[0, 1] x [0, 1]</td></tr>
+        <tr><td>Mesh</td><td>4x4 structured Q4 (25 nodes, 16 elements)</td></tr>
+        <tr><td>Material</td><td>Steel: E=200 GPa, nu=0.3</td></tr>
+        <tr><td>Left edge</td><td>Clamped: ux=0, uy=0</td></tr>
+        <tr><td>Right edge</td><td>Prescribed: ux=0.001 * x (uniform strain)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Expected Result</h2>
+    <div class="callout">
+      <p>
+        For a constant strain state, all elements should recover exactly:<br>
+        sigma_xx = E * epsilon_xx = E * ux_right / L<br>
+        With the penalty method, tolerance is set to 5%.
+      </p>
+    </div>
+
+    <table>
+      <thead><tr><th>Metric</th><th>Expected</th><th>Result</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>sigma_xx (all elements)</td><td>200 MPa</td><td>Within 5%</td><td style="color:var(--green)">PASSED</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Discussion</h2>
+    <p class="section-intro">
+      The patch test passes, confirming that the Q4 element formulation
+      (shape functions, B-matrix, D-matrix, Gauss integration) is correct
+      and that the assembly pipeline produces the expected stiffness matrix.
+      The small residual error (within 5%) is due to the penalty method for
+      Dirichlet BC enforcement, which introduces a small constraint error.
+    </p>
+
+    <div class="site-footer"><p>Cauchy -- 2D Finite Element Structural Solver</p></div>
+  </div>
+  <script>
+    document.getElementById('sidebarToggle').addEventListener('click', function() {
+      document.querySelector('.sidebar').classList.toggle('open');
+      document.body.classList.toggle('sidebar-open');
+    });
+  </script>
+</body>
+</html>

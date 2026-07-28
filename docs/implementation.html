@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Implementation -- Cauchy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+  <div class="sidebar">
+    <div class="sidebar-brand"><a href="index.html">Cauchy</a></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section"><div class="nav-heading">Project</div><a href="index.html" class="nav-item">Home</a></div>
+      <div class="nav-section">
+        <div class="nav-heading">Validation Cases</div>
+        <a href="cantilever.html" class="nav-item">Cantilever</a>
+        <a href="cook.html" class="nav-item">Cook's Membrane</a>
+        <a href="patch.html" class="nav-item">Patch Test</a>
+        <a href="plate_hole.html" class="nav-item">Plate + Hole</a>
+        <a href="lbracket.html" class="nav-item">L-Bracket</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Reference</div>
+        <a href="theory.html" class="nav-item">Theory</a>
+        <a href="implementation.html" class="nav-item active">Implementation</a>
+        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub &nearr;</a>
+      </div>
+    </nav>
+  </div>
+  <div class="main-content">
+    <h1>Implementation</h1>
+    <p class="section-intro">
+      Cauchy is a header-only C++20 codebase with 7 core headers,
+      6 validation entry points, and 19 Google Test cases. The architecture
+      mirrors the LBM-2D solver for consistency across the portfolio.
+    </p>
+
+    <h2>Module Reference</h2>
+    <table class="module-table">
+      <thead>
+        <tr><th>File</th><th>Lines</th><th>Purpose</th><th>Key Types</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>fea_types.hpp</code></td><td>216</td><td>Core types, enums, globals, JSON parser</td><td>Material, Node, Mesh, CaseType, PlaneType</td></tr>
+        <tr><td><code>elements.hpp</code></td><td>203</td><td>Element stiffness matrices</td><td>BarElement (4x4), Q4Element (8x8)</td></tr>
+        <tr><td><code>sparse.hpp</code></td><td>170</td><td>Sparse matrix formats</td><td>COOMatrix, CSRMatrix, DenseMatrix</td></tr>
+        <tr><td><code>solver.hpp</code></td><td>173</td><td>Linear solvers</td><td>CholeskySolver, CGSolver</td></tr>
+        <tr><td><code>mesh.hpp</code></td><td>268</td><td>Mesh generation</td><td>generate_structured_quad, generate_lbracket, load_json</td></tr>
+        <tr><td><code>postprocess.hpp</code></td><td>288</td><td>Stress recovery, JSON output</td><td>ElementStress, compute_all_stresses</td></tr>
+        <tr><td><code>convergence.hpp</code></td><td>140</td><td>GCI computation, h-refinement wrapper</td><td>GCIResult, ConvergenceSample, run_study</td></tr>
+        <tr><td><code>fea.hpp</code></td><td>240</td><td>Assembly + solve pipeline</td><td>assemble, solve, compute_strain_energy</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Include Hierarchy</h2>
+    <pre><code>fea.hpp
+  fea_types.hpp    (types, enums, globals)
+  elements.hpp     (bar + Q4 stiffness matrices)
+  sparse.hpp       (COO/CSR sparse matrix)
+  solver.hpp       (Cholesky + CG)
+  mesh.hpp         (structured quad mesher + JSON input)
+  postprocess.hpp  (stress recovery, Von Mises)
+  convergence.hpp  (GCI, h-refinement)</code></pre>
+
+    <h2>Entry Point Pattern</h2>
+    <p class="section-intro">
+      Each <code>main_*.cpp</code> follows a consistent 7-step pipeline:
+    </p>
+    <ol>
+      <li>Set globals (<code>g_nx</code>, <code>g_ny</code>, <code>g_case</code>)</li>
+      <li>Generate or load mesh</li>
+      <li>Assemble global stiffness matrix (COO, OpenMP parallel)</li>
+      <li>Apply boundary conditions (penalty method)</li>
+      <li>Solve (Cholesky or Conjugate Gradient)</li>
+      <li>Post-process (stress recovery, energy balance)</li>
+      <li>Write JSON output, report statistics</li>
+    </ol>
+
+    <h2>Build Instructions</h2>
+    <div class="callout">
+      <p>
+        <code>cmake -B build</code><br>
+        <code>cmake --build build -j$(sysctl -n hw.ncpu)</code><br><br>
+        Requirements: C++20 compiler, CMake 3.15+, OpenMP (optional), Google Test (auto-fetched)
+      </p>
+    </div>
+
+    <h2>Testing</h2>
+    <p class="section-intro">
+      19 Google Test cases across 9 test suites:
+    </p>
+    <table>
+      <thead><tr><th>Suite</th><th>Tests</th><th>What It Validates</th></tr></thead>
+      <tbody>
+        <tr><td>BarElementTest</td><td>2</td><td>Stiffness matrix correctness, symmetry</td></tr>
+        <tr><td>Q4ElementTest</td><td>4</td><td>Shape functions, Jacobian, stiffness symmetry, negative Jacobian detection</td></tr>
+        <tr><td>SparseMatrixTest</td><td>3</td><td>COO-to-CSR conversion, SpMV, duplicate merging</td></tr>
+        <tr><td>CholeskyTest</td><td>2</td><td>Identity and diagonal system solves</td></tr>
+        <tr><td>CGTest</td><td>2</td><td>Diagonal system convergence, real FE system convergence</td></tr>
+        <tr><td>MeshTest</td><td>3</td><td>Node counts, coordinates, element connectivity</td></tr>
+        <tr><td>PatchTest</td><td>1</td><td>Constant stress recovery (element verification)</td></tr>
+        <tr><td>EnergyBalanceTest</td><td>1</td><td>Strain energy == work done (U == W)</td></tr>
+        <tr><td>SolverComparisonTest</td><td>1</td><td>Cholesky and CG produce identical results</td></tr>
+      </tbody>
+    </table>
+
+    <h2>CI Pipeline</h2>
+    <p class="section-intro">
+      GitHub Actions runs on every push: builds on Ubuntu and macOS,
+      runs the full Google Test suite. Matrix configuration ensures
+      cross-platform compatibility.
+    </p>
+
+    <div class="site-footer"><p>Cauchy -- 2D Finite Element Structural Solver</p></div>
+  </div>
+  <script>
+    document.getElementById('sidebarToggle').addEventListener('click', function() {
+      document.querySelector('.sidebar').classList.toggle('open');
+      document.body.classList.toggle('sidebar-open');
+    });
+  </script>
+</body>
+</html>

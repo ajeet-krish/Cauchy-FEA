@@ -8,9 +8,13 @@
 // ==========================================================================
 
 int main(int argc, char* argv[]) {
-    int nx = 64, ny = 64;
+    int nx = 32, ny = 32;
+    bool use_cg = false;
     if (argc > 1) nx = std::atoi(argv[1]);
     ny = nx;
+    for (int i = 2; i < argc; ++i) {
+        if (std::string(argv[i]) == "--cg") use_cg = true;
+    }
 
     std::cout << "=== FEA-2D: L-Bracket ===" << std::endl;
     std::cout << "Mesh: " << nx << "x" << ny << std::endl;
@@ -44,14 +48,20 @@ int main(int argc, char* argv[]) {
 
     // Apply downward load at bottom of vertical leg
     double P = -1000.0;
+    int load_nodes = 0;
     for (int i = 0; i < m.num_nodes(); ++i) {
         if (std::abs(m.nodes[i].x) < tol && m.nodes[i].y < cy) {
-            m.neumann.push_back({i, 1, P / (m.num_nodes() / 4.0)});
+            load_nodes++;
+        }
+    }
+    for (int i = 0; i < m.num_nodes(); ++i) {
+        if (std::abs(m.nodes[i].x) < tol && m.nodes[i].y < cy) {
+            m.neumann.push_back({i, 1, P / load_nodes});
         }
     }
 
     // Solve
-    auto result = fea::solve(m, false);
+    auto result = fea::solve(m, use_cg);
 
     std::filesystem::create_directories("output/lbracket");
     postprocess::write_meta_json("output/lbracket/meta.json", m, result.displacement, result.stresses,

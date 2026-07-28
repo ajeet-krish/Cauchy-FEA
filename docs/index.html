@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Cauchy: 2D Finite Element Structural Solver in C++20">
+  <title>Cauchy: 2D Finite Element Structural Solver</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+
+  <div class="sidebar">
+    <div class="sidebar-brand"><a href="index.html">Cauchy</a></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-heading">Project</div>
+        <a href="index.html" class="nav-item active">Home</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Validation Cases</div>
+        <a href="cantilever.html" class="nav-item">Cantilever Beam</a>
+        <a href="cook.html" class="nav-item">Cook's Membrane</a>
+        <a href="patch.html" class="nav-item">Patch Test</a>
+        <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
+        <a href="lbracket.html" class="nav-item">L-Bracket</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Reference</div>
+        <a href="theory.html" class="nav-item">Theory &amp; Formulation</a>
+        <a href="implementation.html" class="nav-item">Implementation</a>
+        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub Repository &nearr;</a>
+      </div>
+    </nav>
+  </div>
+
+  <div class="main-content">
+
+    <section class="hero" id="overview">
+      <h1>Cauchy: <span class="accent-orange">2D Finite Element</span> Structural Solver</h1>
+      <p class="subtitle">
+        A header-only C++20 solver implementing bar and bilinear quad (Q4) elements
+        with COO/CSR sparse assembly, Cholesky and Conjugate Gradient solvers,
+        and Von Mises stress recovery. Built as a portfolio centrepiece for
+        mechanical and aerospace engineering roles.
+      </p>
+      <div class="status-badge">
+        <span class="dot"></span>
+        Validated on 6 benchmark cases
+      </div>
+    </section>
+
+    <h2>What Is Cauchy?</h2>
+
+    <p class="section-intro">
+      Cauchy is a from-scratch 2D finite element solver. It solves static
+      structural problems -- beams, plates, trusses, stress concentrations --
+      using first-principles element formulation, sparse linear algebra, and
+      direct/iterative solvers. Every line of code is written to be read
+      and understood.
+    </p>
+
+    <p class="section-intro">
+      The solver handles plane stress and plane strain, supports both bar (truss)
+      and Q4 (bilinear quad) elements, and recovers element-centered stress fields
+      with Von Mises and principal stress computation. It is validated against
+      closed-form analytical solutions and published benchmark data.
+    </p>
+
+    <h2>Validation Cases</h2>
+
+    <div class="case-grid">
+
+      <a href="cantilever.html" class="case-card">
+        <div class="case-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:0.8em;">Cantilever</div>
+        <div class="case-info">
+          <h3>Cantilever Beam</h3>
+          <p>Clamped beam with tip load. Validates element formulation against PL^3/(3EI).</p>
+          <span class="case-link">View case &rarr;</span>
+        </div>
+      </a>
+
+      <a href="cook.html" class="case-card">
+        <div class="case-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:0.8em;">Cook's Membrane</div>
+        <div class="case-info">
+          <h3>Cook's Membrane</h3>
+          <p>Trapezoidal panel under distributed shear. Tests Q4 bending and shear locking.</p>
+          <span class="case-link">View case &rarr;</span>
+        </div>
+      </a>
+
+      <a href="patch.html" class="case-card">
+        <div class="case-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:0.8em;">Patch Test</div>
+        <div class="case-info">
+          <h3>Patch Test</h3>
+          <p>Constant stress recovery. Mandatory element verification for any new formulation.</p>
+          <span class="case-link">View case &rarr;</span>
+        </div>
+      </a>
+
+      <a href="plate_hole.html" class="case-card">
+        <div class="case-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:0.8em;">Plate + Hole</div>
+        <div class="case-info">
+          <h3>Plate with Hole</h3>
+          <p>Kirsch solution: stress concentration factor of 3 at a circular hole edge.</p>
+          <span class="case-link">View case &rarr;</span>
+        </div>
+      </a>
+
+      <a href="lbracket.html" class="case-card">
+        <div class="case-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:0.8em;">L-Bracket</div>
+        <div class="case-info">
+          <h3>L-Bracket</h3>
+          <p>Re-entrant corner stress concentration. Demonstrates mesh refinement needs.</p>
+          <span class="case-link">View case &rarr;</span>
+        </div>
+      </a>
+
+    </div>
+
+    <h2>Key Features</h2>
+
+    <div class="feature-grid">
+
+      <div class="feature-item">
+        <h4>Bar + Q4 Elements</h4>
+        <p>Two-node truss elements and 4-node bilinear quads with full 2x2 Gauss integration.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Dual Solvers</h4>
+        <p>Cholesky direct solver for small/medium systems. Conjugate Gradient with Jacobi preconditioner for large sparse systems.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Sparse Assembly</h4>
+        <p>COO format for natural element assembly, converted to CSR for fast matrix-vector products.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Stress Recovery</h4>
+        <p>Element-centered stress, node-averaged smoothing, Von Mises and principal stresses.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Mesh Convergence</h4>
+        <p>h-refinement studies with GCI (Grid Convergence Index) per ASME V&amp;V 20-2009.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>OpenMP Parallel</h4>
+        <p>Element assembly and stress recovery loops parallelized with OpenMP.</p>
+      </div>
+
+    </div>
+
+    <h2>Architecture</h2>
+
+    <table class="module-table">
+      <thead>
+        <tr><th>Module</th><th>Purpose</th><th>Key Types</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>fea_types.hpp</code></td><td>Core types, enums, globals</td><td>Material, Node, Mesh, CaseType</td></tr>
+        <tr><td><code>elements.hpp</code></td><td>Element stiffness matrices</td><td>BarElement, Q4Element</td></tr>
+        <tr><td><code>sparse.hpp</code></td><td>Sparse matrix formats</td><td>COOMatrix, CSRMatrix, DenseMatrix</td></tr>
+        <tr><td><code>solver.hpp</code></td><td>Linear solvers</td><td>CholeskySolver, CGSolver</td></tr>
+        <tr><td><code>mesh.hpp</code></td><td>Mesh generation</td><td>generate_structured_quad, generate_lbracket</td></tr>
+        <tr><td><code>postprocess.hpp</code></td><td>Stress recovery, JSON output</td><td>ElementStress, write_meta_json</td></tr>
+        <tr><td><code>convergence.hpp</code></td><td>GCI computation, h-refinement</td><td>GCIResult, run_study</td></tr>
+        <tr><td><code>fea.hpp</code></td><td>Assembly + solve pipeline</td><td>assemble, solve, compute_strain_energy</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Quick Start</h2>
+
+    <div class="callout">
+      <p>
+        <code>cmake -B build && cmake --build build -j$(sysctl -n hw.ncpu)</code><br>
+        <code>./build/FEA_Cantilever 32</code> &mdash; cantilever beam (32x8 mesh)<br>
+        <code>./build/FEA_Cook 32</code> &mdash; Cook's membrane (32x32 mesh)<br>
+        <code>./build/FEA_Tests</code> &mdash; run 19 Google Test cases
+      </p>
+    </div>
+
+    <div class="site-footer">
+      <p>Cauchy &mdash; 2D Finite Element Structural Solver &mdash; Portfolio Project</p>
+    </div>
+
+  </div>
+
+  <script>
+    document.getElementById('sidebarToggle').addEventListener('click', function() {
+      document.querySelector('.sidebar').classList.toggle('open');
+      document.body.classList.toggle('sidebar-open');
+    });
+  </script>
+
+</body>
+
+</html>
