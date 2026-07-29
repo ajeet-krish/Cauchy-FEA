@@ -1,5 +1,6 @@
 build/
 output/
+docs/output/
 docs/assets/videos/*.mp4
 **/.DS_Store
 
