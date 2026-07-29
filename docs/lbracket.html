@@ -186,6 +186,7 @@
       const colorbarContainer = document.getElementById('fea-colorbar-container');
       const colorbar = new FEAColorbar(colorbarContainer);
       colorbar.create();
+      viewer.setColorbar(colorbar);
       
       viewer.loadData('assets/data/lbracket.json');
     });

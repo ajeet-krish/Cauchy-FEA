@@ -591,8 +591,8 @@ tr:hover td { background: rgba(255, 179, 71, 0.03); }
 
 /* --- Static Plots Section --- */
 .static-plots {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 1.5rem;
   margin: 1.5rem 0;
 }

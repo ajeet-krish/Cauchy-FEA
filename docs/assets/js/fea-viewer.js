@@ -53,6 +53,9 @@ class FEAViewer {
     // Bounds
     this.bounds = { xmin: 0, xmax: 1, ymin: 0, ymax: 1 };
     
+    // Colorbar reference
+    this.colorbar = null;
+    
     // Options
     this.padding = options.padding || 50;
     
@@ -158,6 +161,12 @@ class FEAViewer {
     this._parseData();
     this._fitView();
     this._buildMesh();
+    
+    // Hide static fallback image once WebGL loads successfully
+    const fallback = this.container.parentElement.querySelector('.static-fallback');
+    if (fallback) {
+      fallback.style.display = 'none';
+    }
   }
   
   setData(data) {
@@ -444,21 +453,24 @@ class FEAViewer {
     
     // Update colorbar
     this._updateColorbar(min, max);
+    
+    // Update colorbar gradient
+    if (this.colorbar) {
+      this.colorbar.updateGradient(colormap);
+    }
   }
   
   _getScalarField() {
     if (!this.data) return null;
     
-    const stress = this.data.stress;
+    const nodalStress = this.data.nodalStress;
     const disp = this.data.displacement;
     const type = this.contourType;
     
-    if (type === 'von_mises' && stress) return stress.von_mises;
-    if (type === 'sigma_xx' && stress) return stress.sigma_xx;
-    if (type === 'sigma_yy' && stress) return stress.sigma_yy;
-    if (type === 'sigma_xy' && stress) return stress.sigma_xy;
-    if (type === 'sigma_1' && stress) return stress.sigma_1;
-    if (type === 'sigma_2' && stress) return stress.sigma_2;
+    // Use nodalStress for smooth nodal coloring (matches node count)
+    if (type === 'von_mises' && nodalStress) return nodalStress.von_mises;
+    if (type === 'sigma_1' && nodalStress) return nodalStress.sigma_1;
+    if (type === 'sigma_2' && nodalStress) return nodalStress.sigma_2;
     if (type === 'displacement' && disp) {
       return disp.map(d => Math.sqrt(d.ux * d.ux + d.uy * d.uy));
     }
@@ -477,8 +489,7 @@ class FEAViewer {
   }
   
   _getColormap() {
-    const signed = ['sigma_xx', 'sigma_yy', 'sigma_xy'];
-    return signed.includes(this.contourType) ? Colormaps.RdBu_r : Colormaps.turbo;
+    return Colormaps.hot;
   }
   
   _getUnits() {
@@ -525,6 +536,11 @@ class FEAViewer {
   setContourType(type) {
     this.contourType = type;
     this._applyContour();
+    
+    // Update colorbar gradient
+    if (this.colorbar) {
+      this.colorbar.updateGradient(this._getColormap());
+    }
   }
   
   toggleUndeformed() {
@@ -550,6 +566,10 @@ class FEAViewer {
   toggleBoundary() {
     this.showBoundary = !this.showBoundary;
     this.boundaryGroup.visible = this.showBoundary;
+  }
+  
+  setColorbar(colorbar) {
+    this.colorbar = colorbar;
   }
   
   playAnimation() {
