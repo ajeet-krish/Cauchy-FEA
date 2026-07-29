@@ -183,10 +183,11 @@ def plot_deformed_mesh(outdir, meta, scale=None):
     y_orig = np.array([n['y'] for n in nodes_orig])
     ux = np.array([n['ux'] for n in nodes_disp])
     uy = np.array([n['uy'] for n in nodes_disp])
+    disp_mag = np.sqrt(ux**2 + uy**2)
 
     # Auto-scale deformation for visualization
     if scale is None:
-        max_disp = np.max(np.sqrt(ux**2 + uy**2))
+        max_disp = np.max(disp_mag)
         if max_disp > 0:
             x_range = np.max(x_orig) - np.min(x_orig)
             y_range = np.max(y_orig) - np.min(y_orig)
@@ -195,55 +196,75 @@ def plot_deformed_mesh(outdir, meta, scale=None):
     x_def = x_orig + ux * scale
     y_def = y_orig + uy * scale
 
+    # Setup colormap for mesh edges
+    vmin = 0
+    vmax = np.max(disp_mag)
+    cmap = plt.cm.hot
+    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Draw undeformed mesh (gray dashed)
+    # Draw undeformed mesh (light gray dashed)
     for elem in elements:
         n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
         xs = list(x_orig[n]) + [x_orig[n[0]]]
         ys = list(y_orig[n]) + [y_orig[n[0]]]
-        ax.plot(xs, ys, color='#aaaaaa', linestyle='--', linewidth=0.5, alpha=0.6)
+        ax.plot(xs, ys, color='#cccccc', linestyle='--', linewidth=0.4, alpha=0.5, zorder=1)
 
-    # Draw deformed mesh (bold cyan)
+    # Draw deformed mesh with colormap edges (each edge colored by average node displacement)
     for elem in elements:
         n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
-        xs = list(x_def[n]) + [x_def[n[0]]]
-        ys = list(y_def[n]) + [y_def[n[0]]]
-        ax.plot(xs, ys, color='#00d4ff', linewidth=0.8)
+        # Close the quad
+        n_closed = n + [n[0]]
+        for i in range(4):
+            i0, i1 = n_closed[i], n_closed[i + 1]
+            avg_disp = (disp_mag[i0] + disp_mag[i1]) / 2.0
+            color = cmap(norm(avg_disp))
+            ax.plot([x_def[i0], x_def[i1]], [y_def[i0], y_def[i1]], 
+                    color=color, linewidth=0.9, solid_capstyle='round', zorder=2)
 
-    # Scatter colored by displacement magnitude (hot colormap)
-    disp_mag = np.sqrt(ux**2 + uy**2)
-    sc = ax.scatter(x_def, y_def, c=disp_mag, cmap='hot', s=3, zorder=5, edgecolors='none')
-    cb = plt.colorbar(sc, ax=ax, shrink=0.8, label='|u| (m)')
+    # Scatter colored by displacement magnitude for node dots
+    sc = ax.scatter(x_def, y_def, c=disp_mag, cmap='hot', s=2, zorder=5, 
+                    edgecolors='none', vmin=vmin, vmax=vmax)
+    cb = plt.colorbar(sc, ax=ax, shrink=0.8, label='|u| (m)', pad=0.02)
 
-    # Add displacement vectors at sampled nodes (10% of nodes)
+    # Add displacement vectors at sampled nodes (bold black arrows)
     num_nodes = len(x_orig)
-    step = max(1, num_nodes // 20)
+    step = max(1, num_nodes // 25)
     indices = np.arange(0, num_nodes, step)
     
-    # Scale arrows for visibility (normalize to mesh extent)
-    arrow_scale = 0.05 * max(x_range, y_range) / max_disp if max_disp > 0 else 1.0
     ax.quiver(x_orig[indices], y_orig[indices], 
               ux[indices] * scale, uy[indices] * scale,
               angles='xy', scale_units='xy', scale=1, 
-              color='#333333', alpha=0.5, width=0.003, zorder=4)
+              color='#111111', alpha=0.85, width=0.004, zorder=6)
 
-    # Add max displacement annotation
+    # Add max displacement annotation (positioned to avoid overlap with colorbar)
     max_idx = np.argmax(disp_mag)
     max_x, max_y = x_def[max_idx], y_def[max_idx]
     max_val = disp_mag[max_idx]
+    
+    # Choose annotation position based on where the max point is
+    x_mid = (np.min(x_def) + np.max(x_def)) / 2
+    if max_x > x_mid:
+        # Max is on right side, annotate to the left
+        xytext = (-80, 30)
+    else:
+        # Max is on left side, annotate to the right
+        xytext = (30, 30)
+    
     ax.annotate(f'Max |u| = {max_val:.4e} m',
-                xy=(max_x, max_y), xytext=(10, 10),
+                xy=(max_x, max_y), xytext=xytext,
                 textcoords='offset points',
-                fontsize=10, color='#333333',
-                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8, edgecolor='#cccccc'),
-                arrowprops=dict(arrowstyle='->', color='#333333'))
+                fontsize=9, color='#111111',
+                bbox=dict(boxstyle='round,pad=0.4', facecolor='white', alpha=0.9, edgecolor='#666666'),
+                arrowprops=dict(arrowstyle='->', color='#111111', lw=1.2),
+                zorder=10)
 
-    ax.set_title(f'Deformed Mesh (scale: {scale:.0f}x)', fontsize=12)
+    ax.set_title('Deformed Mesh', fontsize=12)
     ax.set_aspect('equal')
     ax.set_xlabel('x (m)')
     ax.set_ylabel('y (m)')
-    ax.grid(True, alpha=0.2)
+    ax.grid(True, alpha=0.15, linestyle='-', color='#dddddd')
 
     plt.tight_layout()
     plt.savefig(os.path.join(outdir, 'deformed_mesh.png'), dpi=150, bbox_inches='tight')
