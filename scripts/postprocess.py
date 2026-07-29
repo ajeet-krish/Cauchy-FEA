@@ -73,7 +73,7 @@ def plot_displacement_contour(outdir, meta):
 
     # Displacement magnitude
     ax = axes[0]
-    ax.tricontourf(triang, disp, levels=20, cmap='hot')
+    ax.tricontourf(triang, disp, levels=20, cmap='turbo')
     ax.set_title('|u| (m)')
     ax.set_aspect('equal')
     plt.colorbar(ax.collections[0], ax=ax, shrink=0.8)
@@ -199,7 +199,7 @@ def plot_deformed_mesh(outdir, meta, scale=None):
     # Setup colormap for mesh edges
     vmin = 0
     vmax = np.max(disp_mag)
-    cmap = plt.cm.hot
+    cmap = plt.cm.turbo
     norm = plt.Normalize(vmin=vmin, vmax=vmax)
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -224,7 +224,7 @@ def plot_deformed_mesh(outdir, meta, scale=None):
                     color=color, linewidth=0.9, solid_capstyle='round', zorder=2)
 
     # Scatter colored by displacement magnitude for node dots
-    sc = ax.scatter(x_def, y_def, c=disp_mag, cmap='hot', s=2, zorder=5, 
+    sc = ax.scatter(x_def, y_def, c=disp_mag, cmap='turbo', s=2, zorder=5, 
                     edgecolors='none', vmin=vmin, vmax=vmax)
     cb = plt.colorbar(sc, ax=ax, shrink=0.8, label='|u| (m)', pad=0.02)
 
