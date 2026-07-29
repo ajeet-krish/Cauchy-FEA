@@ -102,17 +102,25 @@
       <div class="plot-item">
         <h3>Stress Contour</h3>
         <img src="output/plate_hole/stress_contour.png" 
-             alt="Stress contour (Von Mises, sigma_xx)" 
+             alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)" 
              loading="lazy" />
-        <p>Von Mises and sigma_xx stress fields. Maximum stress occurs at the hole edge.</p>
+        <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
       </div>
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
         <img src="output/plate_hole/deformed_mesh.png" 
-             alt="Deformed mesh overlay" 
+             alt="Deformed mesh overlay with displacement vectors" 
              loading="lazy" />
-        <p>Deformed mesh overlay showing displacement amplification for visualization.</p>
+        <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors. Stress concentration visible at hole edge.</p>
+      </div>
+
+      <div class="plot-item">
+        <h3>Principal Stress Directions</h3>
+        <img src="output/plate_hole/principal_stress.png" 
+             alt="Principal stress arrow plot" 
+             loading="lazy" />
+        <p>Arrow plot showing sigma_1 (red) and sigma_2 (blue) directions. Stress concentration at hole edge clearly visible.</p>
       </div>
     </div>
 

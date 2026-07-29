@@ -98,17 +98,25 @@
       <div class="plot-item">
         <h3>Stress Contour</h3>
         <img src="output/patch/stress_contour.png" 
-             alt="Stress contour (Von Mises, sigma_xx)" 
+             alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)" 
              loading="lazy" />
-        <p>Von Mises and sigma_xx stress fields. Constant stress state indicates patch test pass.</p>
+        <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
       </div>
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
         <img src="output/patch/deformed_mesh.png" 
-             alt="Deformed mesh overlay" 
+             alt="Deformed mesh overlay with displacement vectors" 
              loading="lazy" />
-        <p>Deformed mesh overlay showing uniform stretching (constant strain).</p>
+        <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors. Constant strain indicates patch test pass.</p>
+      </div>
+
+      <div class="plot-item">
+        <h3>Principal Stress Directions</h3>
+        <img src="output/patch/principal_stress.png" 
+             alt="Principal stress arrow plot" 
+             loading="lazy" />
+        <p>Arrow plot showing sigma_1 and sigma_2 directions. Uniform orientation indicates constant stress state.</p>
       </div>
     </div>
 

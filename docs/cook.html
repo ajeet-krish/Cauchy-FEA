@@ -102,17 +102,25 @@
       <div class="plot-item">
         <h3>Stress Contour</h3>
         <img src="output/cook_32/stress_contour.png" 
-             alt="Stress contour (Von Mises, sigma_xx)" 
+             alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)" 
              loading="lazy" />
-        <p>Von Mises and sigma_xx stress fields. Maximum stress occurs at the clamped corner.</p>
+        <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
       </div>
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
         <img src="output/cook_32/deformed_mesh.png" 
-             alt="Deformed mesh overlay" 
+             alt="Deformed mesh overlay with displacement vectors" 
              loading="lazy" />
-        <p>Deformed mesh overlay showing displacement amplification for visualization.</p>
+        <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors and max displacement annotation.</p>
+      </div>
+
+      <div class="plot-item">
+        <h3>Principal Stress Directions</h3>
+        <img src="output/cook_32/principal_stress.png" 
+             alt="Principal stress arrow plot" 
+             loading="lazy" />
+        <p>Arrow plot showing sigma_1 (red=tension, blue=compression) and sigma_2 directions at element centroids.</p>
       </div>
     </div>
 
