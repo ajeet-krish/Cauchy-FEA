@@ -20,13 +20,13 @@ inline int g_ny = 20;
 constexpr int DOF_PER_NODE = 2;
 
 // Element type selection
-enum class ElementType { BAR, Q4 };
+enum class ElementType { BAR, Q4, T3 };
 
 // Analysis type
 enum class AnalysisType { STATIC, BUCKLING };
 
 // Simulation case type (drives behavior like LBM's g_case)
-enum class CaseType { CANTILEVER, MICHELL, COOK, LBRACKET, PATCH, PLATE_HOLE };
+enum class CaseType { CANTILEVER, MICHELL, COOK, LBRACKET, PATCH, PLATE_HOLE, THERMAL_CYLINDER };
 
 // Plane stress vs plane strain
 enum class PlaneType { STRESS, STRAIN };
@@ -44,15 +44,16 @@ struct Material {
     double nu;      // Poisson's ratio
     double rho;     // Density (kg/m3)
     double t;       // Thickness (m) for 2D
+    double alpha = 0.0; // Thermal expansion coefficient (1/K)
 
     // Default: structural steel
     static Material steel() {
-        return { 200.0e9, 0.3, 7800.0, 0.01 };
+        return { 200.0e9, 0.3, 7800.0, 0.01, 12.0e-6 };
     }
 
     // Aluminum
     static Material aluminum() {
-        return { 70.0e9, 0.33, 2700.0, 0.01 };
+        return { 70.0e9, 0.33, 2700.0, 0.01, 23.0e-6 };
     }
 
     // Create D matrix (constitutive law) for plane stress or strain
@@ -114,15 +115,19 @@ struct NeumannBC {
 struct Mesh {
     std::vector<Node> nodes;
     std::vector<std::array<int, 4>> quad_elements;    // Q4 connectivity (CCW)
+    std::vector<std::array<int, 3>> tri_elements;     // T3 connectivity (CCW)
     std::vector<std::array<int, 2>> bar_elements;     // Bar connectivity
     std::vector<double> bar_areas;                     // Cross-sectional area per bar
     std::vector<DirichletBC> dirichlet;
     std::vector<NeumannBC> neumann;
+    std::vector<double> temperature;                  // Nodal temperatures (K or C)
+    double T_ref = 0.0;                                // Reference temperature
     Material mat;
     PlaneType plane = PlaneType::STRESS;
 
     int num_nodes() const { return static_cast<int>(nodes.size()); }
     int num_quads() const { return static_cast<int>(quad_elements.size()); }
+    int num_tris() const { return static_cast<int>(tri_elements.size()); }
     int num_bars() const { return static_cast<int>(bar_elements.size()); }
     int num_dofs() const { return num_nodes() * DOF_PER_NODE; }
 };

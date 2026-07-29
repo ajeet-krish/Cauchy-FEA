@@ -54,16 +54,45 @@
     <h2>Problem Setup</h2>
 
     <table>
-      <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>Value</th>
+        </tr>
+      </thead>
       <tbody>
-        <tr><td>Length (L)</td><td>1.0 m</td></tr>
-        <tr><td>Height (H)</td><td>0.25 m</td></tr>
-        <tr><td>Thickness (t)</td><td>0.01 m</td></tr>
-        <tr><td>Young's modulus (E)</td><td>200 GPa (steel)</td></tr>
-        <tr><td>Poisson's ratio (&nu;)</td><td>0.3</td></tr>
-        <tr><td>Tip load (P)</td><td>-1000 N (downward)</td></tr>
-        <tr><td>Mesh</td><td>32 x 8 Q4 elements</td></tr>
-        <tr><td>Solver</td><td>Cholesky (594 DOFs)</td></tr>
+        <tr>
+          <td>Length (L)</td>
+          <td>1.0 m</td>
+        </tr>
+        <tr>
+          <td>Height (H)</td>
+          <td>0.25 m</td>
+        </tr>
+        <tr>
+          <td>Thickness (t)</td>
+          <td>0.01 m</td>
+        </tr>
+        <tr>
+          <td>Young's modulus (E)</td>
+          <td>200 GPa (steel)</td>
+        </tr>
+        <tr>
+          <td>Poisson's ratio (&nu;)</td>
+          <td>0.3</td>
+        </tr>
+        <tr>
+          <td>Tip load (P)</td>
+          <td>-1000 N (downward)</td>
+        </tr>
+        <tr>
+          <td>Mesh</td>
+          <td>32 x 8 Q4 elements</td>
+        </tr>
+        <tr>
+          <td>Solver</td>
+          <td>Cholesky (594 DOFs)</td>
+        </tr>
       </tbody>
     </table>
 
@@ -84,43 +113,38 @@
 
     <h2>Results</h2>
 
-    <img src="output/cantilever_32/stress_contour.png" 
-         alt="Cantilever stress contour" 
-         class="case-hero-img"
-         loading="lazy" />
-
-    <h2>Visualizations</h2>
-
     <div class="static-plots">
       <div class="plot-item">
+        <h3>Mesh Quality</h3>
+        <img src="output/cantilever_32/mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
+        <p>Mesh geometry and element quality statistics.</p>
+      </div>
+
+      <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="output/cantilever_32/displacement_contour.png" 
-             alt="Displacement contour (|u|, ux, uy)" 
-             loading="lazy" />
+        <img src="output/cantilever_32/displacement_contour.png" alt="Displacement contour (|u|, ux, uy)"
+          loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
       </div>
 
       <div class="plot-item">
         <h3>Stress Contour</h3>
-        <img src="output/cantilever_32/stress_contour.png" 
-             alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)" 
-             loading="lazy" />
+        <img src="output/cantilever_32/stress_contour.png" alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)"
+          loading="lazy" />
         <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
       </div>
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="output/cantilever_32/deformed_mesh.png" 
-             alt="Deformed mesh overlay with displacement vectors" 
-             loading="lazy" />
-        <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors and max displacement annotation.</p>
+        <img src="output/cantilever_32/deformed_mesh.png" alt="Deformed mesh overlay with displacement vectors"
+          loading="lazy" />
+        <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors and max displacement
+          annotation.</p>
       </div>
 
       <div class="plot-item">
         <h3>Principal Stress Directions</h3>
-        <img src="output/cantilever_32/principal_stress.png" 
-             alt="Principal stress arrow plot" 
-             loading="lazy" />
+        <img src="output/cantilever_32/principal_stress.png" alt="Principal stress arrow plot" loading="lazy" />
         <p>Arrow plot showing sigma_1 (red=tension, blue=compression) and sigma_2 directions at element centroids.</p>
       </div>
     </div>
@@ -135,11 +159,31 @@
     </div>
 
     <table>
-      <thead><tr><th>Metric</th><th>FEA</th><th>Analytical</th><th>Error</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>FEA</th>
+          <th>Analytical</th>
+          <th>Error</th>
+        </tr>
+      </thead>
       <tbody>
-        <tr><td>Tip deflection</td><td>1.37e-4 m</td><td>1.28e-4 m</td><td>~5%</td></tr>
-        <tr><td>Max &sigma;<sub>xx</sub></td><td>8.55e6 Pa</td><td>9.60e6 Pa</td><td>~11%</td></tr>
-        <tr><td>Energy balance</td><td colspan="3">U == W (verified in test suite)</td></tr>
+        <tr>
+          <td>Tip deflection</td>
+          <td>1.37e-4 m</td>
+          <td>1.28e-4 m</td>
+          <td>~5%</td>
+        </tr>
+        <tr>
+          <td>Max &sigma;<sub>xx</sub></td>
+          <td>8.55e6 Pa</td>
+          <td>9.60e6 Pa</td>
+          <td>~11%</td>
+        </tr>
+        <tr>
+          <td>Energy balance</td>
+          <td colspan="3">U == W (verified in test suite)</td>
+        </tr>
       </tbody>
     </table>
 
@@ -170,16 +214,16 @@
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
   <script>
-    document.getElementById('sidebarToggle').addEventListener('click', function() {
+    document.getElementById('sidebarToggle').addEventListener('click', function () {
       document.querySelector('.sidebar').classList.toggle('open');
       document.body.classList.toggle('sidebar-open');
     });
 
-    document.addEventListener("DOMContentLoaded", function() {
+    document.addEventListener("DOMContentLoaded", function () {
       renderMathInElement(document.body, {
         delimiters: [
-          {left: "$$", right: "$$", display: true},
-          {left: "$", right: "$", display: false}
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
         ]
       });
     });

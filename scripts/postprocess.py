@@ -42,29 +42,38 @@ def load_mesh(outdir):
 def load_triangulation(outdir):
     """Load mesh and create a matplotlib Triangulation using actual element connectivity.
     
-    Splits quad elements into 2 triangles each, so contours respect the mesh topology.
-    Returns (triang, x, y) or (None, None, None) if mesh.json not found or no quads.
+    Splits quad elements into 2 triangles each, uses T3 elements directly.
+    Returns (triang, x, y) or (None, None, None) if mesh.json not found or no elements.
     """
     mesh = load_mesh(outdir)
     if not mesh:
         return None, None, None
     
     nodes = mesh['nodes']
-    elements = mesh['elements']
+    
+    # Handle new format (quad_elements + tri_elements) or legacy format (elements)
+    quad_elems = mesh.get('quad_elements', mesh.get('elements', []))
+    tri_elems = mesh.get('tri_elements', [])
     
     # Skip if no elements (e.g., bar elements only like michell)
-    if not elements:
+    if not quad_elems and not tri_elems:
         return None, None, None
     
     x = np.array([n['x'] for n in nodes])
     y = np.array([n['y'] for n in nodes])
     
-    # Split each quad into 2 triangles: (n0,n1,n2) and (n0,n2,n3)
     triangles = []
-    for elem in elements:
+    
+    # Split each quad into 2 triangles: (n0,n1,n2) and (n0,n2,n3)
+    for elem in quad_elems:
         n0, n1, n2, n3 = elem['n0'], elem['n1'], elem['n2'], elem['n3']
         triangles.append([n0, n1, n2])
         triangles.append([n0, n2, n3])
+    
+    # Add T3 elements directly
+    for elem in tri_elems:
+        n0, n1, n2 = elem['n0'], elem['n1'], elem['n2']
+        triangles.append([n0, n1, n2])
     
     triangles = np.array(triangles)
     if triangles.shape[0] == 0:
@@ -77,13 +86,26 @@ def load_triangulation(outdir):
 def nodal_average(element_values, mesh):
     """Convert element-centered values to nodal values via averaging."""
     num_nodes = mesh['num_nodes']
-    elements = mesh['elements']
+    
+    # Handle new format (quad_elements + tri_elements) or legacy format (elements)
+    quad_elems = mesh.get('quad_elements', mesh.get('elements', []))
+    tri_elems = mesh.get('tri_elements', [])
+    
     nodal_sum = np.zeros(num_nodes)
     nodal_count = np.zeros(num_nodes)
     
-    for i, elem in enumerate(elements):
+    # Average Q4 element values
+    for i, elem in enumerate(quad_elems):
         val = element_values[i]
         for node_idx in [elem['n0'], elem['n1'], elem['n2'], elem['n3']]:
+            nodal_sum[node_idx] += val
+            nodal_count[node_idx] += 1
+    
+    # Average T3 element values
+    offset = len(quad_elems)
+    for i, elem in enumerate(tri_elems):
+        val = element_values[offset + i]
+        for node_idx in [elem['n0'], elem['n1'], elem['n2']]:
             nodal_sum[node_idx] += val
             nodal_count[node_idx] += 1
     
@@ -217,7 +239,8 @@ def plot_deformed_mesh(outdir, meta, scale=None):
         return
 
     nodes_orig = mesh['nodes']
-    elements = mesh['elements']
+    quad_elems = mesh.get('quad_elements', mesh.get('elements', []))
+    tri_elems = mesh.get('tri_elements', [])
     nodes_disp = disp_data['nodes']
 
     x_orig = np.array([n['x'] for n in nodes_orig])
@@ -245,15 +268,22 @@ def plot_deformed_mesh(outdir, meta, scale=None):
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Draw undeformed mesh (light gray dashed)
-    for elem in elements:
+    # Draw undeformed mesh (light gray dashed) - Q4 elements
+    for elem in quad_elems:
         n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
         xs = list(x_orig[n]) + [x_orig[n[0]]]
         ys = list(y_orig[n]) + [y_orig[n[0]]]
         ax.plot(xs, ys, color='#cccccc', linestyle='--', linewidth=0.4, alpha=0.5, zorder=1)
 
-    # Draw deformed mesh with colormap edges (each edge colored by average node displacement)
-    for elem in elements:
+    # Draw undeformed mesh - T3 elements
+    for elem in tri_elems:
+        n = [elem['n0'], elem['n1'], elem['n2']]
+        xs = list(x_orig[n]) + [x_orig[n[0]]]
+        ys = list(y_orig[n]) + [y_orig[n[0]]]
+        ax.plot(xs, ys, color='#cccccc', linestyle='--', linewidth=0.4, alpha=0.5, zorder=1)
+
+    # Draw deformed mesh with colormap edges - Q4 elements
+    for elem in quad_elems:
         n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
         # Close the quad
         n_closed = n + [n[0]]
@@ -261,7 +291,18 @@ def plot_deformed_mesh(outdir, meta, scale=None):
             i0, i1 = n_closed[i], n_closed[i + 1]
             avg_disp = (disp_mag[i0] + disp_mag[i1]) / 2.0
             color = cmap(norm(avg_disp))
-            ax.plot([x_def[i0], x_def[i1]], [y_def[i0], y_def[i1]], 
+            ax.plot([x_def[i0], x_def[i1]], [y_def[i0], y_def[i1]],
+                    color=color, linewidth=0.9, solid_capstyle='round', zorder=2)
+
+    # Draw deformed mesh with colormap edges - T3 elements
+    for elem in tri_elems:
+        n = [elem['n0'], elem['n1'], elem['n2']]
+        n_closed = n + [n[0]]
+        for i in range(3):
+            i0, i1 = n_closed[i], n_closed[i + 1]
+            avg_disp = (disp_mag[i0] + disp_mag[i1]) / 2.0
+            color = cmap(norm(avg_disp))
+            ax.plot([x_def[i0], x_def[i1]], [y_def[i0], y_def[i1]],
                     color=color, linewidth=0.9, solid_capstyle='round', zorder=2)
 
     # Scatter colored by displacement magnitude for node dots
@@ -346,7 +387,9 @@ def plot_principal_stress_arrows(outdir, meta):
 
     # Compute element centroids
     nodes = mesh['nodes']
-    quads = mesh['elements']
+    # Handle new format (quad_elements + tri_elements) or legacy format (elements)
+    quads = mesh.get('quad_elements', mesh.get('elements', []))
+    tri_elems = mesh.get('tri_elements', [])
     cx = np.array([(nodes[e['n0']]['x'] + nodes[e['n1']]['x'] +
                     nodes[e['n2']]['x'] + nodes[e['n3']]['x']) / 4.0 for e in quads])
     cy = np.array([(nodes[e['n0']]['y'] + nodes[e['n1']]['y'] +
@@ -478,7 +521,9 @@ def plot_stress_contour_thumbnail(outdir, meta, figsize=(4, 3)):
 
     if mesh:
         nodes = mesh['nodes']
-        quads = mesh['elements']
+        # Handle new format (quad_elements + tri_elements) or legacy format (elements)
+        quads = mesh.get('quad_elements', mesh.get('elements', []))
+        tri_elems = mesh.get('tri_elements', [])
         cx = np.array([(nodes[e['n0']]['x'] + nodes[e['n1']]['x'] +
                         nodes[e['n2']]['x'] + nodes[e['n3']]['x']) / 4.0 for e in quads])
         cy = np.array([(nodes[e['n0']]['y'] + nodes[e['n1']]['y'] +
@@ -511,7 +556,8 @@ def plot_deformed_mesh_thumbnail(outdir, meta, figsize=(4, 3)):
         return
 
     nodes_orig = mesh['nodes']
-    elements = mesh['elements']
+    quad_elems = mesh.get('quad_elements', mesh.get('elements', []))
+    tri_elems = mesh.get('tri_elements', [])
     nodes_disp = disp_data['nodes']
 
     x_orig = np.array([n['x'] for n in nodes_orig])
@@ -538,16 +584,27 @@ def plot_deformed_mesh_thumbnail(outdir, meta, figsize=(4, 3)):
 
     fig, ax = plt.subplots(figsize=figsize)
 
-    # Draw deformed mesh with colormap edges
-    for elem in elements:
+    # Draw deformed mesh with colormap edges - Q4 elements
+    for elem in quad_elems:
         n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
         n_closed = n + [n[0]]
         for i in range(4):
             i0, i1 = n_closed[i], n_closed[i + 1]
             avg_disp = (disp_mag[i0] + disp_mag[i1]) / 2.0
             color = cmap(norm(avg_disp))
-            ax.plot([x_def[i0], x_def[i1]], [y_def[i0], y_def[i1]], 
-                    color=color, linewidth=0.8, solid_capstyle='round')
+            ax.plot([x_def[i0], x_def[i1]], [y_def[i0], y_def[i1]],
+                    color=color, linewidth=0.5, solid_capstyle='round')
+
+    # Draw deformed mesh - T3 elements
+    for elem in tri_elems:
+        n = [elem['n0'], elem['n1'], elem['n2']]
+        n_closed = n + [n[0]]
+        for i in range(3):
+            i0, i1 = n_closed[i], n_closed[i + 1]
+            avg_disp = (disp_mag[i0] + disp_mag[i1]) / 2.0
+            color = cmap(norm(avg_disp))
+            ax.plot([x_def[i0], x_def[i1]], [y_def[i0], y_def[i1]],
+                    color=color, linewidth=0.5, solid_capstyle='round')
 
     ax.set_aspect('equal')
     ax.axis('off')
@@ -558,14 +615,164 @@ def plot_deformed_mesh_thumbnail(outdir, meta, figsize=(4, 3)):
     print(f'  Saved thumbnail_deformed.png')
 
 
+def plot_mesh_quality(outdir, meta):
+    """Mesh geometry and quality statistics.
+    
+    2x2 subplot:
+    1. Mesh wireframe with element coloring by Jacobian ratio
+    2. Mesh wireframe with element coloring by aspect ratio
+    3. Histogram of quality metrics
+    4. Statistics text box (node count, element count, DOF count, min/max quality)
+    """
+    mesh = load_mesh(outdir)
+    if not mesh:
+        print(f'  No mesh.json found, skipping mesh quality')
+        return
+
+    nodes = mesh['nodes']
+    quad_elems = mesh.get('quad_elements', [])
+    tri_elems = mesh.get('tri_elements', [])
+    quality_summary = mesh.get('quality_summary', {})
+
+    if not quad_elems and not tri_elems:
+        print(f'  No elements found, skipping mesh quality')
+        return
+
+    x = np.array([n['x'] for n in nodes])
+    y = np.array([n['y'] for n in nodes])
+
+    # Extract quality metrics
+    jacobian_ratios = []
+    aspect_ratios = []
+    areas = []
+
+    for elem in quad_elems:
+        jacobian_ratios.append(elem.get('jacobian_ratio', 1.0))
+        aspect_ratios.append(elem.get('aspect_ratio', 1.0))
+        areas.append(elem.get('area', 0.0))
+
+    for elem in tri_elems:
+        jacobian_ratios.append(elem.get('jacobian_ratio', 1.0))
+        aspect_ratios.append(elem.get('aspect_ratio', 1.0))
+        areas.append(elem.get('area', 0.0))
+
+    jacobian_ratios = np.array(jacobian_ratios)
+    aspect_ratios = np.array(aspect_ratios)
+    areas = np.array(areas)
+
+    # Create figure with 2x2 subplots
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+
+    # Plot 1: Jacobian ratio
+    ax1 = axes[0, 0]
+    if len(quad_elems) > 0:
+        # Draw quad elements colored by Jacobian ratio
+        for i, elem in enumerate(quad_elems):
+            n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
+            n_closed = n + [n[0]]
+            x_poly = [x[idx] for idx in n_closed]
+            y_poly = [y[idx] for idx in n_closed]
+            color = plt.cm.RdYlGn(jacobian_ratios[i])
+            ax1.fill(x_poly, y_poly, facecolor=color, edgecolor='black', linewidth=0.3)
+    if len(tri_elems) > 0:
+        for i, elem in enumerate(tri_elems):
+            n = [elem['n0'], elem['n1'], elem['n2']]
+            n_closed = n + [n[0]]
+            x_poly = [x[idx] for idx in n_closed]
+            y_poly = [y[idx] for idx in n_closed]
+            idx = len(quad_elems) + i
+            color = plt.cm.RdYlGn(jacobian_ratios[idx])
+            ax1.fill(x_poly, y_poly, facecolor=color, edgecolor='black', linewidth=0.3)
+    ax1.set_aspect('equal')
+    ax1.set_title('Jacobian Ratio (green=good, red=bad)')
+    sm1 = plt.cm.ScalarMappable(cmap='RdYlGn', norm=plt.Normalize(vmin=0, vmax=1))
+    sm1.set_array([])
+    plt.colorbar(sm1, ax=ax1, shrink=0.8)
+
+    # Plot 2: Aspect ratio
+    ax2 = axes[0, 1]
+    if len(quad_elems) > 0:
+        for i, elem in enumerate(quad_elems):
+            n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
+            n_closed = n + [n[0]]
+            x_poly = [x[idx] for idx in n_closed]
+            y_poly = [y[idx] for idx in n_closed]
+            # Clamp aspect ratio for coloring (1-10 range)
+            ar_clamped = min(aspect_ratios[i], 10.0)
+            color = plt.cm.viridis(ar_clamped / 10.0)
+            ax2.fill(x_poly, y_poly, facecolor=color, edgecolor='black', linewidth=0.3)
+    if len(tri_elems) > 0:
+        for i, elem in enumerate(tri_elems):
+            n = [elem['n0'], elem['n1'], elem['n2']]
+            n_closed = n + [n[0]]
+            x_poly = [x[idx] for idx in n_closed]
+            y_poly = [y[idx] for idx in n_closed]
+            idx = len(quad_elems) + i
+            ar_clamped = min(aspect_ratios[idx], 10.0)
+            color = plt.cm.viridis(ar_clamped / 10.0)
+            ax2.fill(x_poly, y_poly, facecolor=color, edgecolor='black', linewidth=0.3)
+    ax2.set_aspect('equal')
+    ax2.set_title('Aspect Ratio (lower=better)')
+    sm2 = plt.cm.ScalarMappable(cmap='viridis', norm=plt.Normalize(vmin=0, vmax=10))
+    sm2.set_array([])
+    plt.colorbar(sm2, ax=ax2, shrink=0.8)
+
+    # Plot 3: Histogram of quality metrics
+    ax3 = axes[1, 0]
+    if len(jacobian_ratios) > 0:
+        ax3.hist(jacobian_ratios, bins=20, alpha=0.7, label='Jacobian Ratio', color='green')
+    if len(aspect_ratios) > 0:
+        # Plot aspect ratio on secondary x-axis
+        ax3_twin = ax3.twiny()
+        ax3_twin.hist(aspect_ratios, bins=20, alpha=0.5, label='Aspect Ratio', color='blue')
+        ax3_twin.set_xlabel('Aspect Ratio', color='blue')
+        ax3_twin.tick_params(axis='x', labelcolor='blue')
+    ax3.set_xlabel('Jacobian Ratio')
+    ax3.set_ylabel('Count')
+    ax3.set_title('Quality Distribution')
+    ax3.legend(loc='upper left')
+
+    # Plot 4: Statistics text box
+    ax4 = axes[1, 1]
+    ax4.axis('off')
+    
+    stats_text = (
+        f"Mesh Statistics\n"
+        f"{'='*30}\n"
+        f"Nodes: {len(nodes)}\n"
+        f"Elements: {len(quad_elems) + len(tri_elems)}\n"
+        f"  Q4: {len(quad_elems)}\n"
+        f"  T3: {len(tri_elems)}\n"
+        f"DOFs: {len(nodes) * 2}\n"
+        f"\n"
+        f"Quality Summary\n"
+        f"{'='*30}\n"
+        f"Min Jacobian Ratio: {quality_summary.get('min_jacobian_ratio', 'N/A'):.4f}\n"
+        f"Max Aspect Ratio: {quality_summary.get('max_aspect_ratio', 'N/A'):.2f}\n"
+        f"Max Skewness: {quality_summary.get('max_skewness', 'N/A'):.4f}\n"
+        f"\n"
+        f"Total Area: {np.sum(areas):.6f} m^2\n"
+    )
+    ax4.text(0.1, 0.9, stats_text, transform=ax4.transAxes, fontsize=11,
+             verticalalignment='top', fontfamily='monospace',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    plt.suptitle('Mesh Quality Analysis', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    plt.savefig(os.path.join(outdir, 'mesh_quality.png'), dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f'  Saved mesh_quality.png')
+
+
 def plot_all_cases(outdir_base):
-    """Generate PNGs for all 6 cases."""
-    cases = ['cantilever_32', 'cook_32', 'lbracket', 'michell', 'patch', 'plate_hole']
+    """Generate PNGs for all cases."""
+    cases = ['cantilever_32', 'cook_32', 'lbracket', 'michell', 'patch', 'plate_hole', 'thermal_cylinder']
     for case in cases:
         outdir = os.path.join(outdir_base, case)
         if os.path.exists(outdir) and os.path.exists(os.path.join(outdir, 'meta.json')):
             print(f'\nProcessing {case}:')
             meta = load_meta(outdir)
+            plot_mesh_quality(outdir, meta)
             plot_displacement_contour(outdir, meta)
             plot_stress_contour(outdir, meta)
             plot_deformed_mesh(outdir, meta)
@@ -597,6 +804,7 @@ def main():
     parser.add_argument('--stress', action='store_true', help='Stress contour only')
     parser.add_argument('--deformed', action='store_true', help='Deformed mesh plot')
     parser.add_argument('--principal', action='store_true', help='Principal stress arrows')
+    parser.add_argument('--mesh-quality', action='store_true', help='Mesh quality analysis')
     parser.add_argument('--convergence', action='store_true', help='Convergence plot')
     args = parser.parse_args()
 
@@ -623,9 +831,11 @@ def main():
         plot_deformed_mesh(args.outdir, load_meta(args.outdir))
     if (args.all or args.principal) and has_meta:
         plot_principal_stress_arrows(args.outdir, load_meta(args.outdir))
+    if (args.all or args.mesh_quality) and has_meta:
+        plot_mesh_quality(args.outdir, load_meta(args.outdir))
 
-    if not (args.all or args.displacement or args.stress or args.deformed or args.principal or args.convergence):
-        print('\n  Use --all, --all-cases, --thumbnails, --displacement, --stress, --deformed, --principal, or --convergence to generate plots')
+    if not (args.all or args.displacement or args.stress or args.deformed or args.principal or args.mesh_quality or args.convergence):
+        print('\n  Use --all, --all-cases, --thumbnails, --displacement, --stress, --deformed, --principal, --mesh-quality, or --convergence to generate plots')
 
 
 if __name__ == '__main__':

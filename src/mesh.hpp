@@ -7,10 +7,384 @@
 #include <stdexcept>
 
 // ==========================================================================
-// MESH GENERATION -- Structured quad mesher + JSON input
+// MESH GENERATION -- Structured quad mesher + JSON input + boundary snapping
 // ==========================================================================
 
 namespace mesh {
+
+// ------------------------------------------------------------------
+// Curve definitions for boundary snapping
+// ------------------------------------------------------------------
+struct CurveCircle {
+    double cx, cy, radius;
+};
+
+struct CurveEllipse {
+    double cx, cy, a, b;  // a = semi-major in x, b = semi-minor in y
+};
+
+struct CurveLine {
+    double x1, y1, x2, y2;
+};
+
+struct CurvePolygon {
+    std::vector<std::pair<double, double>> vertices;  // CCW ordered
+};
+
+// Find nearest point on a line segment (x1,y1)-(x2,y2) to point (px,py)
+inline std::pair<double, double> nearest_point_on_segment(
+    double px, double py,
+    double x1, double y1,
+    double x2, double y2) {
+
+    double dx = x2 - x1;
+    double dy = y2 - y1;
+    double len_sq = dx * dx + dy * dy;
+
+    if (len_sq < 1e-20) return {x1, y1};
+
+    double t = ((px - x1) * dx + (py - y1) * dy) / len_sq;
+    t = std::max(0.0, std::min(1.0, t));
+
+    return {x1 + t * dx, y1 + t * dy};
+}
+
+// Find nearest point on a circle to point (px,py)
+inline std::pair<double, double> nearest_point_on_circle(
+    double px, double py,
+    double cx, double cy, double radius) {
+
+    double dx = px - cx;
+    double dy = py - cy;
+    double dist = std::sqrt(dx * dx + dy * dy);
+
+    if (dist < 1e-20) return {cx + radius, cy};
+
+    return {cx + radius * dx / dist, cy + radius * dy / dist};
+}
+
+// Find nearest point on an ellipse to point (px,py) (iterative)
+inline std::pair<double, double> nearest_point_on_ellipse(
+    double px, double py,
+    double cx, double cy, double a, double b) {
+
+    // Simple iterative approach (Newton's method)
+    double x = px - cx;
+    double y = py - cy;
+
+    // Initial guess: project onto ellipse
+    double dist = std::sqrt(x * x + y * y);
+    if (dist < 1e-20) return {cx + a, cy};
+
+    for (int iter = 0; iter < 10; ++iter) {
+        double t = std::atan2(a * y, b * x);
+        double ex = a * std::cos(t);
+        double ey = b * std::sin(t);
+        double dtx = -a * std::sin(t);
+        double dty = b * std::cos(t);
+        double f = (ex - x) * dtx + (ey - y) * dty;
+        double df = dtx * dtx + (ex - x) * (-a * std::cos(t)) +
+                    dty * dty + (ey - y) * (-b * std::sin(t));
+        if (std::abs(df) > 1e-20) t -= f / df;
+        x = a * std::cos(t);
+        y = b * std::sin(t);
+    }
+
+    return {cx + x, cy + y};
+}
+
+// ------------------------------------------------------------------
+// Snap boundary nodes to a circle
+// m: mesh to modify
+// cx, cy, radius: circle definition
+// snap_distance: maximum distance to snap (default: element size)
+// ------------------------------------------------------------------
+inline void snap_to_circle(Mesh& m, double cx, double cy, double radius,
+                           double snap_distance = -1.0) {
+
+    // Auto-compute snap distance if not provided
+    if (snap_distance < 0.0 && m.num_quads() > 0) {
+        // Use average element size
+        double avg_size = 0.0;
+        for (const auto& elem : m.quad_elements) {
+            double dx = m.nodes[elem[1]].x - m.nodes[elem[0]].x;
+            double dy = m.nodes[elem[1]].y - m.nodes[elem[0]].y;
+            avg_size += std::sqrt(dx * dx + dy * dy);
+        }
+        snap_distance = avg_size / m.num_quads() * 0.5;
+    }
+
+    for (auto& node : m.nodes) {
+        double dx = node.x - cx;
+        double dy = node.y - cy;
+        double dist = std::sqrt(dx * dx + dy * dy);
+
+        // Check if node is close to the circle boundary
+        if (std::abs(dist - radius) < snap_distance) {
+            auto [sx, sy] = nearest_point_on_circle(node.x, node.y, cx, cy, radius);
+            node.x = sx;
+            node.y = sy;
+        }
+    }
+}
+
+// ------------------------------------------------------------------
+// Snap boundary nodes to an ellipse
+// ------------------------------------------------------------------
+inline void snap_to_ellipse(Mesh& m, double cx, double cy, double a, double b,
+                            double snap_distance = -1.0) {
+
+    if (snap_distance < 0.0 && m.num_quads() > 0) {
+        double avg_size = 0.0;
+        for (const auto& elem : m.quad_elements) {
+            double dx = m.nodes[elem[1]].x - m.nodes[elem[0]].x;
+            double dy = m.nodes[elem[1]].y - m.nodes[elem[0]].y;
+            avg_size += std::sqrt(dx * dx + dy * dy);
+        }
+        snap_distance = avg_size / m.num_quads() * 0.5;
+    }
+
+    for (auto& node : m.nodes) {
+        // Check if node is close to the ellipse
+        double dx = (node.x - cx) / a;
+        double dy = (node.y - cy) / b;
+        double dist_ellipse = std::sqrt(dx * dx + dy * dy);
+
+        if (std::abs(dist_ellipse - 1.0) < snap_distance / std::min(a, b)) {
+            auto [sx, sy] = nearest_point_on_ellipse(node.x, node.y, cx, cy, a, b);
+            node.x = sx;
+            node.y = sy;
+        }
+    }
+}
+
+// ------------------------------------------------------------------
+// Snap boundary nodes to a polygon (series of line segments)
+// ------------------------------------------------------------------
+inline void snap_to_polygon(Mesh& m,
+                            const std::vector<std::pair<double, double>>& vertices,
+                            double snap_distance = -1.0) {
+
+    if (snap_distance < 0.0 && m.num_quads() > 0) {
+        double avg_size = 0.0;
+        for (const auto& elem : m.quad_elements) {
+            double dx = m.nodes[elem[1]].x - m.nodes[elem[0]].x;
+            double dy = m.nodes[elem[1]].y - m.nodes[elem[0]].y;
+            avg_size += std::sqrt(dx * dx + dy * dy);
+        }
+        snap_distance = avg_size / m.num_quads() * 0.5;
+    }
+
+    int n_vertices = static_cast<int>(vertices.size());
+    for (auto& node : m.nodes) {
+        double min_dist = 1e20;
+        double best_x = node.x, best_y = node.y;
+
+        for (int i = 0; i < n_vertices; ++i) {
+            int j = (i + 1) % n_vertices;
+            auto [sx, sy] = nearest_point_on_segment(
+                node.x, node.y,
+                vertices[i].first, vertices[i].second,
+                vertices[j].first, vertices[j].second);
+
+            double dx = node.x - sx;
+            double dy = node.y - sy;
+            double dist = std::sqrt(dx * dx + dy * dy);
+
+            if (dist < min_dist) {
+                min_dist = dist;
+                best_x = sx;
+                best_y = sy;
+            }
+        }
+
+        if (min_dist < snap_distance) {
+            node.x = best_x;
+            node.y = best_y;
+        }
+    }
+}
+
+// ------------------------------------------------------------------
+// Element quality metrics
+// ------------------------------------------------------------------
+struct ElementQuality {
+    double jacobian_ratio = 1.0;   // min/max Jacobian ratio (1.0 = perfect)
+    double aspect_ratio = 1.0;     // max/min edge length ratio (1.0 = perfect)
+    double skewness = 0.0;         // deviation from ideal (0.0 = perfect)
+    double area = 0.0;             // element area
+};
+
+// Compute edge length between two nodes
+inline double edge_length(const Node& a, const Node& b) {
+    double dx = b.x - a.x;
+    double dy = b.y - a.y;
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+// Compute Jacobian determinant at a point for Q4
+inline double q4_jacobian_det(const std::array<Node, 4>& nodes,
+                               double xi, double eta) {
+    static const double xi_pts[4]  = { -1.0,  1.0,  1.0, -1.0 };
+    static const double eta_pts[4] = { -1.0, -1.0,  1.0,  1.0 };
+
+    double J11 = 0.0, J12 = 0.0, J21 = 0.0, J22 = 0.0;
+    for (int i = 0; i < 4; ++i) {
+        double dN_dxi  = 0.25 * xi_pts[i]  * (1.0 + eta_pts[i] * eta);
+        double dN_deta = 0.25 * (1.0 + xi_pts[i] * xi) * eta_pts[i];
+        J11 += dN_dxi * nodes[i].x;
+        J12 += dN_dxi * nodes[i].y;
+        J21 += dN_deta * nodes[i].x;
+        J22 += dN_deta * nodes[i].y;
+    }
+    return J11 * J22 - J12 * J21;
+}
+
+// Compute quality metrics for a Q4 element
+inline ElementQuality compute_q4_quality(const std::array<Node, 4>& nodes) {
+    ElementQuality q;
+
+    // Compute Jacobian at 4 corner points and center
+    double j_min = 1e20, j_max = -1e20;
+    double xi_pts[5] = {-1.0, 1.0, 1.0, -1.0, 0.0};
+    double eta_pts[5] = {-1.0, -1.0, 1.0, 1.0, 0.0};
+
+    for (int i = 0; i < 5; ++i) {
+        double detJ = q4_jacobian_det(nodes, xi_pts[i], eta_pts[i]);
+        j_min = std::min(j_min, detJ);
+        j_max = std::max(j_max, detJ);
+    }
+
+    q.jacobian_ratio = (j_max > 1e-20) ? j_min / j_max : 0.0;
+
+    // Compute edge lengths
+    double e0 = edge_length(nodes[0], nodes[1]);  // bottom
+    double e1 = edge_length(nodes[1], nodes[2]);  // right
+    double e2 = edge_length(nodes[2], nodes[3]);  // top
+    double e3 = edge_length(nodes[3], nodes[0]);  // left
+
+    double e_min = std::min({e0, e1, e2, e3});
+    double e_max = std::max({e0, e1, e2, e3});
+
+    q.aspect_ratio = (e_min > 1e-20) ? e_max / e_min : 1e20;
+
+    // Compute area (shoelace formula)
+    q.area = 0.5 * std::abs(
+        (nodes[1].x - nodes[0].x) * (nodes[2].y - nodes[0].y) -
+        (nodes[2].x - nodes[0].x) * (nodes[1].y - nodes[0].y)) +
+        0.5 * std::abs(
+        (nodes[2].x - nodes[0].x) * (nodes[3].y - nodes[0].y) -
+        (nodes[3].x - nodes[0].x) * (nodes[2].y - nodes[0].y));
+
+    // Skewness: deviation from ideal square (0 = perfect, 1 = degenerate)
+    // Based on angle deviation from 90 degrees
+    double max_angle = 0.0, min_angle = 180.0;
+    for (int i = 0; i < 4; ++i) {
+        int prev = (i + 3) % 4;
+        int next = (i + 1) % 4;
+        double v1x = nodes[prev].x - nodes[i].x;
+        double v1y = nodes[prev].y - nodes[i].y;
+        double v2x = nodes[next].x - nodes[i].x;
+        double v2y = nodes[next].y - nodes[i].y;
+        double dot = v1x * v2x + v1y * v2y;
+        double len1 = std::sqrt(v1x * v1x + v1y * v1y);
+        double len2 = std::sqrt(v2x * v2x + v2y * v2y);
+        double cos_angle = (len1 * len2 > 1e-20) ? dot / (len1 * len2) : 0.0;
+        cos_angle = std::max(-1.0, std::min(1.0, cos_angle));
+        double angle = std::acos(cos_angle) * 180.0 / M_PI;
+        max_angle = std::max(max_angle, angle);
+        min_angle = std::min(min_angle, angle);
+    }
+    // Skewness based on angle deviation from 90 degrees
+    q.skewness = std::max(std::abs(max_angle - 90.0), std::abs(90.0 - min_angle)) / 90.0;
+
+    return q;
+}
+
+// Compute quality metrics for a T3 element
+inline ElementQuality compute_t3_quality(const std::array<Node, 3>& nodes) {
+    ElementQuality q;
+
+    // Compute area
+    q.area = 0.5 * std::abs(
+        (nodes[1].x - nodes[0].x) * (nodes[2].y - nodes[0].y) -
+        (nodes[2].x - nodes[0].x) * (nodes[1].y - nodes[0].y));
+
+    // Jacobian ratio for T3 is always 1.0 (constant Jacobian)
+    q.jacobian_ratio = 1.0;
+
+    // Compute edge lengths
+    double e0 = edge_length(nodes[0], nodes[1]);
+    double e1 = edge_length(nodes[1], nodes[2]);
+    double e2 = edge_length(nodes[2], nodes[0]);
+
+    double e_min = std::min({e0, e1, e2});
+    double e_max = std::max({e0, e1, e2});
+
+    q.aspect_ratio = (e_min > 1e-20) ? e_max / e_min : 1e20;
+
+    // Skewness: deviation from equilateral triangle (0 = perfect)
+    double max_angle = 0.0, min_angle = 180.0;
+    for (int i = 0; i < 3; ++i) {
+        int prev = (i + 2) % 3;
+        int next = (i + 1) % 3;
+        double v1x = nodes[prev].x - nodes[i].x;
+        double v1y = nodes[prev].y - nodes[i].y;
+        double v2x = nodes[next].x - nodes[i].x;
+        double v2y = nodes[next].y - nodes[i].y;
+        double dot = v1x * v2x + v1y * v2y;
+        double len1 = std::sqrt(v1x * v1x + v1y * v1y);
+        double len2 = std::sqrt(v2x * v2x + v2y * v2y);
+        double cos_angle = (len1 * len2 > 1e-20) ? dot / (len1 * len2) : 0.0;
+        cos_angle = std::max(-1.0, std::min(1.0, cos_angle));
+        double angle = std::acos(cos_angle) * 180.0 / M_PI;
+        max_angle = std::max(max_angle, angle);
+        min_angle = std::min(min_angle, angle);
+    }
+    // Skewness based on angle deviation from 60 degrees (equilateral)
+    q.skewness = std::max(std::abs(max_angle - 60.0), std::abs(60.0 - min_angle)) / 60.0;
+
+    return q;
+}
+
+// Compute quality metrics for all elements in the mesh
+struct MeshQuality {
+    std::vector<ElementQuality> quad_quality;
+    std::vector<ElementQuality> tri_quality;
+    double min_jacobian_ratio = 1.0;
+    double max_aspect_ratio = 1.0;
+    double max_skewness = 0.0;
+};
+
+inline MeshQuality compute_mesh_quality(const Mesh& m) {
+    MeshQuality mq;
+
+    mq.quad_quality.resize(m.num_quads());
+    for (int e = 0; e < m.num_quads(); ++e) {
+        const auto& elem = m.quad_elements[e];
+        std::array<Node, 4> nodes;
+        for (int i = 0; i < 4; ++i) nodes[i] = m.nodes[elem[i]];
+        mq.quad_quality[e] = compute_q4_quality(nodes);
+
+        mq.min_jacobian_ratio = std::min(mq.min_jacobian_ratio, mq.quad_quality[e].jacobian_ratio);
+        mq.max_aspect_ratio = std::max(mq.max_aspect_ratio, mq.quad_quality[e].aspect_ratio);
+        mq.max_skewness = std::max(mq.max_skewness, mq.quad_quality[e].skewness);
+    }
+
+    mq.tri_quality.resize(m.num_tris());
+    for (int e = 0; e < m.num_tris(); ++e) {
+        const auto& elem = m.tri_elements[e];
+        std::array<Node, 3> nodes;
+        for (int i = 0; i < 3; ++i) nodes[i] = m.nodes[elem[i]];
+        mq.tri_quality[e] = compute_t3_quality(nodes);
+
+        mq.min_jacobian_ratio = std::min(mq.min_jacobian_ratio, mq.tri_quality[e].jacobian_ratio);
+        mq.max_aspect_ratio = std::max(mq.max_aspect_ratio, mq.tri_quality[e].aspect_ratio);
+        mq.max_skewness = std::max(mq.max_skewness, mq.tri_quality[e].skewness);
+    }
+
+    return mq;
+}
 
 // ------------------------------------------------------------------
 // Generate a structured quad mesh on [0, Lx] x [0, Ly]

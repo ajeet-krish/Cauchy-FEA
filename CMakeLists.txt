@@ -52,6 +52,10 @@ add_executable(FEA_PlateHole src/main_plate_hole.cpp ${FEA_HEADERS})
 target_include_directories(FEA_PlateHole PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(FEA_PlateHole PRIVATE OpenMP::OpenMP_CXX)
 
+add_executable(FEA_ThermalCylinder src/main_thermal.cpp ${FEA_HEADERS})
+target_include_directories(FEA_ThermalCylinder PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(FEA_ThermalCylinder PRIVATE OpenMP::OpenMP_CXX)
+
 # ------------------------------------------------------------------
 # Unit tests (Google Test)
 # ------------------------------------------------------------------

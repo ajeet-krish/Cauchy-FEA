@@ -46,6 +46,25 @@ inline COOMatrix assemble(const Mesh& m) {
             }
         }
 
+        // Assemble T3 elements
+        #pragma omp for nowait
+        for (int e = 0; e < m.num_tris(); ++e) {
+            const auto& elem = m.tri_elements[e];
+            std::array<Node, 3> elem_nodes;
+            for (int i = 0; i < 3; ++i) {
+                elem_nodes[i] = m.nodes[elem[i]];
+            }
+
+            auto Ke = elements::T3Element::stiffness(elem_nodes, m.mat, m.plane);
+            auto dof_idx = elements::T3Element::dof_indices(elem);
+
+            for (int i = 0; i < 6; ++i) {
+                for (int j = 0; j < 6; ++j) {
+                    K_local.add(dof_idx[i], dof_idx[j], Ke[i][j]);
+                }
+            }
+        }
+
         // Assemble bar elements
         #pragma omp for nowait
         for (int e = 0; e < m.num_bars(); ++e) {
@@ -103,13 +122,49 @@ inline void apply_dirichlet_penalty(COOMatrix& K, const Mesh& m, double penalty)
 }
 
 // ------------------------------------------------------------------
-// Build RHS vector from Neumann BCs
+// Build RHS vector from Neumann BCs and thermal loads
 // ------------------------------------------------------------------
 inline std::vector<double> build_rhs(const Mesh& m) {
     std::vector<double> f(m.num_dofs(), 0.0);
     for (const auto& bc : m.neumann) {
         f[dof_index(bc.node, bc.dof)] += bc.value;
     }
+
+    // Assemble thermal load if temperature field is defined
+    if (m.temperature.size() == static_cast<size_t>(m.num_nodes()) && m.mat.alpha != 0.0) {
+        // Q4 elements
+        for (int e = 0; e < m.num_quads(); ++e) {
+            const auto& elem = m.quad_elements[e];
+            std::array<Node, 4> elem_nodes;
+            std::array<double, 4> temps;
+            for (int i = 0; i < 4; ++i) {
+                elem_nodes[i] = m.nodes[elem[i]];
+                temps[i] = m.temperature[elem[i]];
+            }
+            auto fe_th = elements::Q4Element::thermal_load(elem_nodes, m.mat, temps, m.T_ref, m.plane);
+            auto dof_idx = elements::Q4Element::dof_indices(elem);
+            for (int i = 0; i < 8; ++i) {
+                f[dof_idx[i]] += fe_th[i];
+            }
+        }
+
+        // T3 elements
+        for (int e = 0; e < m.num_tris(); ++e) {
+            const auto& elem = m.tri_elements[e];
+            std::array<Node, 3> elem_nodes;
+            std::array<double, 3> temps;
+            for (int i = 0; i < 3; ++i) {
+                elem_nodes[i] = m.nodes[elem[i]];
+                temps[i] = m.temperature[elem[i]];
+            }
+            auto fe_th = elements::T3Element::thermal_load(elem_nodes, m.mat, temps, m.T_ref, m.plane);
+            auto dof_idx = elements::T3Element::dof_indices(elem);
+            for (int i = 0; i < 6; ++i) {
+                f[dof_idx[i]] += fe_th[i];
+            }
+        }
+    }
+
     return f;
 }
 
