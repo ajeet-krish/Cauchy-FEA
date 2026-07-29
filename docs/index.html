@@ -46,33 +46,29 @@
     <section class="hero" id="overview">
       <h1>Cauchy: <span class="accent-orange">2D Finite Element</span> Structural Solver</h1>
       <p class="subtitle">
-        A header-only C++20 solver implementing bar and bilinear quad (Q4) elements
-        with COO/CSR sparse assembly, Cholesky and Conjugate Gradient solvers,
-        and Von Mises stress recovery. Built as a portfolio centrepiece for
-        mechanical and aerospace engineering roles.
+        How does a bridge bear its load, a wing resist lift, or a building
+        withstand wind? To predict this without building expensive physical
+        prototypes, engineers use Finite Element Analysis to discretize
+        structures into thousands of small elements and solve for deformation
+        and stress.
+      </p>
+      <p class="subtitle">
+        Commercial solvers like ANSYS and Abaqus are powerful tools, but their
+        black-box nature hides the underlying mechanics. To better understand
+        FEA at the implementation level, I set out to build a solver from scratch.
+      </p>
+      <p class="subtitle">
+        Cauchy is a custom 2D structural solver written in C++20. It uses
+        bilinear quad (Q4) elements with Gauss quadrature, sparse matrix
+        assembly, and direct/iterative solvers to compute displacement and
+        stress fields. The solver validates against 6 classical benchmark
+        cases with analytical references.
       </p>
       <div class="status-badge">
         <span class="dot"></span>
         Validated on 6 benchmark cases
       </div>
     </section>
-
-    <h2>What Is Cauchy?</h2>
-
-    <p class="section-intro">
-      Cauchy is a from-scratch 2D finite element solver. It solves static
-      structural problems -- beams, plates, trusses, stress concentrations --
-      using first-principles element formulation, sparse linear algebra, and
-      direct/iterative solvers. Every line of code is written to be read
-      and understood.
-    </p>
-
-    <p class="section-intro">
-      The solver handles plane stress and plane strain, supports both bar (truss)
-      and Q4 (bilinear quad) elements, and recovers element-centered stress fields
-      with Von Mises and principal stress computation. It is validated against
-      closed-form analytical solutions and published benchmark data.
-    </p>
 
     <h2>Validation Cases</h2>
 

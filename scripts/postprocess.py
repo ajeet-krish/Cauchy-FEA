@@ -39,6 +39,41 @@ def load_mesh(outdir):
     return None
 
 
+def load_triangulation(outdir):
+    """Load mesh and create a matplotlib Triangulation using actual element connectivity.
+    
+    Splits quad elements into 2 triangles each, so contours respect the mesh topology.
+    Returns (triang, x, y) or (None, None, None) if mesh.json not found or no quads.
+    """
+    mesh = load_mesh(outdir)
+    if not mesh:
+        return None, None, None
+    
+    nodes = mesh['nodes']
+    elements = mesh['elements']
+    
+    # Skip if no elements (e.g., bar elements only like michell)
+    if not elements:
+        return None, None, None
+    
+    x = np.array([n['x'] for n in nodes])
+    y = np.array([n['y'] for n in nodes])
+    
+    # Split each quad into 2 triangles: (n0,n1,n2) and (n0,n2,n3)
+    triangles = []
+    for elem in elements:
+        n0, n1, n2, n3 = elem['n0'], elem['n1'], elem['n2'], elem['n3']
+        triangles.append([n0, n1, n2])
+        triangles.append([n0, n2, n3])
+    
+    triangles = np.array(triangles)
+    if triangles.shape[0] == 0:
+        return None, None, None
+    
+    triang = Triangulation(x, y, triangles=triangles)
+    return triang, x, y
+
+
 def nodal_average(element_values, mesh):
     """Convert element-centered values to nodal values via averaging."""
     num_nodes = mesh['num_nodes']
@@ -69,7 +104,10 @@ def plot_displacement_contour(outdir, meta):
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
-    triang = Triangulation(x, y)
+    # Use mesh-aware triangulation (respects hole/cutout geometry)
+    triang, _, _ = load_triangulation(outdir)
+    if triang is None:
+        triang = Triangulation(x, y)
 
     # Displacement magnitude
     ax = axes[0]
@@ -128,7 +166,10 @@ def plot_stress_contour(outdir, meta):
     s2_nodal = nodal_average(sigma_2, mesh)
     sxy_nodal = nodal_average(sigma_xy, mesh)
 
-    triang = Triangulation(x, y)
+    # Use mesh-aware triangulation (respects hole/cutout geometry)
+    triang, _, _ = load_triangulation(outdir)
+    if triang is None:
+        triang = Triangulation(x, y)
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 

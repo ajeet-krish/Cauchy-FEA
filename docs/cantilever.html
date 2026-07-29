@@ -82,19 +82,14 @@
       </p>
     </div>
 
-    <h2>Interactive Results</h2>
+    <h2>Results</h2>
 
-    <div class="case-visualization">
-      <img src="output/cantilever_32/stress_contour.png" 
-           alt="Cantilever stress contour" 
-           class="static-fallback"
-           loading="lazy" />
-      <div id="fea-viewer" class="viewer-container"></div>
-      <div id="fea-colorbar-container"></div>
-      <div class="fea-toolbar" id="toolbar"></div>
-    </div>
+    <img src="output/cantilever_32/stress_contour.png" 
+         alt="Cantilever stress contour" 
+         class="case-hero-img"
+         loading="lazy" />
 
-    <h2>Static Visualizations</h2>
+    <h2>Visualizations</h2>
 
     <div class="static-plots">
       <div class="plot-item">
@@ -174,12 +169,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="assets/js/colormaps.js"></script>
-  <script src="assets/js/fea-viewer.js"></script>
-  <script src="assets/js/fea-colorbar.js"></script>
-  <script src="assets/js/ui-controls.js"></script>
   <script>
     document.getElementById('sidebarToggle').addEventListener('click', function() {
       document.querySelector('.sidebar').classList.toggle('open');
@@ -193,20 +182,6 @@
           {left: "$", right: "$", display: false}
         ]
       });
-
-      const container = document.getElementById('fea-viewer');
-      const viewer = new FEAViewer(container);
-      
-      const toolbar = document.getElementById('toolbar');
-      const controls = new FEAControls(viewer);
-      controls.createToolbar(toolbar);
-      
-      const colorbarContainer = document.getElementById('fea-colorbar-container');
-      const colorbar = new FEAColorbar(colorbarContainer);
-      colorbar.create();
-      viewer.setColorbar(colorbar);
-      
-      viewer.loadData('assets/data/cantilever_32.json');
     });
   </script>
 
