@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,13 +9,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 </head>
+
 <body>
+
   <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+
   <div class="sidebar">
     <div class="sidebar-brand"><a href="index.html">Cauchy</a></div>
     <nav class="sidebar-nav">
-      <div class="nav-section"><div class="nav-heading">Project</div><a href="index.html" class="nav-item">Home</a></div>
+      <div class="nav-section">
+        <div class="nav-heading">Project</div>
+        <a href="index.html" class="nav-item">Home</a>
+      </div>
       <div class="nav-section">
         <div class="nav-heading">Validation Cases</div>
         <a href="cantilever.html" class="nav-item">Cantilever Beam</a>
@@ -22,64 +30,163 @@
         <a href="patch.html" class="nav-item">Patch Test</a>
         <a href="plate_hole.html" class="nav-item active">Plate with Hole</a>
         <a href="lbracket.html" class="nav-item">L-Bracket</a>
+        <a href="michell.html" class="nav-item">Michell Truss</a>
       </div>
       <div class="nav-section">
         <div class="nav-heading">Reference</div>
-        <a href="theory.html" class="nav-item">Theory</a>
+        <a href="theory.html" class="nav-item">Theory &amp; Formulation</a>
         <a href="implementation.html" class="nav-item">Implementation</a>
-        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub &nearr;</a>
+        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub Repository &nearr;</a>
       </div>
     </nav>
   </div>
+
   <div class="main-content">
-    <h1>Plate with Circular Hole</h1>
+
+    <h1>Plate with Hole</h1>
     <p class="section-intro">
-      A classic stress concentration problem validated against the Kirsch
-      analytical solution. A large plate with a central circular hole
-      under uniaxial tension develops a stress concentration factor (SCF)
-      of 3.0 at the hole edge.
+      Quarter-symmetry model of a plate with a central circular hole under uniform
+      tension. Validates stress concentration factor against the Kirsch analytical
+      solution.
     </p>
 
     <h2>Problem Setup</h2>
+
     <table>
       <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
       <tbody>
-        <tr><td>Domain</td><td>[0, 2] x [0, 2] (quarter-symmetry)</td></tr>
-        <tr><td>Hole</td><td>Radius R=0.5 at origin (0, 0)</td></tr>
-        <tr><td>Material</td><td>Steel: E=200 GPa, nu=0.3, t=0.01m</td></tr>
-        <tr><td>Left edge (x=0)</td><td>ux=0 (symmetry)</td></tr>
-        <tr><td>Bottom edge (y=0)</td><td>uy=0 (symmetry)</td></tr>
-        <tr><td>Right edge (x=2)</td><td>sigma_inf=1 MPa tension</td></tr>
-        <tr><td>Mesh</td><td>16x16 structured Q4 with hole cutout</td></tr>
+        <tr><td>Domain (quarter)</td><td>2.0 x 2.0 m</td></tr>
+        <tr><td>Hole radius (R)</td><td>0.5 m</td></tr>
+        <tr><td>Applied stress (&sigma;<sub>&infin;</sub>)</td><td>1.0 MPa</td></tr>
+        <tr><td>Young's modulus (E)</td><td>200 GPa (steel)</td></tr>
+        <tr><td>Poisson's ratio (&nu;)</td><td>0.3</td></tr>
+        <tr><td>Mesh</td><td>16 x 16 Q4 elements (241 active)</td></tr>
+        <tr><td>Solver</td><td>Cholesky (548 DOFs)</td></tr>
       </tbody>
     </table>
 
-    <h2>Kirsch Solution</h2>
+    <h2>Boundary Conditions</h2>
+
     <div class="callout">
       <p>
-        For an infinite plate with a circular hole under uniaxial tension:<br>
-        sigma_max = 3 * sigma_inf at theta = 90 deg (hole edge)<br>
-        This is the theoretical stress concentration factor (SCF = 3.0).
+        Left edge (x=0): u<sub>x</sub> = 0 (symmetry)<br>
+        Bottom edge (y=0): u<sub>y</sub> = 0 (symmetry)<br>
+        Right edge (x=2): &sigma;<sub>xx</sub> = 1.0 MPa (uniform tension)<br>
+        Top edge (y=2): free
       </p>
     </div>
 
+    <h2>Interactive Results</h2>
+
+    <div class="case-visualization">
+      <img src="output/plate_hole/stress_contour.png" 
+           alt="Plate with hole stress contour" 
+           class="static-fallback"
+           loading="lazy" />
+      <div id="fea-viewer" class="viewer-container"></div>
+      <div id="fea-colorbar-container"></div>
+    </div>
+
+    <div class="fea-toolbar" id="toolbar"></div>
+
+    <h2>Static Visualizations</h2>
+
+    <div class="static-plots">
+      <div class="plot-item">
+        <h3>Displacement Contour</h3>
+        <img src="output/plate_hole/displacement_contour.png" 
+             alt="Displacement contour (|u|, ux, uy)" 
+             loading="lazy" />
+        <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
+      </div>
+
+      <div class="plot-item">
+        <h3>Stress Contour</h3>
+        <img src="output/plate_hole/stress_contour.png" 
+             alt="Stress contour (Von Mises, sigma_xx)" 
+             loading="lazy" />
+        <p>Von Mises and sigma_xx stress fields. Maximum stress occurs at the hole edge.</p>
+      </div>
+
+      <div class="plot-item">
+        <h3>Deformed Mesh</h3>
+        <img src="output/plate_hole/deformed_mesh.png" 
+             alt="Deformed mesh overlay" 
+             loading="lazy" />
+        <p>Deformed mesh overlay showing displacement amplification for visualization.</p>
+      </div>
+    </div>
+
+    <h2>Validation</h2>
+
+    <div class="callout">
+      <p>
+        Kirsch solution: $$\sigma_{\max} = 3 \cdot \sigma_{\infty}$$<br>
+        at the hole edge (theta = 90 degrees from loading direction).
+      </p>
+    </div>
+
+    <table>
+      <thead><tr><th>Metric</th><th>FEA</th><th>Kirsch</th><th>SCF</th></tr></thead>
+      <tbody>
+        <tr><td>Max von Mises</td><td>2.66 MPa</td><td>3.0 MPa</td><td>2.7 (expected 3.0)</td></tr>
+        <tr><td>Energy balance</td><td colspan="3">U == W (verified)</td></tr>
+      </tbody>
+    </table>
+
     <h2>Discussion</h2>
+
     <p class="section-intro">
-      The quarter-symmetry model reduces the problem size by a factor of 4.
-      Nodes inside the circular hole are removed from the mesh, and symmetry
-      boundary conditions are applied on the cut edges. The SCF at the hole
-      edge should approach 3.0 as the mesh is refined, though the staircase
-      approximation of the circular boundary on a structured quad mesh
-      introduces geometric error that limits accuracy on coarse meshes.
+      The stress concentration factor of 2.7 is close to the theoretical value of 3.0.
+      The slight under-prediction is due to the relatively coarse 16x16 mesh. The quarter-symmetry
+      model correctly captures the stress concentration at the hole edge. Refining the mesh
+      near the hole would improve accuracy. This case demonstrates correct handling of
+      hole cutouts, symmetry boundary conditions, and distributed traction loading.
     </p>
 
-    <div class="site-footer"><p>Cauchy -- 2D Finite Element Structural Solver</p></div>
+    <div class="site-footer">
+      <p>Cauchy -- 2D Finite Element Structural Solver</p>
+    </div>
+
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="assets/js/colormaps.js"></script>
+  <script src="assets/js/fea-viewer.js"></script>
+  <script src="assets/js/fea-colorbar.js"></script>
+  <script src="assets/js/ui-controls.js"></script>
   <script>
     document.getElementById('sidebarToggle').addEventListener('click', function() {
       document.querySelector('.sidebar').classList.toggle('open');
       document.body.classList.toggle('sidebar-open');
     });
+
+    document.addEventListener("DOMContentLoaded", function() {
+      renderMathInElement(document.body, {
+        delimiters: [
+          {left: "$$", right: "$$", display: true},
+          {left: "$", right: "$", display: false}
+        ]
+      });
+
+      const container = document.getElementById('fea-viewer');
+      const viewer = new FEAViewer(container);
+      
+      const toolbar = document.getElementById('toolbar');
+      const controls = new FEAControls(viewer);
+      controls.createToolbar(toolbar);
+      
+      const colorbarContainer = document.getElementById('fea-colorbar-container');
+      const colorbar = new FEAColorbar(colorbarContainer);
+      colorbar.create();
+      
+      viewer.loadData('assets/data/plate_hole.json');
+    });
   </script>
+
 </body>
+
 </html>

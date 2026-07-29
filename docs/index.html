@@ -30,6 +30,7 @@
         <a href="patch.html" class="nav-item">Patch Test</a>
         <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
         <a href="lbracket.html" class="nav-item">L-Bracket</a>
+        <a href="michell.html" class="nav-item">Michell Truss</a>
       </div>
       <div class="nav-section">
         <div class="nav-heading">Reference</div>
@@ -78,7 +79,11 @@
     <div class="case-grid">
 
       <a href="cantilever.html" class="case-card">
-        <div class="case-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:0.8em;">Cantilever</div>
+        <div class="case-thumb">
+          <img src="assets/data/thumbnails/cantilever_stress.png" 
+               alt="Cantilever stress contour" 
+               loading="lazy" />
+        </div>
         <div class="case-info">
           <h3>Cantilever Beam</h3>
           <p>Clamped beam with tip load. Validates element formulation against PL^3/(3EI).</p>
@@ -87,7 +92,11 @@
       </a>
 
       <a href="cook.html" class="case-card">
-        <div class="case-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:0.8em;">Cook's Membrane</div>
+        <div class="case-thumb">
+          <img src="assets/data/thumbnails/cook_stress.png" 
+               alt="Cook's membrane stress contour" 
+               loading="lazy" />
+        </div>
         <div class="case-info">
           <h3>Cook's Membrane</h3>
           <p>Trapezoidal panel under distributed shear. Tests Q4 bending and shear locking.</p>
@@ -96,7 +105,11 @@
       </a>
 
       <a href="patch.html" class="case-card">
-        <div class="case-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:0.8em;">Patch Test</div>
+        <div class="case-thumb">
+          <img src="assets/data/thumbnails/patch_stress.png" 
+               alt="Patch test stress contour" 
+               loading="lazy" />
+        </div>
         <div class="case-info">
           <h3>Patch Test</h3>
           <p>Constant stress recovery. Mandatory element verification for any new formulation.</p>
@@ -105,7 +118,11 @@
       </a>
 
       <a href="plate_hole.html" class="case-card">
-        <div class="case-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:0.8em;">Plate + Hole</div>
+        <div class="case-thumb">
+          <img src="assets/data/thumbnails/plate_hole_stress.png" 
+               alt="Plate with hole stress contour" 
+               loading="lazy" />
+        </div>
         <div class="case-info">
           <h3>Plate with Hole</h3>
           <p>Kirsch solution: stress concentration factor of 3 at a circular hole edge.</p>
@@ -114,10 +131,23 @@
       </a>
 
       <a href="lbracket.html" class="case-card">
-        <div class="case-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:0.8em;">L-Bracket</div>
+        <div class="case-thumb">
+          <img src="assets/data/thumbnails/lbracket_stress.png" 
+               alt="L-bracket stress contour" 
+               loading="lazy" />
+        </div>
         <div class="case-info">
           <h3>L-Bracket</h3>
           <p>Re-entrant corner stress concentration. Demonstrates mesh refinement needs.</p>
+          <span class="case-link">View case &rarr;</span>
+        </div>
+      </a>
+
+      <a href="michell.html" class="case-card">
+        <div class="case-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:0.8em;">Michell Truss</div>
+        <div class="case-info">
+          <h3>Michell Truss</h3>
+          <p>3-bar truss structure. Validates bar element assembly and hand calculations.</p>
           <span class="case-link">View case &rarr;</span>
         </div>
       </a>

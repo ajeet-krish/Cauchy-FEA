@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cantilever Beam -- Cauchy</title>
+  <title>Michell Truss -- Cauchy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -25,12 +25,12 @@
       </div>
       <div class="nav-section">
         <div class="nav-heading">Validation Cases</div>
-        <a href="cantilever.html" class="nav-item active">Cantilever Beam</a>
+        <a href="cantilever.html" class="nav-item">Cantilever Beam</a>
         <a href="cook.html" class="nav-item">Cook's Membrane</a>
         <a href="patch.html" class="nav-item">Patch Test</a>
         <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
         <a href="lbracket.html" class="nav-item">L-Bracket</a>
-        <a href="michell.html" class="nav-item">Michell Truss</a>
+        <a href="michell.html" class="nav-item active">Michell Truss</a>
       </div>
       <div class="nav-section">
         <div class="nav-heading">Reference</div>
@@ -43,12 +43,10 @@
 
   <div class="main-content">
 
-    <h1>Cantilever Beam</h1>
+    <h1>Michell Truss</h1>
     <p class="section-intro">
-      A beam clamped at the left end with a point load at the right tip.
-      Validates basic element correctness, stiffness matrix assembly,
-      and boundary condition enforcement against the Euler-Bernoulli beam
-      analytical solution.
+      Classic 3-bar truss structure. Validates bar element formulation, assembly
+      for truss structures, and displacement computation against hand calculations.
     </p>
 
     <h2>Problem Setup</h2>
@@ -56,37 +54,32 @@
     <table>
       <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
       <tbody>
-        <tr><td>Length (L)</td><td>1.0 m</td></tr>
-        <tr><td>Height (H)</td><td>0.25 m</td></tr>
-        <tr><td>Thickness (t)</td><td>0.01 m</td></tr>
+        <tr><td>Configuration</td><td>3 nodes, 3 bar elements</td></tr>
+        <tr><td>Node 0</td><td>(0, 0) -- fixed</td></tr>
+        <tr><td>Node 1</td><td>(0, 0.5) -- fixed</td></tr>
+        <tr><td>Node 2</td><td>(1.0, 0.25) -- loaded</td></tr>
+        <tr><td>Bar area</td><td>0.001 m^2 each</td></tr>
         <tr><td>Young's modulus (E)</td><td>200 GPa (steel)</td></tr>
-        <tr><td>Poisson's ratio (&nu;)</td><td>0.3</td></tr>
-        <tr><td>Tip load (P)</td><td>-1000 N (downward)</td></tr>
-        <tr><td>Mesh</td><td>32 x 8 Q4 elements</td></tr>
-        <tr><td>Solver</td><td>Cholesky (594 DOFs)</td></tr>
+        <tr><td>Load</td><td>F<sub>y</sub> = -1000 N at node 2</td></tr>
+        <tr><td>Solver</td><td>Cholesky (6 DOFs)</td></tr>
       </tbody>
     </table>
 
     <h2>Boundary Conditions</h2>
 
-    <p class="section-intro">
-      The left edge (x=0) is fully clamped: u<sub>x</sub>=0, u<sub>y</sub>=0 for all nodes.
-      A single point load P=-1000 N is applied at the bottom-right corner
-      node in the y-direction.
-    </p>
-
     <div class="callout">
       <p>
-        Clamped: u<sub>x</sub> = u<sub>y</sub> = 0 at x = 0<br>
-        Loaded: F<sub>y</sub> = -1000 N at tip node
+        Node 0: u<sub>x</sub> = u<sub>y</sub> = 0 (pinned)<br>
+        Node 1: u<sub>x</sub> = u<sub>y</sub> = 0 (pinned)<br>
+        Node 2: F<sub>y</sub> = -1000 N (downward load)
       </p>
     </div>
 
     <h2>Interactive Results</h2>
 
     <div class="case-visualization">
-      <img src="output/cantilever_32/stress_contour.png" 
-           alt="Cantilever stress contour" 
+      <img src="output/michell/displacement_contour.png" 
+           alt="Michell truss displacement contour" 
            class="static-fallback"
            loading="lazy" />
       <div id="fea-viewer" class="viewer-container"></div>
@@ -100,26 +93,18 @@
     <div class="static-plots">
       <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="output/cantilever_32/displacement_contour.png" 
+        <img src="output/michell/displacement_contour.png" 
              alt="Displacement contour (|u|, ux, uy)" 
              loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
       </div>
 
       <div class="plot-item">
-        <h3>Stress Contour</h3>
-        <img src="output/cantilever_32/stress_contour.png" 
-             alt="Stress contour (Von Mises, sigma_xx)" 
-             loading="lazy" />
-        <p>Von Mises and sigma_xx stress fields. Maximum stress occurs at the clamped end.</p>
-      </div>
-
-      <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="output/cantilever_32/deformed_mesh.png" 
+        <img src="output/michell/deformed_mesh.png" 
              alt="Deformed mesh overlay" 
              loading="lazy" />
-        <p>Deformed mesh overlay showing displacement amplification for visualization.</p>
+        <p>Deformed mesh overlay showing truss deflection under load.</p>
       </div>
     </div>
 
@@ -127,36 +112,31 @@
 
     <div class="callout">
       <p>
-        Analytical tip deflection: $$\delta = \frac{PL^3}{3EI}$$<br>
-        Analytical max stress: $$\sigma = \frac{|P| \cdot H}{2I}$$
+        Hand calculation:<br>
+        Bar lengths: L = sqrt(1^2 + 0.25^2) = 1.0308 m (bars 0-2 and 1-2)<br>
+        Vertical equilibrium: F * (0.25/1.0308) * 2 = 1000<br>
+        F = 1000 * 1.0308 / (2 * 0.25) = 2061.6 N (compression in each bar)
       </p>
     </div>
 
     <table>
-      <thead><tr><th>Metric</th><th>FEA</th><th>Analytical</th><th>Error</th></tr></thead>
+      <thead><tr><th>Node</th><th>u<sub>x</sub></th><th>u<sub>y</sub></th></tr></thead>
       <tbody>
-        <tr><td>Tip deflection</td><td>1.37e-4 m</td><td>1.28e-4 m</td><td>~5%</td></tr>
-        <tr><td>Max &sigma;<sub>xx</sub></td><td>8.55e6 Pa</td><td>9.60e6 Pa</td><td>~11%</td></tr>
-        <tr><td>Energy balance</td><td colspan="3">U == W (verified in test suite)</td></tr>
+        <tr><td>0 (fixed)</td><td>0</td><td>0</td></tr>
+        <tr><td>1 (fixed)</td><td>0</td><td>0</td></tr>
+        <tr><td>2 (loaded)</td><td>~0</td><td>-4.38e-5 m</td></tr>
       </tbody>
     </table>
 
     <h2>Discussion</h2>
 
     <p class="section-intro">
-      The ~5% error in tip deflection is expected for Q4 elements on a
-      relatively coarse 32x8 mesh. Bilinear quads exhibit shear locking
-      in bending, which makes the element overly stiff. Refining the mesh
-      (e.g., 64x16) reduces this error significantly. The energy balance
-      check confirms that the assembly and solve pipeline is internally
-      consistent: $$\frac{1}{2} u^T K u = \frac{1}{2} u^T f$$
-    </p>
-
-    <p class="section-intro">
-      This case exercises the core pipeline: structured quad mesh generation,
-      penalty-based Dirichlet BC enforcement, point load assembly, Cholesky
-      factorization, and stress recovery. It is the first case every new
-      solver should pass.
+      The Michell truss is the simplest validation case for bar elements. It verifies
+      that the 4x4 bar element stiffness matrix, assembly into the global system, and
+      boundary condition enforcement all work correctly. The small displacement at node 2
+      is consistent with the high axial stiffness of the bars (E=200 GPa, A=0.001 m^2).
+      The zero Von Mises stress output is expected since bar elements do not compute
+      element-level stress in the same way as Q4 elements.
     </p>
 
     <div class="site-footer">
@@ -198,7 +178,7 @@
       const colorbar = new FEAColorbar(colorbarContainer);
       colorbar.create();
       
-      viewer.loadData('assets/data/cantilever_32.json');
+      viewer.loadData('assets/data/michell.json');
     });
   </script>
 

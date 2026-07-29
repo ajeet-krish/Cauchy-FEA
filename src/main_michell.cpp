@@ -56,6 +56,7 @@ int main() {
     postprocess::write_meta_json("output/michell/meta.json", m, result.displacement, result.stresses,
                                  result.cg_iterations, result.solve_time_ms);
     postprocess::write_displacement_json("output/michell/displacement.json", m, result.displacement);
+    postprocess::write_mesh_json("output/michell/mesh.json", m);
 
     std::cout << "Output written to output/michell/" << std::endl;
     return 0;

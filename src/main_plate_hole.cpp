@@ -18,10 +18,12 @@
 int main(int argc, char* argv[]) {
     int nx = 16, ny = 16;
     bool use_cg = false;
+    bool convergence_mode = false;
     if (argc > 1) nx = std::atoi(argv[1]);
     ny = nx;
     for (int i = 2; i < argc; ++i) {
         if (std::string(argv[i]) == "--cg") use_cg = true;
+        if (std::string(argv[i]) == "--convergence") convergence_mode = true;
     }
 
     std::cout << "=== FEA-2D: Plate with Hole ===" << std::endl;
@@ -124,7 +126,126 @@ int main(int argc, char* argv[]) {
                                  result.cg_iterations, result.solve_time_ms);
     postprocess::write_displacement_json("output/plate_hole/displacement.json", m, result.displacement);
     postprocess::write_stress_json("output/plate_hole/stress.json", m, result.stresses);
+    postprocess::write_mesh_json("output/plate_hole/mesh.json", m);
 
     std::cout << "Output written to output/plate_hole/" << std::endl;
+
+    // Convergence study
+    if (convergence_mode) {
+        std::cout << "\n=== Convergence Study ===" << std::endl;
+        std::cout << "Reference: Kirsch solution - sigma_max = 3 * sigma_inf" << std::endl;
+        
+        std::vector<int> meshes = {8, 16, 32, 64};
+        std::vector<double> max_stresses;
+        std::vector<double> h_values;
+        
+        for (int mesh_size : meshes) {
+            int nx_test = mesh_size;
+            int ny_test = mesh_size;
+            
+            // Create mesh
+            auto m_test = mesh::generate_structured_quad(Lx, Ly, nx_test, ny_test);
+            m_test.mat = Material::steel();
+            m_test.mat.t = 0.01;
+            m_test.plane = PlaneType::STRESS;
+            
+            // Remove nodes inside the hole
+            std::vector<bool> node_active_test(m_test.num_nodes(), true);
+            for (int i = 0; i < m_test.num_nodes(); ++i) {
+                double dx = m_test.nodes[i].x - cx;
+                double dy = m_test.nodes[i].y - cy;
+                if (std::sqrt(dx * dx + dy * dy) < R) {
+                    node_active_test[i] = false;
+                }
+            }
+            
+            // Filter elements
+            std::vector<std::array<int, 4>> active_quads_test;
+            for (const auto& elem : m_test.quad_elements) {
+                bool all_active = true;
+                for (int n : elem) {
+                    if (!node_active_test[n]) { all_active = false; break; }
+                }
+                if (all_active) active_quads_test.push_back(elem);
+            }
+            m_test.quad_elements = active_quads_test;
+            
+            // Renumber nodes
+            std::vector<int> node_map_test(m_test.num_nodes(), -1);
+            std::vector<Node> new_nodes_test;
+            for (int i = 0; i < m_test.num_nodes(); ++i) {
+                if (node_active_test[i]) {
+                    node_map_test[i] = static_cast<int>(new_nodes_test.size());
+                    new_nodes_test.push_back(m_test.nodes[i]);
+                }
+            }
+            m_test.nodes = new_nodes_test;
+            for (auto& elem : m_test.quad_elements) {
+                for (int& n : elem) n = node_map_test[n];
+            }
+            
+            // Apply BCs
+            for (int i = 0; i < m_test.num_nodes(); ++i) {
+                if (std::abs(m_test.nodes[i].x) < tol) {
+                    m_test.dirichlet.push_back({i, 0, 0.0});
+                }
+                if (std::abs(m_test.nodes[i].y) < tol) {
+                    m_test.dirichlet.push_back({i, 1, 0.0});
+                }
+            }
+            
+            // Apply load
+            for (int i = 0; i < m_test.num_nodes(); ++i) {
+                if (std::abs(m_test.nodes[i].x - Lx) < tol) {
+                    m_test.neumann.push_back({i, 0, sigma_inf * m_test.mat.t * Ly / ny_test});
+                }
+            }
+            
+            // Solve
+            auto result_test = fea::solve(m_test, use_cg);
+            
+            // Find max stress
+            double max_stress_test = 0.0;
+            for (const auto& s : result_test.stresses) {
+                if (s.von_mises > max_stress_test) max_stress_test = s.von_mises;
+            }
+            
+            // Compute h (element size)
+            double h = Lx / nx_test;
+            
+            max_stresses.push_back(max_stress_test);
+            h_values.push_back(h);
+            
+            std::cout << "Mesh " << nx_test << "x" << ny_test 
+                      << ": max_stress=" << max_stress_test << " Pa, h=" << h << std::endl;
+        }
+        
+        // Compute stress concentration factors
+        std::cout << "\nConvergence Results (Stress Concentration Factor):" << std::endl;
+        for (size_t i = 0; i < meshes.size(); ++i) {
+            double scf = max_stresses[i] / sigma_inf;
+            std::cout << "  " << meshes[i] << "x" << meshes[i] 
+                      << ": SCF=" << scf << " (expected ~3.0)" << std::endl;
+        }
+        
+        // Compute GCI
+        if (max_stresses.size() >= 2) {
+            double f1 = max_stresses.back();
+            double f2 = max_stresses[max_stresses.size() - 2];
+            double h1 = h_values.back();
+            double h2 = h_values[h_values.size() - 2];
+            double r = h2 / h1;
+            
+            // Assume second-order convergence
+            double p = 2.0;
+            double gci = std::abs(f1 - f2) / (std::pow(r, p) - 1.0);
+            double extrapolated = f1 + gci;
+            
+            std::cout << "\nRichardson Extrapolation:" << std::endl;
+            std::cout << "  Extrapolated max stress: " << extrapolated << " Pa" << std::endl;
+            std::cout << "  Extrapolated SCF: " << extrapolated / sigma_inf << std::endl;
+        }
+    }
+
     return 0;
 }

@@ -167,6 +167,7 @@ int main(int argc, char* argv[]) {
                                  result.cg_iterations, result.solve_time_ms);
     postprocess::write_displacement_json(outdir + "/displacement.json", m, result.displacement);
     postprocess::write_stress_json(outdir + "/stress.json", m, result.stresses);
+    postprocess::write_mesh_json(outdir + "/mesh.json", m);
 
     std::cout << "Output written to " << outdir << "/" << std::endl;
     return 0;

@@ -60,6 +60,7 @@ int main() {
                                  result.cg_iterations, result.solve_time_ms);
     postprocess::write_displacement_json("output/patch/displacement.json", m, result.displacement);
     postprocess::write_stress_json("output/patch/stress.json", m, result.stresses);
+    postprocess::write_mesh_json("output/patch/mesh.json", m);
 
     std::cout << "Output written to output/patch/" << std::endl;
 

@@ -122,6 +122,107 @@
       $$ \sigma_{vm} = \sqrt{\sigma_{xx}^2 - \sigma_{xx}\sigma_{yy} + \sigma_{yy}^2 + 3\sigma_{xy}^2} $$
     </div>
 
+    <h2>Strain-Displacement Relations</h2>
+    <p class="section-intro">
+      The strain tensor is related to the displacement field through the strain-displacement matrix B:
+    </p>
+    <div class="eq-box">
+      $$ \varepsilon = \begin{bmatrix} \varepsilon_{xx} \\ \varepsilon_{yy} \\ \gamma_{xy} \end{bmatrix} = \begin{bmatrix} \frac{\partial u}{\partial x} \\ \frac{\partial v}{\partial y} \\ \frac{\partial u}{\partial y} + \frac{\partial v}{\partial x} \end{bmatrix} = B \cdot d_e $$
+    </div>
+    <p class="section-intro">
+      where u and v are displacement components in x and y directions, and d_e is the element nodal displacement vector.
+    </p>
+
+    <h2>Principal Stresses</h2>
+    <p class="section-intro">
+      Principal stresses are the maximum and minimum normal stresses at a point, occurring on planes where shear stress is zero:
+    </p>
+    <div class="eq-box">
+      $$ \sigma_{1,2} = \frac{\sigma_{xx} + \sigma_{yy}}{2} \pm \sqrt{\left(\frac{\sigma_{xx} - \sigma_{yy}}{2}\right)^2 + \sigma_{xy}^2} $$
+    </div>
+    <p class="section-intro">
+      The principal angle (orientation of principal planes) is:
+    </p>
+    <div class="eq-box">
+      $$ \tan(2\theta_p) = \frac{2\sigma_{xy}}{\sigma_{xx} - \sigma_{yy}} $$
+    </div>
+
+    <h2>Strain Energy</h2>
+    <p class="section-intro">
+      The strain energy stored in the structure is:
+    </p>
+    <div class="eq-box">
+      $$ U = \frac{1}{2} \int_\Omega \sigma : \varepsilon \, d\Omega = \frac{1}{2} d^T K d $$
+    </div>
+    <p class="section-intro">
+      For linear elastic problems, the strain energy equals the work done by external forces:
+    </p>
+    <div class="eq-box">
+      $$ U = W = \frac{1}{2} f^T d $$
+    </div>
+
+    <h2>Mesh Convergence (GCI Method)</h2>
+    <p class="section-intro">
+      The Grid Convergence Index (GCI) quantifies discretization error in mesh refinement studies:
+    </p>
+    <div class="eq-box">
+      $$ GCI = \frac{F_s}{r^p - 1} \left| \frac{f_2 - f_1}{f_1} \right| $$
+    </div>
+    <p class="section-intro">
+      where F_s is the safety factor (3.0 for two meshes), r is the refinement ratio (h_coarse/h_fine),
+      p is the observed order of convergence, and f_1, f_2 are the fine and coarse mesh solutions.
+    </p>
+    <p class="section-intro">
+      Richardson extrapolation provides an estimate of the exact solution:
+    </p>
+    <div class="eq-box">
+      $$ f_{exact} \approx f_1 + \frac{f_1 - f_2}{r^p - 1} $$
+    </div>
+
+    <h2>Gauss Quadrature</h2>
+    <p class="section-intro">
+      Numerical integration uses Gauss quadrature. For 2x2 integration of Q4 elements:
+    </p>
+    <div class="eq-box">
+      $$ \int_{-1}^{1} \int_{-1}^{1} f(\xi, \eta) \, d\xi \, d\eta \approx \sum_{i=1}^{2} \sum_{j=1}^{2} w_i w_j f(\xi_i, \eta_j) $$
+    </div>
+    <p class="section-intro">
+      Integration points are at +/-1/sqrt(3) with unit weights (w_i = w_j = 1).
+    </p>
+
+    <h2>Assembly Process</h2>
+    <p class="section-intro">
+      Element stiffness matrices are assembled into the global system using connectivity matrices:
+    </p>
+    <div class="eq-box">
+      $$ K_{global} = \sum_{e=1}^{n_{elem}} L_e^T K_e L_e $$
+    </div>
+    <p class="section-intro">
+      where L_e is the Boolean connectivity matrix mapping element DOFs to global DOFs.
+      The assembly uses COO format (append-only) and converts to CSR for efficient matrix-vector products.
+    </p>
+
+    <h2>Boundary Conditions</h2>
+    <h3>Dirichlet (Essential)</h3>
+    <p class="section-intro">
+      Prescribed displacements on boundary Gamma_u:
+    </p>
+    <div class="eq-box">
+      $$ u_i = \bar{u}_i \quad \text{on } \Gamma_u $$
+    </div>
+    
+    <h3>Neumann (Natural)</h3>
+    <p class="section-intro">
+      Prescribed tractions on boundary Gamma_t:
+    </p>
+    <div class="eq-box">
+      $$ \sigma \cdot n = t \quad \text{on } \Gamma_t $$
+    </div>
+    <p class="section-intro">
+      In Cauchy, Dirichlet BCs are enforced using the penalty method, which adds a large stiffness
+      to constrained DOFs without restructuring the matrix.
+    </p>
+
     <h2>Conjugate Gradient Solver</h2>
     <p class="section-intro">
       For large sparse systems, CG solves Kx=f iteratively:

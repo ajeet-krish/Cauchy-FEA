@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 FEA-2D Postprocessor: JSON -> matplotlib contour plots
-Generates displacement and stress contour plots from simulation output.
+Generates displacement, stress, and convergence plots from simulation output.
 
 Usage:
     python3 scripts/postprocess.py output/patch/
@@ -32,6 +32,13 @@ def load_stress(outdir):
     with open(os.path.join(outdir, 'stress.json')) as f:
         return json.load(f)
 
+def load_mesh(outdir):
+    mesh_file = os.path.join(outdir, 'mesh.json')
+    if os.path.exists(mesh_file):
+        with open(mesh_file) as f:
+            return json.load(f)
+    return None
+
 
 def plot_displacement_contour(outdir, meta):
     data = load_displacement(outdir)
@@ -45,10 +52,11 @@ def plot_displacement_contour(outdir, meta):
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
+    triang = Triangulation(x, y)
+
     # Displacement magnitude
     ax = axes[0]
-    triang = Triangulation(x, y)
-    ax.tricontourf(triang, disp, levels=20, cmap='jet')
+    ax.tricontourf(triang, disp, levels=20, cmap='turbo')
     ax.set_title('|u| (m)')
     ax.set_aspect('equal')
     plt.colorbar(ax.collections[0], ax=ax, shrink=0.8)
@@ -75,33 +83,45 @@ def plot_displacement_contour(outdir, meta):
 
 
 def plot_stress_contour(outdir, meta):
-    data = load_stress(outdir)
-    elements = data['elements']
+    stress_file = os.path.join(outdir, 'stress.json')
+    if not os.path.exists(stress_file):
+        print(f'  No stress.json found in {outdir}, skipping stress contour')
+        return
+    
+    stress_data = load_stress(outdir)
+    elements = stress_data['elements']
+    mesh = load_mesh(outdir)
 
     von_mises = np.array([e['von_mises'] for e in elements])
     sigma_xx = np.array([e['sigma_xx'] for e in elements])
+    sigma_yy = np.array([e['sigma_yy'] for e in elements])
 
-    # For element-centered data, use element centroids
-    disp_data = load_displacement(outdir)
-    nodes = disp_data['nodes']
-    x = np.array([n['x'] for n in nodes])
-    y = np.array([n['y'] for n in nodes])
+    # Compute element centroids for proper scatter plotting
+    if mesh:
+        nodes = mesh['nodes']
+        quads = mesh['elements']
+        cx = np.array([(nodes[e['n0']]['x'] + nodes[e['n1']]['x'] +
+                        nodes[e['n2']]['x'] + nodes[e['n3']]['x']) / 4.0 for e in quads])
+        cy = np.array([(nodes[e['n0']]['y'] + nodes[e['n1']]['y'] +
+                        nodes[e['n2']]['y'] + nodes[e['n3']]['y']) / 4.0 for e in quads])
+    else:
+        disp_data = load_displacement(outdir)
+        nodes = disp_data['nodes']
+        cx = np.array([n['x'] for n in nodes])[:len(von_mises)]
+        cy = np.array([n['y'] for n in nodes])[:len(von_mises)]
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
     # Von Mises stress
     ax = axes[0]
-    sc = ax.scatter(x[::1], y[::1], c=von_mises[:len(x)] if len(von_mises) >= len(x)
-                    else np.resize(von_mises, len(x)),
-                    cmap='jet', s=1, vmin=0)
+    sc = ax.scatter(cx, cy, c=von_mises, cmap='viridis', s=1, vmin=0)
     ax.set_title('Von Mises Stress (Pa)')
     ax.set_aspect('equal')
     plt.colorbar(sc, ax=ax, shrink=0.8)
 
     # Sigma XX
     ax = axes[1]
-    sc = ax.scatter(x[:len(sigma_xx)], y[:len(sigma_xx)], c=sigma_xx,
-                    cmap='RdBu_r', s=1)
+    sc = ax.scatter(cx, cy, c=sigma_xx, cmap='RdBu_r', s=1)
     ax.set_title('Sigma XX (Pa)')
     ax.set_aspect('equal')
     plt.colorbar(sc, ax=ax, shrink=0.8)
@@ -111,6 +131,66 @@ def plot_stress_contour(outdir, meta):
     plt.savefig(os.path.join(outdir, 'stress_contour.png'), dpi=150, bbox_inches='tight')
     plt.close()
     print(f'  Saved stress_contour.png')
+
+
+def plot_deformed_mesh(outdir, meta, scale=None):
+    disp_data = load_displacement(outdir)
+    mesh = load_mesh(outdir)
+
+    if not mesh:
+        print(f'  No mesh.json found, skipping deformed mesh plot')
+        return
+
+    nodes_orig = mesh['nodes']
+    elements = mesh['elements']
+    nodes_disp = disp_data['nodes']
+
+    x_orig = np.array([n['x'] for n in nodes_orig])
+    y_orig = np.array([n['y'] for n in nodes_orig])
+    ux = np.array([n['ux'] for n in nodes_disp])
+    uy = np.array([n['uy'] for n in nodes_disp])
+
+    # Auto-scale deformation for visualization
+    if scale is None:
+        max_disp = np.max(np.sqrt(ux**2 + uy**2))
+        if max_disp > 0:
+            x_range = np.max(x_orig) - np.min(x_orig)
+            y_range = np.max(y_orig) - np.min(y_orig)
+            scale = 0.1 * max(x_range, y_range) / max_disp
+
+    x_def = x_orig + ux * scale
+    y_def = y_orig + uy * scale
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Draw undeformed mesh (wireframe)
+    for elem in elements:
+        n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
+        xs = list(x_orig[n]) + [x_orig[n[0]]]
+        ys = list(y_orig[n]) + [y_orig[n[0]]]
+        ax.plot(xs, ys, 'b-', linewidth=0.3, alpha=0.3)
+
+    # Draw deformed mesh outline
+    for elem in elements:
+        n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
+        xs = list(x_def[n]) + [x_def[n[0]]]
+        ys = list(y_def[n]) + [y_def[n[0]]]
+        ax.plot(xs, ys, 'k-', linewidth=0.3)
+
+    # Scatter colored by displacement magnitude
+    disp_mag = np.sqrt(ux**2 + uy**2)
+    sc = ax.scatter(x_def, y_def, c=disp_mag, cmap='turbo', s=2, zorder=5)
+    plt.colorbar(sc, ax=ax, shrink=0.8, label='|u| (m)')
+
+    ax.set_title(f'Deformed Mesh (scale: {scale:.0f}x)')
+    ax.set_aspect('equal')
+    ax.set_xlabel('x (m)')
+    ax.set_ylabel('y (m)')
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(outdir, 'deformed_mesh.png'), dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f'  Saved deformed_mesh.png')
 
 
 def plot_convergence(outdir):
@@ -163,30 +243,108 @@ def print_summary(outdir):
         print(f'  CG iterations: {meta["cg_iterations"]}')
 
 
+def plot_stress_contour_thumbnail(outdir, meta, figsize=(4, 3)):
+    """Generate a small thumbnail for the landing page."""
+    stress_file = os.path.join(outdir, 'stress.json')
+    if not os.path.exists(stress_file):
+        print(f'  No stress.json found in {outdir}, skipping thumbnail')
+        return
+    
+    stress_data = load_stress(outdir)
+    elements = stress_data['elements']
+    mesh = load_mesh(outdir)
+
+    von_mises = np.array([e['von_mises'] for e in elements])
+
+    if mesh:
+        nodes = mesh['nodes']
+        quads = mesh['elements']
+        cx = np.array([(nodes[e['n0']]['x'] + nodes[e['n1']]['x'] +
+                        nodes[e['n2']]['x'] + nodes[e['n3']]['x']) / 4.0 for e in quads])
+        cy = np.array([(nodes[e['n0']]['y'] + nodes[e['n1']]['y'] +
+                        nodes[e['n2']]['y'] + nodes[e['n3']]['y']) / 4.0 for e in quads])
+    else:
+        disp_data = load_displacement(outdir)
+        nodes = disp_data['nodes']
+        cx = np.array([n['x'] for n in nodes])[:len(von_mises)]
+        cy = np.array([n['y'] for n in nodes])[:len(von_mises)]
+
+    fig, ax = plt.subplots(figsize=figsize)
+    sc = ax.scatter(cx, cy, c=von_mises, cmap='viridis', s=1, vmin=0)
+    ax.set_aspect('equal')
+    ax.axis('off')
+    plt.colorbar(sc, ax=ax, shrink=0.8)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(outdir, 'thumbnail_stress.png'), dpi=100, bbox_inches='tight')
+    plt.close()
+    print(f'  Saved thumbnail_stress.png')
+
+
+def plot_all_cases(outdir_base):
+    """Generate PNGs for all 6 cases."""
+    cases = ['cantilever_32', 'cook_32', 'lbracket', 'michell', 'patch', 'plate_hole']
+    for case in cases:
+        outdir = os.path.join(outdir_base, case)
+        if os.path.exists(outdir) and os.path.exists(os.path.join(outdir, 'meta.json')):
+            print(f'\nProcessing {case}:')
+            meta = load_meta(outdir)
+            plot_displacement_contour(outdir, meta)
+            plot_stress_contour(outdir, meta)
+            plot_deformed_mesh(outdir, meta)
+        else:
+            print(f'\nSkipping {case}: output not found')
+
+
+def generate_thumbnails(outdir_base):
+    """Generate small thumbnails for landing page."""
+    cases = ['cantilever_32', 'cook_32', 'lbracket', 'michell', 'patch', 'plate_hole']
+    for case in cases:
+        outdir = os.path.join(outdir_base, case)
+        if os.path.exists(outdir) and os.path.exists(os.path.join(outdir, 'meta.json')):
+            print(f'\nGenerating thumbnail for {case}:')
+            meta = load_meta(outdir)
+            plot_stress_contour_thumbnail(outdir, meta)
+        else:
+            print(f'\nSkipping {case}: output not found')
+
+
 def main():
     parser = argparse.ArgumentParser(description='FEA-2D Postprocessor')
-    parser.add_argument('outdir', help='Output directory')
-    parser.add_argument('--all', action='store_true', help='Generate all plots')
+    parser.add_argument('outdir', help='Output directory (or base directory for --all-cases)')
+    parser.add_argument('--all', action='store_true', help='Generate all plots for a single case')
+    parser.add_argument('--all-cases', action='store_true', help='Generate PNGs for all 6 cases')
+    parser.add_argument('--thumbnails', action='store_true', help='Generate small thumbnails for landing page')
     parser.add_argument('--displacement', action='store_true', help='Displacement contour only')
     parser.add_argument('--stress', action='store_true', help='Stress contour only')
+    parser.add_argument('--deformed', action='store_true', help='Deformed mesh plot')
     parser.add_argument('--convergence', action='store_true', help='Convergence plot')
     args = parser.parse_args()
 
-    if not os.path.exists(os.path.join(args.outdir, 'meta.json')):
-        print(f'Error: No meta.json found in {args.outdir}')
-        sys.exit(1)
+    if args.all_cases:
+        plot_all_cases(args.outdir)
+        return
 
-    print_summary(args.outdir)
+    if args.thumbnails:
+        generate_thumbnails(args.outdir)
+        return
+
+    has_meta = os.path.exists(os.path.join(args.outdir, 'meta.json'))
+
+    if has_meta:
+        print_summary(args.outdir)
 
     if args.all or args.convergence:
         plot_convergence(args.outdir)
-    if args.all or args.displacement:
+    if (args.all or args.displacement) and has_meta:
         plot_displacement_contour(args.outdir, load_meta(args.outdir))
-    if args.all or args.stress:
+    if (args.all or args.stress) and has_meta:
         plot_stress_contour(args.outdir, load_meta(args.outdir))
+    if (args.all or args.deformed) and has_meta:
+        plot_deformed_mesh(args.outdir, load_meta(args.outdir))
 
-    if not (args.all or args.displacement or args.stress or args.convergence):
-        print('\n  Use --all, --displacement, --stress, or --convergence to generate plots')
+    if not (args.all or args.displacement or args.stress or args.deformed or args.convergence):
+        print('\n  Use --all, --all-cases, --thumbnails, --displacement, --stress, --deformed, or --convergence to generate plots')
 
 
 if __name__ == '__main__':

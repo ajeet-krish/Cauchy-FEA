@@ -285,4 +285,37 @@ inline void write_meta_json(
     f << "}\n";
 }
 
+// ------------------------------------------------------------------
+// Write mesh connectivity to JSON (for browser viewer)
+// ------------------------------------------------------------------
+inline void write_mesh_json(
+    const std::string& filepath,
+    const Mesh& m) {
+
+    std::ofstream f(filepath);
+    f << std::fixed << std::setprecision(6);
+    f << "{\n";
+    f << "  \"num_nodes\": " << m.num_nodes() << ",\n";
+    f << "  \"num_elements\": " << m.num_quads() << ",\n";
+    f << "  \"nodes\": [\n";
+    for (int i = 0; i < m.num_nodes(); ++i) {
+        f << "    {\"x\": " << m.nodes[i].x
+          << ", \"y\": " << m.nodes[i].y << "}";
+        if (i < m.num_nodes() - 1) f << ",";
+        f << "\n";
+    }
+    f << "  ],\n";
+    f << "  \"elements\": [\n";
+    for (int i = 0; i < m.num_quads(); ++i) {
+        f << "    {\"n0\": " << m.quad_elements[i][0]
+          << ", \"n1\": " << m.quad_elements[i][1]
+          << ", \"n2\": " << m.quad_elements[i][2]
+          << ", \"n3\": " << m.quad_elements[i][3] << "}";
+        if (i < m.num_quads() - 1) f << ",";
+        f << "\n";
+    }
+    f << "  ]\n";
+    f << "}\n";
+}
+
 }  // namespace postprocess
