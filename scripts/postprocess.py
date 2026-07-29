@@ -460,6 +460,63 @@ def plot_stress_contour_thumbnail(outdir, meta, figsize=(4, 3)):
     print(f'  Saved thumbnail_stress.png')
 
 
+def plot_deformed_mesh_thumbnail(outdir, meta, figsize=(4, 3)):
+    """Generate a small deformed mesh thumbnail for the landing page."""
+    disp_data = load_displacement(outdir)
+    mesh = load_mesh(outdir)
+
+    if not mesh:
+        print(f'  No mesh.json found, skipping deformed mesh thumbnail')
+        return
+
+    nodes_orig = mesh['nodes']
+    elements = mesh['elements']
+    nodes_disp = disp_data['nodes']
+
+    x_orig = np.array([n['x'] for n in nodes_orig])
+    y_orig = np.array([n['y'] for n in nodes_orig])
+    ux = np.array([n['ux'] for n in nodes_disp])
+    uy = np.array([n['uy'] for n in nodes_disp])
+    disp_mag = np.sqrt(ux**2 + uy**2)
+
+    max_disp = np.max(disp_mag)
+    if max_disp > 0:
+        x_range = np.max(x_orig) - np.min(x_orig)
+        y_range = np.max(y_orig) - np.min(y_orig)
+        scale = 0.1 * max(x_range, y_range) / max_disp
+    else:
+        scale = 1.0
+
+    x_def = x_orig + ux * scale
+    y_def = y_orig + uy * scale
+
+    vmin = 0
+    vmax = np.max(disp_mag)
+    cmap = plt.cm.turbo
+    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Draw deformed mesh with colormap edges
+    for elem in elements:
+        n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
+        n_closed = n + [n[0]]
+        for i in range(4):
+            i0, i1 = n_closed[i], n_closed[i + 1]
+            avg_disp = (disp_mag[i0] + disp_mag[i1]) / 2.0
+            color = cmap(norm(avg_disp))
+            ax.plot([x_def[i0], x_def[i1]], [y_def[i0], y_def[i1]], 
+                    color=color, linewidth=0.8, solid_capstyle='round')
+
+    ax.set_aspect('equal')
+    ax.axis('off')
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(outdir, 'thumbnail_deformed.png'), dpi=100, bbox_inches='tight')
+    plt.close()
+    print(f'  Saved thumbnail_deformed.png')
+
+
 def plot_all_cases(outdir_base):
     """Generate PNGs for all 6 cases."""
     cases = ['cantilever_32', 'cook_32', 'lbracket', 'michell', 'patch', 'plate_hole']
@@ -484,7 +541,7 @@ def generate_thumbnails(outdir_base):
         if os.path.exists(outdir) and os.path.exists(os.path.join(outdir, 'meta.json')):
             print(f'\nGenerating thumbnail for {case}:')
             meta = load_meta(outdir)
-            plot_stress_contour_thumbnail(outdir, meta)
+            plot_deformed_mesh_thumbnail(outdir, meta)
         else:
             print(f'\nSkipping {case}: output not found')
 
