@@ -1,0 +1,1 @@
+/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/FEA_Michell.dir/src/main_michell.cpp.o -o FEA_Michell  /opt/homebrew/opt/libomp/lib/libomp.dylib

@@ -79,6 +79,7 @@ open http://localhost:8765
 - **Scientific colormaps**: Turbo, viridis, RdBu_r for professional FEA visualization.
 - **Mesh convergence studies**: h-refinement with GCI (Grid Convergence Index) on log-log scale.
 - **Production-grade**: Google Test suite (22 tests), GitHub Actions CI on ubuntu + macos.
+- **Desktop application**: Qt 6 GUI for mesh generation, BC assignment, solver execution, and interactive results visualization (optional build).
 
 ## Element Formulation
 
@@ -122,25 +123,46 @@ fea-2d/
 ├── .github/workflows/ci.yml
 │
 ├── src/
-│   ├── fea_types.hpp              # Core types, enums, global config
-│   ├── fea.hpp                    # Solver core (assemble, solve, post-process)
-│   ├── elements.hpp               # Element stiffness (Bar + Q4 + Q8 + T3)
-│   ├── sparse.hpp                 # COO/CSR sparse matrix
-│   ├── solver.hpp                 # Cholesky + Conjugate Gradient
-│   ├── postprocess.hpp            # Stress recovery, Von Mises, JSON output
-│   ├── mesh.hpp                   # Structured quad mesher + Q8 generators
-│   ├── adaptivity.hpp             # ZZ SPR, error indicators, red-green refinement
-│   ├── convergence.hpp            # GCI computation, h-refinement wrapper
+│   ├── fea_types.hpp
+│   ├── fea.hpp
+│   ├── elements.hpp
+│   ├── sparse.hpp
+│   ├── solver.hpp
+│   ├── mesh.hpp
+│   ├── postprocess.hpp
+│   ├── adaptivity.hpp
+│   ├── convergence.hpp
 │   │
-│   ├── main_cantilever.cpp        # Case 1: Cantilever beam (--q8, --convergence)
-│   ├── main_michell.cpp           # Case 2: Michell truss
-│   ├── main_cook.cpp              # Case 3: Cook's membrane (--q8, --convergence)
-│   ├── main_lbracket.cpp          # Case 4: L-bracket stress concentration
-│   ├── main_patch.cpp             # Case 5: Patch test
-│   ├── main_plate_hole.cpp        # Case 6: Plate with hole (--q8, --convergence)
-│   ├── main_adapt_hole.cpp        # Adaptive refinement on plate-with-hole
+│   ├── main_cantilever.cpp
+│   ├── main_michell.cpp
+│   ├── main_cook.cpp
+│   ├── main_lbracket.cpp
+│   ├── main_patch.cpp
+│   ├── main_plate_hole.cpp
+│   ├── main_adapt_hole.cpp
+│   ├── main_thermal.cpp
 │   │
-│   └── fea_test.cpp               # Google Test suite (22 tests)
+│   └── fea_test.cpp
+│
+├── src/desktop/                  # Qt 6 desktop application (optional)
+│   ├── main.cpp
+│   ├── cauchy_app.hpp/cpp
+│   ├── main_window.hpp/cpp
+│   ├── mesh_editor.hpp/cpp
+│   ├── solver_panel.hpp/cpp
+│   ├── viewport_widget.hpp/cpp
+│   ├── result_model.hpp/cpp
+│   ├── solver_runner.hpp/cpp
+│   ├── project_io.hpp/cpp
+│   ├── convergence_chart.hpp/cpp
+│   ├── probe_tool.hpp/cpp
+│   ├── mesh_quality_overlay.hpp/cpp
+│   └── about_dialog.hpp/cpp
+│
+├── desktop/                      # Qt resources, .desktop file, Info.plist
+│   ├── resources.qrc
+│   ├── cauchy.desktop
+│   └── Info.plist
 │
 ├── scripts/
 │   ├── postprocess.py             # JSON -> matplotlib PNG contour plots
@@ -177,7 +199,144 @@ fea-2d/
 - Google Test (fetched via CMake FetchContent)
 - Python 3.8+ (for postprocessing scripts)
 - NumPy + Matplotlib (for Python postprocessor, optional)
+- Qt 6 (optional, for desktop application: `cmake -DCAUCHY_DESKTOP=ON`)
 
 ## License
 
 Portfolio project -- see repository for details.
+
+## Desktop Application
+
+Cauchy also ships as a native desktop FEA tool built with Qt 6. The desktop
+application provides an interactive GUI for mesh generation, boundary condition
+assignment, solver execution, and results visualization -- similar to commercial
+FEA tools like Abaqus CAE or ANSYS Mechanical, but focused on 2D plane
+stress/strain problems.
+
+The portfolio website (`docs/`) remains the project deliverable for hiring
+managers. The desktop application is the actual working tool used to run and
+analyze simulations.
+
+### Architecture
+
+```
+Cauchy Desktop (Qt 6)
+├── Application Shell (QMainWindow)
+│   ├── Menu bar (File, Edit, Solve, View, Help)
+│   ├── Toolbar (solver controls, view toggles)
+│   ├── Status bar (solver progress, mesh stats)
+│   ├── Left dock: Mesh & BC editor
+│   ├── Right dock: Properties & results
+│   └── Central: 3D viewport (QOpenGLWidget / QWebEngineView)
+│
+├── Solver Bridge (native C++ link, no IPC)
+│   ├── Mesh model (mirrors fea::Mesh)
+│   ├── Material model (mirrors fea::Material)
+│   ├── BC/Load model (QAbstractItemModel)
+│   ├── Solver runner (QThread, async)
+│   └── Result model (QAbstractItemModel for tables)
+│
+├── Visualization Engine
+│   ├── 3D viewport (reuse Three.js via QWebEngineView, or native OpenGL)
+│   ├── Contour mapping (same colormap JS logic)
+│   ├── Mesh quality overlay
+│   ├── Probe tool (click to read values)
+│   └── Animation controller
+│
+├── File I/O
+│   ├── Project file (.cauchy) -- JSON-based archive
+│   ├── Mesh import (JSON, Gmsh .msh, VTK .vtu)
+│   ├── Results export (JSON, CSV, VTU)
+│   └── Screenshot/PNG export
+│
+└── Solver Backend (existing C++ headers, linked directly)
+    ├── fea_types.hpp
+    ├── elements.hpp
+    ├── sparse.hpp
+    ├── solver.hpp
+    ├── mesh.hpp
+    ├── postprocess.hpp
+    ├── adaptivity.hpp
+    └── fea.hpp
+```
+
+### Key Design Decision: Native Link
+
+The solver is linked directly into the Qt application (not run as a subprocess).
+This eliminates JSON serialization overhead for internal data transfer and
+provides direct access to mesh/material/result data structures. The solver runs
+in a `QThread` to keep the UI responsive.
+
+### GUI Layout
+
+```
++----------------------------------------------------------+
+|  File  Edit  Solve  View  Help                           |  <- Menu bar
++------+-------------------------------------------+-------+
+| Mesh |  Node: 297    Elem: 256    DOF: 594         | Props|
+| Edit |  Material: Steel (E=200GPa, nu=0.3)       |      |
+|      |                                           |      |
+| BC   |  [Dirichlet]  Fixed left edge (x=0)       |      |
+|      |  [Neumann]    Force right edge: -1000 N   |      |
+|      |                                           |      |
+| Mesh |  [Generate]  [Refine]  [Coarsen]          |      |
+| Ops  |  [Import...]  [Export...]                 |      |
+|      |                                           |      |
+| Solve|  [Run Cholesky]  [Run CG]  [Convergence]  |      |
+|      |  [Adaptive]  [Reset]                     |      |
++------+-------------------------------------------+-------+
+|                                                          |
+|              3D Viewport (Three.js / OpenGL)            |
+|                                                          |
+|  [Undeformed] [Deformed] [Edges] [Arrows] [Boundary]   |
+|  Contour: [Von Mises v]  Scale: [====|====]  100x     |
+|  [Animate 10s]  [Export PNG]                            |
++----------------------------------------------------------+
+|  Status: Ready | Mesh: 297 nodes | Solver: Cholesky OK  |
++----------------------------------------------------------+
+```
+
+### Development Phases
+
+| Phase | Duration | Deliverable |
+|-------|----------|-------------|
+| 1 | Week 1-2 | Native solver link + async execution + basic viewport |
+| 2 | Week 3-4 | Full results visualization (contours, arrows, animation) |
+| 3 | Week 5-6 | Mesh generation/editing + quality metrics |
+| 4 | Week 7-8 | BC editor + material editor + project files |
+| 5 | Week 9-10 | Convergence study + energy balance + export |
+| 6 | Week 11-12 | Polish, packaging, CI for desktop, user guide |
+| 7+ | Ongoing | 3D elements, nonlinear, thermal, scripting |
+
+### Production-Grade Considerations
+
+- **Error handling**: Solver result struct with success/error/warning fields; user-facing toast notifications, not console-only errors
+- **Performance**: Async solver via QThread; progress signals every N elements assembled and every N CG iterations
+- **Memory**: Streaming results to disk for large meshes (>1M elements)
+- **Cross-platform**: Qt handles macOS, Linux, Windows from the same CMake tree
+- **Packaging**: CPack for DEB/RPM/DMG/NSIS installers; CI builds all platforms
+- **Extensibility**: Header-only solver backend allows plugin-style additions (new element types, material models)
+
+### Comparison with Commercial Tools
+
+| Capability | Cauchy Desktop | Abaqus CAE | ANSYS Mechanical | CalculiX + CGX |
+|-----------|----------------|------------|------------------|-----------------|
+| 2D elements | Q4, Q8, Bar | Full 3D | Full 3D | 2D + 3D |
+| Static linear | Yes | Yes | Yes | Yes |
+| Adaptive refinement | Yes (ZZ estimator) | Yes (h-adaptive) | Yes | No |
+| GUI framework | Qt (custom) | Qt (proprietary) | Proprietary | GTK (CGX) |
+| Solver | Cholesky + CG | Direct + Iterative | Direct + Iterative | Sparse direct |
+| Cost | Free (MIT) | ~$20K/license | ~$50K/license | Free (GPL) |
+| Transparency | Full source | Black box | Black box | Partial |
+
+### Build (Desktop App)
+
+```bash
+# Requires Qt 6 installed
+cmake -B build -DCAUCHY_DESKTOP=ON
+cmake --build build -j$(sysctl -n hw.ncpu)
+./build/cauchy-desktop
+```
+
+The desktop app is an optional build target. The default build (`cmake -B build`)
+produces only the CLI solvers and tests.

@@ -1,0 +1,1 @@
+/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/FEA_Patch.dir/src/main_patch.cpp.o -o FEA_Patch  /opt/homebrew/opt/libomp/lib/libomp.dylib

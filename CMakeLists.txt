@@ -99,3 +99,69 @@ add_custom_target(serve-docs
   COMMAND python3 -m http.server 8765 -d ${CMAKE_SOURCE_DIR}/docs
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
+
+# ------------------------------------------------------------------
+# Desktop Application (Qt 6, optional)
+# ------------------------------------------------------------------
+option(CAUCHY_DESKTOP "Build the Qt 6 desktop FEA application" OFF)
+
+if(CAUCHY_DESKTOP)
+  find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets)
+
+  set(CMAKE_AUTOMOC ON)
+  set(CMAKE_AUTORCC ON)
+  set(CMAKE_AUTOUIC ON)
+
+  set(DESKTOP_SOURCES
+    src/desktop/main.cpp
+    src/desktop/cauchy_app.cpp
+    src/desktop/main_window.cpp
+    src/desktop/mesh_editor.cpp
+    src/desktop/solver_panel.cpp
+    src/desktop/viewport_widget.cpp
+    src/desktop/result_model.cpp
+    src/desktop/solver_runner.cpp
+    src/desktop/project_io.cpp
+    src/desktop/convergence_chart.cpp
+    src/desktop/probe_tool.cpp
+    src/desktop/mesh_quality_overlay.cpp
+    src/desktop/about_dialog.cpp
+  )
+
+  set(DESKTOP_HEADERS
+    src/desktop/cauchy_app.hpp
+    src/desktop/main_window.hpp
+    src/desktop/mesh_editor.hpp
+    src/desktop/solver_panel.hpp
+    src/desktop/viewport_widget.hpp
+    src/desktop/result_model.hpp
+    src/desktop/solver_runner.hpp
+    src/desktop/project_io.hpp
+    src/desktop/convergence_chart.hpp
+    src/desktop/probe_tool.hpp
+    src/desktop/mesh_quality_overlay.hpp
+    src/desktop/about_dialog.hpp
+  )
+
+  add_executable(cauchy-desktop ${DESKTOP_SOURCES} ${DESKTOP_HEADERS})
+  target_include_directories(cauchy-desktop PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_link_libraries(cauchy-desktop PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Widgets Qt6::OpenGLWidgets OpenMP::OpenMP_CXX
+  )
+
+  # macOS bundle
+  if(APPLE)
+    set_target_properties(cauchy-desktop PROPERTIES
+      MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/desktop/Info.plist
+      MACOSX_BUNDLE_BUNDLE_NAME "Cauchy"
+      MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+    )
+  endif()
+
+  # Linux .desktop file
+  if(UNIX AND NOT APPLE)
+    install(FILES desktop/cauchy.desktop
+      DESTINATION share/applications
+    )
+  endif()
+endif()

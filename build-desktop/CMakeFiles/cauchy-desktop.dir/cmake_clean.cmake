@@ -1,0 +1,42 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/cauchy-desktop_autogen.dir/AutogenUsed.txt"
+  "CMakeFiles/cauchy-desktop_autogen.dir/ParseCache.txt"
+  "cauchy-desktop_autogen"
+  "CMakeFiles/cauchy-desktop.dir/cauchy-desktop_autogen/mocs_compilation.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/cauchy-desktop_autogen/mocs_compilation.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/about_dialog.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/about_dialog.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/cauchy_app.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/cauchy_app.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/convergence_chart.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/convergence_chart.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/main.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/main.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/main_window.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/main_window.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/mesh_editor.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/mesh_editor.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/mesh_quality_overlay.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/mesh_quality_overlay.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/probe_tool.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/probe_tool.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/project_io.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/project_io.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/result_model.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/result_model.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/solver_panel.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/solver_panel.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/solver_runner.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/solver_runner.cpp.o.d"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/viewport_widget.cpp.o"
+  "CMakeFiles/cauchy-desktop.dir/src/desktop/viewport_widget.cpp.o.d"
+  "cauchy-desktop"
+  "cauchy-desktop.pdb"
+  "cauchy-desktop_autogen/mocs_compilation.cpp"
+  "cauchy-desktop_autogen/timestamp"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/cauchy-desktop.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

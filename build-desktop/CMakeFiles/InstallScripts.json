@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/ajeet/Projects/fea-2d/build-desktop/cmake_install.cmake",
+		"/Users/ajeet/Projects/fea-2d/build-desktop/_deps/googletest-build/cmake_install.cmake",
+		"/Users/ajeet/Projects/fea-2d/build-desktop/_deps/googletest-build/googletest/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

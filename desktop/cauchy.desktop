@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Cauchy FEA
+Comment=2D Finite Element Structural Solver
+Exec=cauchy-desktop %f
+Terminal=false
+Categories=Science;Engineering;Physics;
+Keywords=FEA;FEM;Finite Element;Structural;Stress;Engineering;

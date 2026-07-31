@@ -28,6 +28,7 @@ Mechanical/aerospace hiring managers at SpaceX, Lockheed Martin, Northrop Grumma
 | 5 | Q8 serendipity element (3x3 Gauss, 16x16 stiffness) | Complete |
 | 6 | ZZ error estimator + adaptive h-refinement | Complete |
 | 7 | Website update (Q8 comparison, adaptive refinement) | Complete |
+| 8 | Desktop FEA application (Qt 6) | Planned |
 
 ## Architecture Decisions
 
@@ -232,3 +233,148 @@ docs/assets/js/
 - `--stress`: Generate stress contour only
 - `--deformed`: Generate deformed mesh only
 - `--convergence`: Generate convergence plot only
+
+## Desktop Application Plan
+
+### Overview
+A native Qt 6 desktop FEA tool that provides an interactive GUI for mesh
+generation, boundary condition assignment, solver execution, and results
+visualization. The portfolio website (`docs/`) remains the project deliverable
+for hiring managers. The desktop application is the actual working tool.
+
+### Architecture Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| GUI framework | Qt 6 (QWidgets + QOpenGLWidget) | Industry standard C++ GUI, native look, cross-platform, CMake-native |
+| 3D rendering | QWebEngineView (Three.js) + native QOpenGLWidget fallback | Reuse existing web viewer; native OpenGL for performance-critical paths |
+| Solver integration | Direct C++ link (no IPC) | Eliminates JSON serialization overhead; direct access to data structures |
+| Async execution | QThread with progress signals | Keeps UI responsive during solver runs |
+| Project format | JSON (.cauchy) | Same format as existing pipeline; human-readable |
+| Plotting | Qt Charts or QCustomPlot | Native Qt charting; no external JS dependency |
+| Packaging | CPack (DEB/RPM/DMG/NSIS) | Cross-platform installers from same CMake tree |
+| License | MIT (same as solver) | Consistent with existing project |
+
+### Desktop App File Structure
+
+```
+src/
+├── desktop/
+│   ├── main.cpp                  # Qt application entry point
+│   ├── cauchy_app.hpp            # QApplication subclass
+│   ├── cauchy_app.cpp
+│   ├── main_window.hpp           # QMainWindow with menu/toolbar/docks
+│   ├── main_window.cpp
+│   ├── mesh_editor.hpp           # Left dock: mesh generation + BC editor
+│   ├── mesh_editor.cpp
+│   ├── solver_panel.hpp          # Right dock: solver controls + results
+│   ├── solver_panel.cpp
+│   ├── viewport_widget.hpp       # Central: 3D viewport (QWebEngineView or QOpenGLWidget)
+│   ├── viewport_widget.cpp
+│   ├── result_model.hpp          # QAbstractItemModel for stress/displacement tables
+│   ├── result_model.cpp
+│   ├── solver_runner.hpp         # QThread wrapper for async solver execution
+│   ├── solver_runner.cpp
+│   ├── project_io.hpp            # Save/load .cauchy project files
+│   ├── project_io.cpp
+│   ├── convergence_chart.hpp     # Qt Charts convergence plot widget
+│   ├── convergence_chart.cpp
+│   ├── probe_tool.hpp            # Click-to-probe stress/displacement at a point
+│   ├── probe_tool.cpp
+│   ├── mesh_quality_overlay.hpp  # Aspect ratio / Jacobian heatmap overlay
+│   ├── mesh_quality_overlay.cpp
+│   └── about_dialog.hpp          # About/help dialog
+│
+└── desktop/
+    ├── resources.qrc             # Qt resource system (icons, styles)
+    ├── cauchy.desktop            # Linux .desktop file
+    └── Info.plist                # macOS .plist file
+
+docs/                             # Portfolio website (unchanged)
+scripts/                          # Python postprocessing (unchanged)
+```
+
+### Solver Bridge API
+
+The desktop app links directly to the existing solver headers. A new
+`fea::run_case()` function is extracted from the `main_*.cpp` entry points:
+
+```cpp
+struct SolveConfig {
+    CaseType case_type;
+    ElementType element_type;
+    PlaneType plane_type;
+    int nx;
+    int ny;
+    Material material;
+    std::vector<BoundaryCondition> boundary_conditions;
+    SolverType solver_type;       // Cholesky or CG
+    double cg_tolerance;
+    int cg_max_iterations;
+    bool use_adaptivity;
+    int adaptive_iterations;
+};
+
+struct SolveResult {
+    bool success;
+    std::string error_message;
+    std::string warning_message;
+    SolverType solver_used;
+    int iterations;
+    double final_residual;
+    double solve_time_ms;
+    Mesh mesh;
+    std::vector<NodeDisplacement> displacements;
+    std::vector<ElementStress> stresses;
+    std::vector<NodalStress> nodal_stresses;
+    ConvergenceData convergence;
+    double max_displacement;
+    double max_stress;
+    double strain_energy;
+};
+
+SolveResult run_case(const SolveConfig& config);
+```
+
+### Desktop App Code Conventions
+
+- C++20, same as solver backend
+- Qt 6 APIs (Qt6Core, Qt6Gui, Qt6Widgets, Qt6WebEngineWidgets)
+- 4-space indentation, K&R braces (same as solver)
+- `snake_case` for locals, `PascalCase` for classes/structs
+- `g_` prefix for inline globals (e.g., `g_app`, `g_main_window`)
+- `Q_OBJECT` macro for all QObject-derived classes
+- Signals/slots for solver-to-UI communication (not direct function calls)
+- `QThread` for async solver execution, not `QtConcurrent` (explicit control)
+- `QVariant` for flexible data passing in the result model
+- JSON for project file format (same as existing pipeline)
+
+### Production-Grade Features
+
+| Feature | Implementation |
+|---------|---------------|
+| Async solver | QThread with `started()` signal, `finished()` signal, progress |
+| Error handling | `SolveResult::success` + `error_message`; toast notifications |
+| Mesh quality | Aspect ratio + Jacobian per element; color-coded overlay |
+| Probe tool | Ray-cast from mouse to mesh; display node/element properties |
+| Undo/redo | `QUndoCommand` for model changes (BC assignment, mesh refine) |
+| Project files | JSON archive of config + results; load/save via QFileDialog |
+| Progress feedback | QProgressBar in status bar; solver status in status bar |
+| Memory management | Streaming results for meshes >100K elements |
+| Cross-platform | Qt handles macOS/Linux/Windows; CI builds all three |
+| Packaging | CPack generates DEB/RPM/DMG/NSIS from same build |
+
+### Desktop App Verification Checklist
+
+- [ ] Solver runs asynchronously without blocking UI
+- [ ] Mesh generation produces correct mesh for all 6 cases
+- [ ] BC editor assigns and persists boundary conditions correctly
+- [ ] Results visualization matches web viewer output
+- [ ] Convergence study produces correct GCI and order of convergence
+- [ ] Project save/load round-trips correctly
+- [ ] Error handling shows user-friendly messages for invalid inputs
+- [ ] Probe tool reads correct stress/displacement values at clicked points
+- [ ] Mesh quality overlay correctly identifies invalid elements
+- [ ] Cross-platform build passes on Ubuntu + macOS
+- [ ] Installer packages build correctly for all target platforms
+- [ ] All existing 22 Google Test cases still pass
