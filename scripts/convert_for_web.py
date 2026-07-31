@@ -99,8 +99,7 @@ def compute_principal_stresses(sigma_xx, sigma_yy, sigma_xy):
 
 
 def extract_boundary_conditions(outdir):
-    """Extract boundary conditions from meta.json or mesh.json."""
-    meta = load_json(outdir, 'meta.json')
+    """Extract boundary conditions from mesh.json."""
     mesh = load_json(outdir, 'mesh.json')
     
     boundary = {
@@ -108,13 +107,9 @@ def extract_boundary_conditions(outdir):
         'neumann': []
     }
     
-    # Try to extract from meta.json if available
-    if meta and 'boundary_conditions' in meta:
-        bc = meta['boundary_conditions']
-        if 'dirichlet' in bc:
-            boundary['dirichlet'] = bc['dirichlet']
-        if 'neumann' in bc:
-            boundary['neumann'] = bc['neumann']
+    if mesh:
+        boundary['dirichlet'] = mesh.get('dirichlet', [])
+        boundary['neumann'] = mesh.get('neumann', [])
     
     return boundary
 
@@ -151,17 +146,23 @@ def convert_single(outdir, outfile):
         return False
 
     nodes = mesh['nodes']
-    elements = mesh['elements']
+
+    # Handle new format (quad_elements + tri_elements) or legacy format (elements)
+    quad_elems = mesh.get('quad_elements', mesh.get('elements', []))
+    tri_elems = mesh.get('tri_elements', [])
 
     # Build node array for Three.js
     node_array = []
     for n in nodes:
         node_array.append({'x': n['x'], 'y': n['y'], 'z': 0.0})
 
-    # Build element array for Three.js
+    # Build element array for Three.js (quads only, split into triangles for Three.js)
     elem_array = []
-    for e in elements:
+    for e in quad_elems:
         elem_array.append({'n0': e['n0'], 'n1': e['n1'], 'n2': e['n2'], 'n3': e['n3']})
+    for e in tri_elems:
+        # Convert T3 to T4 (degenerate quad) for Three.js compatibility
+        elem_array.append({'n0': e['n0'], 'n1': e['n1'], 'n2': e['n2'], 'n3': e['n2']})
 
     # Displacement data
     disp_array = []
@@ -199,7 +200,8 @@ def convert_single(outdir, outfile):
         stress_data['theta2'] = theta2
 
     # Compute nodally-averaged stresses for smooth contours
-    node_stress_avg = compute_nodal_averaged_stresses(nodes, elements, stress['elements'] if stress else [])
+    all_elems = quad_elems + tri_elems
+    node_stress_avg = compute_nodal_averaged_stresses(nodes, all_elems, stress['elements'] if stress else [])
     
     nodal_stress = {
         'von_mises': [s['von_mises'] for s in node_stress_avg],
@@ -237,7 +239,7 @@ def convert_single(outdir, outfile):
     with open(outfile, 'w') as f:
         json.dump(output, f)
 
-    print(f'  Converted: {os.path.basename(outfile)} ({len(nodes)} nodes, {len(elements)} elements)')
+    print(f'  Converted: {os.path.basename(outfile)} ({len(nodes)} nodes, {len(all_elems)} elements)')
     return True
 
 

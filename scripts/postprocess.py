@@ -114,7 +114,9 @@ def nodal_average(element_values, mesh):
     return nodal_sum / nodal_count
 
 
-def plot_displacement_contour(outdir, meta):
+def plot_displacement_contour(outdir, meta, image_dir):
+    # Extract case name from outdir (e.g., 'output/cantilever_32' -> 'cantilever')
+    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
     data = load_displacement(outdir)
     nodes = data['nodes']
 
@@ -154,12 +156,14 @@ def plot_displacement_contour(outdir, meta):
 
     fig.suptitle(f'Displacement Field ({meta["num_nodes"]} nodes, {meta["num_elements"]} elements)')
     plt.tight_layout()
-    plt.savefig(os.path.join(outdir, 'displacement_contour.png'), dpi=150, bbox_inches='tight')
+    plt.savefig(os.path.join(image_dir, f'{case_name}_displacement_contour.png'), dpi=150, bbox_inches='tight')
     plt.close()
     print(f'  Saved displacement_contour.png')
 
 
-def plot_stress_contour(outdir, meta):
+def plot_stress_contour(outdir, meta, image_dir):
+    # Extract case name from outdir
+    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
     stress_file = os.path.join(outdir, 'stress.json')
     if not os.path.exists(stress_file):
         print(f'  No stress.json found in {outdir}, skipping stress contour')
@@ -225,12 +229,14 @@ def plot_stress_contour(outdir, meta):
 
     fig.suptitle(f'Stress Field ({meta["num_nodes"]} nodes, {meta["num_elements"]} elements)', fontsize=14)
     plt.tight_layout()
-    plt.savefig(os.path.join(outdir, 'stress_contour.png'), dpi=150, bbox_inches='tight')
+    plt.savefig(os.path.join(image_dir, f'{case_name}_stress_contour.png'), dpi=150, bbox_inches='tight')
     plt.close()
     print(f'  Saved stress_contour.png')
 
 
-def plot_deformed_mesh(outdir, meta, scale=None):
+def plot_deformed_mesh(outdir, meta, image_dir, scale=None):
+    # Extract case name from outdir
+    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
     disp_data = load_displacement(outdir)
     mesh = load_mesh(outdir)
 
@@ -349,12 +355,14 @@ def plot_deformed_mesh(outdir, meta, scale=None):
     ax.grid(True, alpha=0.15, linestyle='-', color='#dddddd')
 
     plt.tight_layout()
-    plt.savefig(os.path.join(outdir, 'deformed_mesh.png'), dpi=150, bbox_inches='tight')
+    plt.savefig(os.path.join(image_dir, f'{case_name}_deformed_mesh.png'), dpi=150, bbox_inches='tight')
     plt.close()
     print(f'  Saved deformed_mesh.png')
 
 
-def plot_principal_stress_arrows(outdir, meta):
+def plot_principal_stress_arrows(outdir, meta, image_dir):
+    # Extract case name from outdir
+    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
     stress_file = os.path.join(outdir, 'stress.json')
     if not os.path.exists(stress_file):
         print(f'  No stress.json found in {outdir}, skipping principal stress arrows')
@@ -451,12 +459,14 @@ def plot_principal_stress_arrows(outdir, meta):
     ax.grid(True, alpha=0.2)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(outdir, 'principal_stress.png'), dpi=150, bbox_inches='tight')
+    plt.savefig(os.path.join(image_dir, f'{case_name}_principal_stress.png'), dpi=150, bbox_inches='tight')
     plt.close()
     print(f'  Saved principal_stress.png')
 
 
-def plot_convergence(outdir):
+def plot_convergence(outdir, image_dir):
+    # Extract case name from outdir
+    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
     conv_file = os.path.join(outdir, 'convergence.json')
     if not os.path.exists(conv_file):
         print(f'  No convergence.json found in {outdir}')
@@ -490,7 +500,7 @@ def plot_convergence(outdir):
     ax.grid(True, which='both', alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(outdir, 'convergence.png'), dpi=150, bbox_inches='tight')
+    plt.savefig(os.path.join(image_dir, f'{case_name}_convergence.png'), dpi=150, bbox_inches='tight')
     plt.close()
     print(f'  Saved convergence.png')
 
@@ -506,8 +516,10 @@ def print_summary(outdir):
         print(f'  CG iterations: {meta["cg_iterations"]}')
 
 
-def plot_stress_contour_thumbnail(outdir, meta, figsize=(4, 3)):
+def plot_stress_contour_thumbnail(outdir, meta, image_dir, figsize=(4, 3)):
     """Generate a small thumbnail for the landing page."""
+    # Extract case name from outdir
+    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
     stress_file = os.path.join(outdir, 'stress.json')
     if not os.path.exists(stress_file):
         print(f'  No stress.json found in {outdir}, skipping thumbnail')
@@ -541,13 +553,15 @@ def plot_stress_contour_thumbnail(outdir, meta, figsize=(4, 3)):
     plt.colorbar(sc, ax=ax, shrink=0.8)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(outdir, 'thumbnail_stress.png'), dpi=100, bbox_inches='tight')
+    plt.savefig(os.path.join(image_dir, f'{case_name}_thumbnail_stress.png'), dpi=100, bbox_inches='tight')
     plt.close()
     print(f'  Saved thumbnail_stress.png')
 
 
-def plot_deformed_mesh_thumbnail(outdir, meta, figsize=(4, 3)):
+def plot_deformed_mesh_thumbnail(outdir, meta, image_dir, figsize=(4, 3)):
     """Generate a small deformed mesh thumbnail for the landing page."""
+    # Extract case name from outdir
+    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
     disp_data = load_displacement(outdir)
     mesh = load_mesh(outdir)
 
@@ -610,20 +624,23 @@ def plot_deformed_mesh_thumbnail(outdir, meta, figsize=(4, 3)):
     ax.axis('off')
 
     plt.tight_layout()
-    plt.savefig(os.path.join(outdir, 'thumbnail_deformed.png'), dpi=100, bbox_inches='tight')
+    plt.savefig(os.path.join(image_dir, f'{case_name}_thumbnail_deformed.png'), dpi=100, bbox_inches='tight')
     plt.close()
     print(f'  Saved thumbnail_deformed.png')
 
 
-def plot_mesh_quality(outdir, meta):
-    """Mesh geometry and quality statistics.
+def plot_mesh_quality(outdir, meta, image_dir):
+    """Mesh wireframe with boundary condition symbols.
     
-    2x2 subplot:
-    1. Mesh wireframe with element coloring by Jacobian ratio
-    2. Mesh wireframe with element coloring by aspect ratio
-    3. Histogram of quality metrics
-    4. Statistics text box (node count, element count, DOF count, min/max quality)
+    Single-panel figure showing:
+    1. Element edges as black wireframe lines
+    2. Yellow triangles at fully fixed nodes (ux=0 AND uy=0)
+    3. Yellow circles at roller nodes (single-DOF constraint)
+    4. Green/red arrows at force application points
+    5. Statistics text box (node count, element count, material)
     """
+    # Extract case name from outdir
+    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
     mesh = load_mesh(outdir)
     if not mesh:
         print(f'  No mesh.json found, skipping mesh quality')
@@ -632,7 +649,8 @@ def plot_mesh_quality(outdir, meta):
     nodes = mesh['nodes']
     quad_elems = mesh.get('quad_elements', [])
     tri_elems = mesh.get('tri_elements', [])
-    quality_summary = mesh.get('quality_summary', {})
+    dirichlet = mesh.get('dirichlet', [])
+    neumann = mesh.get('neumann', [])
 
     if not quad_elems and not tri_elems:
         print(f'  No elements found, skipping mesh quality')
@@ -641,155 +659,146 @@ def plot_mesh_quality(outdir, meta):
     x = np.array([n['x'] for n in nodes])
     y = np.array([n['y'] for n in nodes])
 
-    # Extract quality metrics
-    jacobian_ratios = []
-    aspect_ratios = []
-    areas = []
+    fig, ax = plt.subplots(figsize=(10, 8))
 
+    # 1. Draw wireframe (element edges)
     for elem in quad_elems:
-        jacobian_ratios.append(elem.get('jacobian_ratio', 1.0))
-        aspect_ratios.append(elem.get('aspect_ratio', 1.0))
-        areas.append(elem.get('area', 0.0))
-
+        n = [elem['n0'], elem['n1'], elem['n2'], elem['n3'], elem['n0']]
+        ax.plot([x[i] for i in n], [y[i] for i in n], 'k-', linewidth=0.5)
     for elem in tri_elems:
-        jacobian_ratios.append(elem.get('jacobian_ratio', 1.0))
-        aspect_ratios.append(elem.get('aspect_ratio', 1.0))
-        areas.append(elem.get('area', 0.0))
+        n = [elem['n0'], elem['n1'], elem['n2'], elem['n0']]
+        ax.plot([x[i] for i in n], [y[i] for i in n], 'k-', linewidth=0.5)
 
-    jacobian_ratios = np.array(jacobian_ratios)
-    aspect_ratios = np.array(aspect_ratios)
-    areas = np.array(areas)
+    # 2. Classify Dirichlet BCs
+    ux_fixed = set()
+    uy_fixed = set()
+    for bc in dirichlet:
+        if bc['dof'] == 0 and bc['value'] == 0.0:
+            ux_fixed.add(bc['node'])
+        elif bc['dof'] == 1 and bc['value'] == 0.0:
+            uy_fixed.add(bc['node'])
 
-    # Create figure with 2x2 subplots
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    fixed_nodes = ux_fixed & uy_fixed
+    roller_x_only = ux_fixed - uy_fixed
+    roller_y_only = uy_fixed - ux_fixed
 
-    # Plot 1: Jacobian ratio
-    ax1 = axes[0, 0]
-    if len(quad_elems) > 0:
-        # Draw quad elements colored by Jacobian ratio
-        for i, elem in enumerate(quad_elems):
-            n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
-            n_closed = n + [n[0]]
-            x_poly = [x[idx] for idx in n_closed]
-            y_poly = [y[idx] for idx in n_closed]
-            color = plt.cm.RdYlGn(jacobian_ratios[i])
-            ax1.fill(x_poly, y_poly, facecolor=color, edgecolor='black', linewidth=0.3)
-    if len(tri_elems) > 0:
-        for i, elem in enumerate(tri_elems):
-            n = [elem['n0'], elem['n1'], elem['n2']]
-            n_closed = n + [n[0]]
-            x_poly = [x[idx] for idx in n_closed]
-            y_poly = [y[idx] for idx in n_closed]
-            idx = len(quad_elems) + i
-            color = plt.cm.RdYlGn(jacobian_ratios[idx])
-            ax1.fill(x_poly, y_poly, facecolor=color, edgecolor='black', linewidth=0.3)
-    ax1.set_aspect('equal')
-    ax1.set_title('Jacobian Ratio (green=good, red=bad)')
-    sm1 = plt.cm.ScalarMappable(cmap='RdYlGn', norm=plt.Normalize(vmin=0, vmax=1))
-    sm1.set_array([])
-    plt.colorbar(sm1, ax=ax1, shrink=0.8)
+    # 3. Compute triangle size based on mesh dimensions
+    x_range = x.max() - x.min()
+    y_range = y.max() - y.min()
+    tri_size = min(x_range, y_range) * 0.03
 
-    # Plot 2: Aspect ratio
-    ax2 = axes[0, 1]
-    if len(quad_elems) > 0:
-        for i, elem in enumerate(quad_elems):
-            n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
-            n_closed = n + [n[0]]
-            x_poly = [x[idx] for idx in n_closed]
-            y_poly = [y[idx] for idx in n_closed]
-            # Clamp aspect ratio for coloring (1-10 range)
-            ar_clamped = min(aspect_ratios[i], 10.0)
-            color = plt.cm.viridis(ar_clamped / 10.0)
-            ax2.fill(x_poly, y_poly, facecolor=color, edgecolor='black', linewidth=0.3)
-    if len(tri_elems) > 0:
-        for i, elem in enumerate(tri_elems):
-            n = [elem['n0'], elem['n1'], elem['n2']]
-            n_closed = n + [n[0]]
-            x_poly = [x[idx] for idx in n_closed]
-            y_poly = [y[idx] for idx in n_closed]
-            idx = len(quad_elems) + i
-            ar_clamped = min(aspect_ratios[idx], 10.0)
-            color = plt.cm.viridis(ar_clamped / 10.0)
-            ax2.fill(x_poly, y_poly, facecolor=color, edgecolor='black', linewidth=0.3)
-    ax2.set_aspect('equal')
-    ax2.set_title('Aspect Ratio (lower=better)')
-    sm2 = plt.cm.ScalarMappable(cmap='viridis', norm=plt.Normalize(vmin=0, vmax=10))
-    sm2.set_array([])
-    plt.colorbar(sm2, ax=ax2, shrink=0.8)
+    # 4. Draw fixed support triangles (fully constrained)
+    for node in fixed_nodes:
+        cx, cy = x[node], y[node]
+        triangle = np.array([
+            [cx, cy + tri_size * 0.3],
+            [cx - tri_size * 0.5, cy - tri_size * 0.7],
+            [cx + tri_size * 0.5, cy - tri_size * 0.7],
+            [cx, cy + tri_size * 0.3]
+        ])
+        ax.fill(triangle[:, 0], triangle[:, 1],
+                facecolor='#FFD700', edgecolor='black', linewidth=0.8, zorder=5)
 
-    # Plot 3: Histogram of quality metrics
-    ax3 = axes[1, 0]
-    if len(jacobian_ratios) > 0:
-        ax3.hist(jacobian_ratios, bins=20, alpha=0.7, label='Jacobian Ratio', color='green')
-    if len(aspect_ratios) > 0:
-        # Plot aspect ratio on secondary x-axis
-        ax3_twin = ax3.twiny()
-        ax3_twin.hist(aspect_ratios, bins=20, alpha=0.5, label='Aspect Ratio', color='blue')
-        ax3_twin.set_xlabel('Aspect Ratio', color='blue')
-        ax3_twin.tick_params(axis='x', labelcolor='blue')
-    ax3.set_xlabel('Jacobian Ratio')
-    ax3.set_ylabel('Count')
-    ax3.set_title('Quality Distribution')
-    ax3.legend(loc='upper left')
+    # 5. Draw roller circles (single-DOF constraint)
+    for node in roller_x_only | roller_y_only:
+        cx, cy = x[node], y[node]
+        circle = plt.Circle((cx, cy), tri_size * 0.35,
+                            facecolor='#FFD700', edgecolor='black', linewidth=0.8, zorder=5)
+        ax.add_patch(circle)
 
-    # Plot 4: Statistics text box
-    ax4 = axes[1, 1]
-    ax4.axis('off')
-    
+    # 6. Draw force arrows
+    for bc in neumann:
+        node = bc['node']
+        dof = bc['dof']
+        value = bc['value']
+        if value == 0.0:
+            continue
+        cx, cy = x[node], y[node]
+        arrow_len = tri_size * 3.0
+        if dof == 0:
+            dx = arrow_len if value > 0 else -arrow_len
+            dy = 0.0
+        else:
+            dx = 0.0
+            dy = arrow_len if value > 0 else -arrow_len
+        color = '#228B22' if value > 0 else '#CC0000'
+        ax.annotate('', xy=(cx + dx, cy + dy), xytext=(cx, cy),
+                    arrowprops=dict(arrowstyle='->', color=color, lw=2.0), zorder=6)
+
+    ax.set_aspect('equal')
+    ax.set_xlabel('x (m)')
+    ax.set_ylabel('y (m)')
+    ax.set_title(f'Mesh: {len(nodes)} nodes, {len(quad_elems) + len(tri_elems)} elements')
+
+    # 7. Statistics text box
     stats_text = (
         f"Mesh Statistics\n"
-        f"{'='*30}\n"
-        f"Nodes: {len(nodes)}\n"
-        f"Elements: {len(quad_elems) + len(tri_elems)}\n"
-        f"  Q4: {len(quad_elems)}\n"
-        f"  T3: {len(tri_elems)}\n"
-        f"DOFs: {len(nodes) * 2}\n"
+        f"{'='*28}\n"
+        f"Nodes:      {len(nodes)}\n"
+        f"Elements:   {len(quad_elems) + len(tri_elems)}\n"
+        f"  Q4:       {len(quad_elems)}\n"
+        f"  T3:       {len(tri_elems)}\n"
+        f"DOFs:       {len(nodes) * 2}\n"
         f"\n"
-        f"Quality Summary\n"
-        f"{'='*30}\n"
-        f"Min Jacobian Ratio: {quality_summary.get('min_jacobian_ratio', 'N/A'):.4f}\n"
-        f"Max Aspect Ratio: {quality_summary.get('max_aspect_ratio', 'N/A'):.2f}\n"
-        f"Max Skewness: {quality_summary.get('max_skewness', 'N/A'):.4f}\n"
-        f"\n"
-        f"Total Area: {np.sum(areas):.6f} m^2\n"
+        f"Boundary Conditions\n"
+        f"{'='*28}\n"
+        f"Fixed (tri):    {len(fixed_nodes)}\n"
+        f"Roller (circ):  {len(roller_x_only | roller_y_only)}\n"
+        f"Forces (arrow): {len(neumann)}\n"
     )
-    ax4.text(0.1, 0.9, stats_text, transform=ax4.transAxes, fontsize=11,
-             verticalalignment='top', fontfamily='monospace',
-             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    ax.text(0.98, 0.98, stats_text, transform=ax.transAxes, fontsize=9,
+            verticalalignment='top', horizontalalignment='right',
+            fontfamily='monospace',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
 
-    plt.suptitle('Mesh Quality Analysis', fontsize=14, fontweight='bold')
+    # Legend
+    from matplotlib.patches import Patch
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Patch(facecolor='#FFD700', edgecolor='black', label='Fixed support'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#FFD700',
+               markeredgecolor='black', markersize=8, label='Roller'),
+        Line2D([0], [0], marker='>', color='w', markerfacecolor='#228B22',
+               markeredgecolor='#228B22', markersize=8, label='Force (+)'),
+        Line2D([0], [0], marker='>', color='w', markerfacecolor='#CC0000',
+               markeredgecolor='#CC0000', markersize=8, label='Force (-)'),
+    ]
+    ax.legend(handles=legend_elements, loc='lower left', fontsize=8)
+
     plt.tight_layout()
-    plt.savefig(os.path.join(outdir, 'mesh_quality.png'), dpi=150, bbox_inches='tight')
+    plt.savefig(os.path.join(image_dir, f'{case_name}_mesh_quality.png'), dpi=150, bbox_inches='tight')
     plt.close()
-    print(f'  Saved mesh_quality.png')
+    print(f'  Saved {case_name}_mesh_quality.png')
 
 
-def plot_all_cases(outdir_base):
+def plot_all_cases(outdir_base, image_dir):
     """Generate PNGs for all cases."""
+    os.makedirs(image_dir, exist_ok=True)
     cases = ['cantilever_32', 'cook_32', 'lbracket', 'michell', 'patch', 'plate_hole', 'thermal_cylinder']
     for case in cases:
         outdir = os.path.join(outdir_base, case)
         if os.path.exists(outdir) and os.path.exists(os.path.join(outdir, 'meta.json')):
             print(f'\nProcessing {case}:')
             meta = load_meta(outdir)
-            plot_mesh_quality(outdir, meta)
-            plot_displacement_contour(outdir, meta)
-            plot_stress_contour(outdir, meta)
-            plot_deformed_mesh(outdir, meta)
-            plot_principal_stress_arrows(outdir, meta)
+            plot_mesh_quality(outdir, meta, image_dir)
+            plot_displacement_contour(outdir, meta, image_dir)
+            plot_stress_contour(outdir, meta, image_dir)
+            plot_deformed_mesh(outdir, meta, image_dir)
+            plot_principal_stress_arrows(outdir, meta, image_dir)
         else:
             print(f'\nSkipping {case}: output not found')
 
 
-def generate_thumbnails(outdir_base):
+def generate_thumbnails(outdir_base, image_dir):
     """Generate small thumbnails for landing page."""
+    os.makedirs(image_dir, exist_ok=True)
     cases = ['cantilever_32', 'cook_32', 'lbracket', 'michell', 'patch', 'plate_hole']
     for case in cases:
         outdir = os.path.join(outdir_base, case)
         if os.path.exists(outdir) and os.path.exists(os.path.join(outdir, 'meta.json')):
             print(f'\nGenerating thumbnail for {case}:')
             meta = load_meta(outdir)
-            plot_deformed_mesh_thumbnail(outdir, meta)
+            plot_deformed_mesh_thumbnail(outdir, meta, image_dir)
         else:
             print(f'\nSkipping {case}: output not found')
 
@@ -797,6 +806,7 @@ def generate_thumbnails(outdir_base):
 def main():
     parser = argparse.ArgumentParser(description='FEA-2D Postprocessor')
     parser.add_argument('outdir', help='Output directory (or base directory for --all-cases)')
+    parser.add_argument('--image-dir', default='docs/assets/images', help='Directory to save PNG plots (default: docs/assets/images)')
     parser.add_argument('--all', action='store_true', help='Generate all plots for a single case')
     parser.add_argument('--all-cases', action='store_true', help='Generate PNGs for all 6 cases')
     parser.add_argument('--thumbnails', action='store_true', help='Generate small thumbnails for landing page')
@@ -809,11 +819,11 @@ def main():
     args = parser.parse_args()
 
     if args.all_cases:
-        plot_all_cases(args.outdir)
+        plot_all_cases(args.outdir, args.image_dir)
         return
 
     if args.thumbnails:
-        generate_thumbnails(args.outdir)
+        generate_thumbnails(args.outdir, args.image_dir)
         return
 
     has_meta = os.path.exists(os.path.join(args.outdir, 'meta.json'))
@@ -821,18 +831,21 @@ def main():
     if has_meta:
         print_summary(args.outdir)
 
+    # Ensure image directory exists
+    os.makedirs(args.image_dir, exist_ok=True)
+
     if args.all or args.convergence:
-        plot_convergence(args.outdir)
+        plot_convergence(args.outdir, args.image_dir)
     if (args.all or args.displacement) and has_meta:
-        plot_displacement_contour(args.outdir, load_meta(args.outdir))
+        plot_displacement_contour(args.outdir, load_meta(args.outdir), args.image_dir)
     if (args.all or args.stress) and has_meta:
-        plot_stress_contour(args.outdir, load_meta(args.outdir))
+        plot_stress_contour(args.outdir, load_meta(args.outdir), args.image_dir)
     if (args.all or args.deformed) and has_meta:
-        plot_deformed_mesh(args.outdir, load_meta(args.outdir))
+        plot_deformed_mesh(args.outdir, load_meta(args.outdir), args.image_dir)
     if (args.all or args.principal) and has_meta:
-        plot_principal_stress_arrows(args.outdir, load_meta(args.outdir))
+        plot_principal_stress_arrows(args.outdir, load_meta(args.outdir), args.image_dir)
     if (args.all or args.mesh_quality) and has_meta:
-        plot_mesh_quality(args.outdir, load_meta(args.outdir))
+        plot_mesh_quality(args.outdir, load_meta(args.outdir), args.image_dir)
 
     if not (args.all or args.displacement or args.stress or args.deformed or args.principal or args.mesh_quality or args.convergence):
         print('\n  Use --all, --all-cases, --thumbnails, --displacement, --stress, --deformed, --principal, --mesh-quality, or --convergence to generate plots')
