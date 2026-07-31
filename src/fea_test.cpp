@@ -357,6 +357,161 @@ TEST(CGTest, ConvergenceOnFEASystem) {
 }
 
 // ==========================================================================
+// Q8 ELEMENT TESTS
+// ==========================================================================
+
+TEST(Q8ElementTest, PatchTest) {
+    // 2x2 Q8 elements, prescribe exact linear displacement on all nodes
+    // Verify element reproduces constant stress state within tolerance
+    double L = 2.0, H = 2.0;
+    int nx = 2, ny = 2;
+    auto m = mesh::generate_structured_quad8(L, H, nx, ny);
+    m.mat = Material::steel();
+    m.mat.t = 0.01;
+    m.plane = PlaneType::STRESS;
+
+    int num_corners = (nx + 1) * (ny + 1);
+    int num_hmid = nx * (ny + 1);
+    double eps_xx = 0.0005;
+
+    for (int j = 0; j <= ny; ++j) {
+        for (int i = 0; i <= nx; ++i) {
+            int node = j * (nx + 1) + i;
+            m.dirichlet.push_back({node, 0, eps_xx * m.nodes[node].x});
+            m.dirichlet.push_back({node, 1, 0.0});
+        }
+    }
+    for (int j = 0; j <= ny; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            int node = num_corners + j * nx + i;
+            m.dirichlet.push_back({node, 0, eps_xx * m.nodes[node].x});
+            m.dirichlet.push_back({node, 1, 0.0});
+        }
+    }
+    for (int j = 0; j < ny; ++j) {
+        for (int i = 0; i <= nx; ++i) {
+            int node = num_corners + num_hmid + j * (nx + 1) + i;
+            m.dirichlet.push_back({node, 0, eps_xx * m.nodes[node].x});
+            m.dirichlet.push_back({node, 1, 0.0});
+        }
+    }
+
+    auto result = fea::solve(m);
+
+    double sigma_xx_expected = m.mat.E * eps_xx / (1.0 - m.mat.nu * m.mat.nu);
+    double sigma_yy_expected = m.mat.nu * sigma_xx_expected;
+
+    // Allow 5% tolerance for Gauss point stress averaging
+    for (const auto& s : result.stresses) {
+        EXPECT_NEAR(s.sigma_xx, sigma_xx_expected, sigma_xx_expected * 0.05);
+        EXPECT_NEAR(s.sigma_yy, sigma_yy_expected, sigma_yy_expected * 0.05);
+        EXPECT_NEAR(s.sigma_xy, 0.0, 100.0);
+    }
+}
+
+TEST(Q8ElementTest, ShapeFunctions) {
+    // Check shape functions at nodes
+    // Node 0: (-1,-1) -> N0=1, others=0
+    double xi = -1.0, eta = -1.0;
+    double N[8];
+    N[0] = 0.25 * (1.0 - xi) * (1.0 - eta) * (-xi - eta - 1.0);
+    N[1] = 0.25 * (1.0 + xi) * (1.0 - eta) * (xi - eta - 1.0);
+    N[2] = 0.25 * (1.0 + xi) * (1.0 + eta) * (xi + eta - 1.0);
+    N[3] = 0.25 * (1.0 - xi) * (1.0 + eta) * (-xi + eta - 1.0);
+    N[4] = 0.5 * (1.0 - xi * xi) * (1.0 - eta);
+    N[5] = 0.5 * (1.0 + xi) * (1.0 - eta * eta);
+    N[6] = 0.5 * (1.0 - xi * xi) * (1.0 + eta);
+    N[7] = 0.5 * (1.0 - xi) * (1.0 - eta * eta);
+
+    EXPECT_NEAR(N[0], 1.0, 1e-10);
+    EXPECT_NEAR(N[1], 0.0, 1e-10);
+    EXPECT_NEAR(N[2], 0.0, 1e-10);
+    EXPECT_NEAR(N[3], 0.0, 1e-10);
+    EXPECT_NEAR(N[4], 0.0, 1e-10);
+    EXPECT_NEAR(N[5], 0.0, 1e-10);
+    EXPECT_NEAR(N[6], 0.0, 1e-10);
+    EXPECT_NEAR(N[7], 0.0, 1e-10);
+
+    // Check partition of unity at center
+    xi = 0.0; eta = 0.0;
+    N[0] = 0.25 * (1.0 - xi) * (1.0 - eta) * (-xi - eta - 1.0);
+    N[1] = 0.25 * (1.0 + xi) * (1.0 - eta) * (xi - eta - 1.0);
+    N[2] = 0.25 * (1.0 + xi) * (1.0 + eta) * (xi + eta - 1.0);
+    N[3] = 0.25 * (1.0 - xi) * (1.0 + eta) * (-xi + eta - 1.0);
+    N[4] = 0.5 * (1.0 - xi * xi) * (1.0 - eta);
+    N[5] = 0.5 * (1.0 + xi) * (1.0 - eta * eta);
+    N[6] = 0.5 * (1.0 - xi * xi) * (1.0 + eta);
+    N[7] = 0.5 * (1.0 - xi) * (1.0 - eta * eta);
+
+    double sum = 0.0;
+    for (int i = 0; i < 8; ++i) sum += N[i];
+    EXPECT_NEAR(sum, 1.0, 1e-10);
+}
+
+TEST(Q8ElementTest, CantileverComparison) {
+    double L = 1.0, H = 0.25, P = -1000.0, t = 0.01;
+    int nx = 16, ny = 4;
+
+    auto mat = Material::steel();
+    mat.t = t;
+    double I = t * H * H * H / 12.0;
+    double delta_exact = P * L * L * L / (3.0 * mat.E * I);
+
+    // Q4 mesh
+    auto m4 = mesh::generate_structured_quad(L, H, nx, ny);
+    m4.mat = mat;
+    m4.plane = PlaneType::STRESS;
+    for (int j = 0; j <= ny; ++j) {
+        int node = j * (nx + 1);
+        m4.dirichlet.push_back({node, 0, 0.0});
+        m4.dirichlet.push_back({node, 1, 0.0});
+    }
+    int tip4 = ny * (nx + 1) + nx;
+    m4.neumann.push_back({tip4, 1, P});
+    auto r4 = fea::solve(m4);
+    double delta4 = std::abs(r4.displacement[dof_index(tip4, 1)]);
+
+    // Q8 mesh
+    auto m8 = mesh::generate_structured_quad8(L, H, nx, ny);
+    m8.mat = mat;
+    m8.plane = PlaneType::STRESS;
+
+    int num_corners = (nx + 1) * (ny + 1);
+    int num_hmid = nx * (ny + 1);
+
+    // Fix left edge: corners + vertical midside nodes
+    for (int j = 0; j <= ny; ++j) {
+        int corner = j * (nx + 1);
+        m8.dirichlet.push_back({corner, 0, 0.0});
+        m8.dirichlet.push_back({corner, 1, 0.0});
+        int vmid = num_corners + num_hmid + j * (nx + 1);
+        m8.dirichlet.push_back({vmid, 0, 0.0});
+        m8.dirichlet.push_back({vmid, 1, 0.0});
+    }
+
+    // Q8 tip node is the same corner node as Q4
+    int tip8 = ny * (nx + 1) + nx;
+    m8.neumann.push_back({tip8, 1, P});
+    auto r8 = fea::solve(m8);
+    double delta8 = std::abs(r8.displacement[dof_index(tip8, 1)]);
+
+    double delta_exact_abs = std::abs(P * L * L * L / (3.0 * mat.E * I));
+
+    std::cout << "Q4 tip: " << delta4 << ", Q8 tip: " << delta8
+              << ", exact: " << delta_exact_abs << std::endl;
+
+    double err4 = std::abs(delta4 - delta_exact_abs) / delta_exact_abs;
+    double err8 = std::abs(delta8 - delta_exact_abs) / delta_exact_abs;
+
+    std::cout << "Q4 error: " << err4 * 100.0 << "%" << std::endl;
+    std::cout << "Q8 error: " << err8 * 100.0 << "%" << std::endl;
+
+    // Both should be reasonable
+    EXPECT_LT(err4, 0.50);
+    EXPECT_LT(err8, 0.50);
+}
+
+// ==========================================================================
 // NEGATIVE JACOBIAN DETECTION
 // ==========================================================================
 

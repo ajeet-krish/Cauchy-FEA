@@ -1,6 +1,7 @@
 build/
 output/
 docs/output/
+docs/assets/data/
 docs/assets/videos/*.mp4
 **/.DS_Store
 
@@ -8,3 +9,11 @@ __pycache__/
 *.pyc
 *.pyo
 .venv/
+
+# PINN models and data
+*.onnx
+pinn/data/
+pinn/models/
+
+# OpenCode
+.cache/

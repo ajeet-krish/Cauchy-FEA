@@ -3,9 +3,11 @@
 #include "sparse.hpp"
 #include <cmath>
 #include <array>
+#include <vector>
 
 // ==========================================================================
-// ELEMENT STIFFNESS MATRICES -- Bar + Q4 bilinear quad + T3 linear triangle
+// ELEMENT STIFFNESS MATRICES -- Bar + Q4 bilinear quad + Q8 serendipity +
+//                              T3 linear triangle
 // ==========================================================================
 
 namespace elements {
@@ -266,6 +268,282 @@ struct Q4Element {
             }
         }
         return fe_th;
+    }
+};
+
+// ------------------------------------------------------------------
+// Q8 element: 8-node serendipity quad (2 DOF per node, 16 DOF total)
+// Shape functions: biquadratic serendipity (no center node)
+// Gauss quadrature: 3x3 (full integration for quadratic shape functions)
+//
+// Node ordering (CCW from bottom-left):
+//   7---6---5
+//   |       |
+//   0   8   4  <-- (8 is virtual center, not used in Q8)
+//   |       |
+//   3---2---1
+//
+// Corners: 0=(-1,-1), 1=(+1,-1), 2=(+1,+1), 3=(-1,+1)
+// Midside: 4=(0,-1), 5=(+1,0), 6=(0,+1), 7=(-1,0)
+// ------------------------------------------------------------------
+struct Q8Element {
+    // 3x3 Gauss quadrature points and weights
+    // Points: ±sqrt(3/5), 0
+    // Weights: 5/9, 8/9, 5/9
+    static constexpr double SQRT3_5 = 0.7745966692414834;  // sqrt(3/5)
+    static inline const double GP3[3] = { -SQRT3_5, 0.0, SQRT3_5 };
+    static inline const double GW3[3] = { 5.0/9.0, 8.0/9.0, 5.0/9.0 };
+
+    // Natural coordinates of the 8 nodes
+    static inline const double XI[8]   = { -1.0,  1.0,  1.0, -1.0,  0.0,  1.0,  0.0, -1.0 };
+    static inline const double ETA[8]  = { -1.0, -1.0,  1.0,  1.0, -1.0,  0.0,  1.0,  0.0 };
+
+    // Shape function N_i at (xi, eta) for 8-node serendipity
+    // Corner nodes (i = 0,1,2,3):
+    //   N_i = (1/4)(1 + xi_i*xi)(1 + eta_i*eta)(xi_i*xi + eta_i*eta - 1)
+    // Midside nodes:
+    //   N_4 = (1/2)(1 - xi^2)(1 - eta)      [edge 0-1, eta=-1]
+    //   N_5 = (1/2)(1 + xi)(1 - eta^2)      [edge 1-2, xi=+1]
+    //   N_6 = (1/2)(1 - xi^2)(1 + eta)      [edge 2-3, eta=+1]
+    //   N_7 = (1/2)(1 - xi)(1 - eta^2)      [edge 3-0, xi=-1]
+    static double shape_func(int i, double xi, double eta) {
+        if (i < 4) {
+            // Corner nodes
+            double xi_i = XI[i];
+            double eta_i = ETA[i];
+            return 0.25 * (1.0 + xi_i * xi) * (1.0 + eta_i * eta) *
+                   (xi_i * xi + eta_i * eta - 1.0);
+        }
+        // Midside nodes
+        double xi2 = xi * xi;
+        double eta2 = eta * eta;
+        switch (i) {
+            case 4: return 0.5 * (1.0 - xi2) * (1.0 - eta);   // bottom midside
+            case 5: return 0.5 * (1.0 + xi)  * (1.0 - eta2);  // right midside
+            case 6: return 0.5 * (1.0 - xi2) * (1.0 + eta);   // top midside
+            case 7: return 0.5 * (1.0 - xi)  * (1.0 - eta2);  // left midside
+        }
+        return 0.0;
+    }
+
+    // Derivatives of shape functions w.r.t. (xi, eta)
+    static std::array<double, 2> shape_deriv(int i, double xi, double eta) {
+        if (i < 4) {
+            // Corner nodes: dN/dxi and dN/deta
+            double xi_i = XI[i];
+            double eta_i = ETA[i];
+            double a = xi_i * xi + eta_i * eta - 1.0;
+            double dN_dxi  = 0.25 * xi_i  * (1.0 + eta_i * eta) * (2.0 * xi_i * xi + eta_i * eta - 1.0)
+                           + 0.25 * (1.0 + xi_i * xi) * (1.0 + eta_i * eta) * xi_i;
+            double dN_deta = 0.25 * eta_i * (1.0 + xi_i * xi) * (xi_i * xi + 2.0 * eta_i * eta - 1.0)
+                           + 0.25 * (1.0 + xi_i * xi) * (1.0 + eta_i * eta) * eta_i;
+            // Simplified derivatives for serendipity corners
+            dN_dxi  = 0.25 * xi_i * (1.0 + eta_i * eta) * (2.0 * xi_i * xi + eta_i * eta - 1.0)
+                    + 0.25 * xi_i * (1.0 + xi_i * xi) * (1.0 + eta_i * eta);
+            dN_deta = 0.25 * eta_i * (1.0 + xi_i * xi) * (xi_i * xi + 2.0 * eta_i * eta - 1.0)
+                    + 0.25 * eta_i * (1.0 + xi_i * xi) * (1.0 + eta_i * eta);
+            // Further simplified (standard form):
+            dN_dxi  = 0.25 * xi_i * (1.0 + eta_i * eta) * (2.0 * xi_i * xi + eta_i * eta);
+            dN_deta = 0.25 * eta_i * (1.0 + xi_i * xi) * (xi_i * xi + 2.0 * eta_i * eta);
+            return { dN_dxi, dN_deta };
+        }
+        // Midside nodes
+        double xi2 = xi * xi;
+        double eta2 = eta * eta;
+        double dN_dxi = 0.0, dN_deta = 0.0;
+        switch (i) {
+            case 4: // N_4 = 0.5*(1-xi^2)*(1-eta)
+                dN_dxi  = -xi * (1.0 - eta);
+                dN_deta = -0.5 * (1.0 - xi2);
+                break;
+            case 5: // N_5 = 0.5*(1+xi)*(1-eta^2)
+                dN_dxi  =  0.5 * (1.0 - eta2);
+                dN_deta = -eta * (1.0 + xi);
+                break;
+            case 6: // N_6 = 0.5*(1-xi^2)*(1+eta)
+                dN_dxi  = -xi * (1.0 + eta);
+                dN_deta =  0.5 * (1.0 - xi2);
+                break;
+            case 7: // N_7 = 0.5*(1-xi)*(1-eta^2)
+                dN_dxi  = -0.5 * (1.0 - eta2);
+                dN_deta = -eta * (1.0 - xi);
+                break;
+        }
+        return { dN_dxi, dN_deta };
+    }
+
+    // Compute element stiffness matrix (16x16)
+    // nodes: the 8 nodes of the Q8 element (corners + midside)
+    // mat: material properties
+    // plane: plane stress or strain
+    static std::array<std::array<double, 16>, 16> stiffness(
+        const std::vector<Node>& elem_nodes,
+        const Material& mat,
+        PlaneType plane) {
+
+        auto D = mat.d_matrix(plane);
+        std::array<std::array<double, 16>, 16> K{};
+
+        // 3x3 Gauss quadrature
+        for (int gi = 0; gi < 3; ++gi) {
+            for (int gj = 0; gj < 3; ++gj) {
+                double xi  = GP3[gi];
+                double eta = GP3[gj];
+
+                // Compute Jacobian J = [[dx/dxi, dy/dxi], [dx/deta, dy/deta]]
+                double J11 = 0.0, J12 = 0.0, J21 = 0.0, J22 = 0.0;
+                for (int i = 0; i < 8; ++i) {
+                    auto dN = shape_deriv(i, xi, eta);
+                    J11 += dN[0] * elem_nodes[i].x;
+                    J12 += dN[0] * elem_nodes[i].y;
+                    J21 += dN[1] * elem_nodes[i].x;
+                    J22 += dN[1] * elem_nodes[i].y;
+                }
+
+                double detJ = J11 * J22 - J12 * J21;
+                if (detJ <= 0.0)
+                    throw std::runtime_error("Q8: negative or zero Jacobian");
+
+                // Inverse Jacobian
+                double invJ11 =  J22 / detJ;
+                double invJ12 = -J12 / detJ;
+                double invJ21 = -J21 / detJ;
+                double invJ22 =  J11 / detJ;
+
+                // B matrix (3 x 16): strain-displacement
+                std::array<std::array<double, 16>, 3> B{};
+                for (int i = 0; i < 8; ++i) {
+                    auto dN = shape_deriv(i, xi, eta);
+                    double dNdx = invJ11 * dN[0] + invJ12 * dN[1];
+                    double dNdy = invJ21 * dN[0] + invJ22 * dN[1];
+
+                    int col = 2 * i;
+                    B[0][col]     = dNdx;   // epsilon_xx
+                    B[0][col + 1] = 0.0;
+                    B[1][col]     = 0.0;
+                    B[1][col + 1] = dNdy;   // epsilon_yy
+                    B[2][col]     = dNdy;   // gamma_xy
+                    B[2][col + 1] = dNdx;
+                }
+
+                // K += B^T * D * B * det(J) * w_i * w_j * t
+                double factor = detJ * GW3[gi] * GW3[gj] * mat.t;
+
+                // Compute D*B (3x16)
+                std::array<std::array<double, 16>, 3> DB{};
+                for (int r = 0; r < 3; ++r) {
+                    for (int c = 0; c < 16; ++c) {
+                        double sum = 0.0;
+                        for (int k = 0; k < 3; ++k) {
+                            sum += D[r][k] * B[k][c];
+                        }
+                        DB[r][c] = sum;
+                    }
+                }
+
+                // K += B^T * (D*B) * factor
+                for (int i = 0; i < 16; ++i) {
+                    for (int j = 0; j < 16; ++j) {
+                        double sum = 0.0;
+                        for (int k = 0; k < 3; ++k) {
+                            sum += B[k][i] * DB[k][j];
+                        }
+                        K[i][j] += sum * factor;
+                    }
+                }
+            }
+        }
+
+        return K;
+    }
+
+    // DOF indices for a Q8 element with node indices [n0..n7]
+    static std::array<int, 16> dof_indices(const std::array<int, 8>& nodes) {
+        std::array<int, 16> dofs;
+        for (int i = 0; i < 8; ++i) {
+            dofs[2*i]   = dof_index(nodes[i], 0);
+            dofs[2*i+1] = dof_index(nodes[i], 1);
+        }
+        return dofs;
+    }
+
+    // Compute Jacobian determinant at a point (for validation)
+    static double jacobian_det(const std::vector<Node>& elem_nodes,
+                               double xi, double eta) {
+        double J11 = 0.0, J12 = 0.0, J21 = 0.0, J22 = 0.0;
+        for (int i = 0; i < 8; ++i) {
+            auto dN = shape_deriv(i, xi, eta);
+            J11 += dN[0] * elem_nodes[i].x;
+            J12 += dN[0] * elem_nodes[i].y;
+            J21 += dN[1] * elem_nodes[i].x;
+            J22 += dN[1] * elem_nodes[i].y;
+        }
+        return J11 * J22 - J12 * J21;
+    }
+
+    // Compute stress at a Gauss point from element displacement
+    // Returns [sigma_xx, sigma_yy, sigma_xy]
+    static std::array<double, 3> stress_at_gauss_point(
+        const std::vector<Node>& elem_nodes,
+        const std::array<double, 16>& u_elem,
+        const Material& mat,
+        PlaneType plane,
+        double xi, double eta) {
+
+        auto D = mat.d_matrix(plane);
+
+        // Compute Jacobian and its inverse
+        double J11 = 0.0, J12 = 0.0, J21 = 0.0, J22 = 0.0;
+        for (int i = 0; i < 8; ++i) {
+            auto dN = shape_deriv(i, xi, eta);
+            J11 += dN[0] * elem_nodes[i].x;
+            J12 += dN[0] * elem_nodes[i].y;
+            J21 += dN[1] * elem_nodes[i].x;
+            J22 += dN[1] * elem_nodes[i].y;
+        }
+
+        double detJ = J11 * J22 - J12 * J21;
+        double invJ11 =  J22 / detJ;
+        double invJ12 = -J12 / detJ;
+        double invJ21 = -J21 / detJ;
+        double invJ22 =  J11 / detJ;
+
+        // B matrix (3 x 16)
+        std::array<std::array<double, 16>, 3> B{};
+        for (int i = 0; i < 8; ++i) {
+            auto dN = shape_deriv(i, xi, eta);
+            double dNdx = invJ11 * dN[0] + invJ12 * dN[1];
+            double dNdy = invJ21 * dN[0] + invJ22 * dN[1];
+            int col = 2 * i;
+            B[0][col]     = dNdx;
+            B[0][col + 1] = 0.0;
+            B[1][col]     = 0.0;
+            B[1][col + 1] = dNdy;
+            B[2][col]     = dNdy;
+            B[2][col + 1] = dNdx;
+        }
+
+        // Strain = B * u
+        std::array<double, 3> strain{};
+        for (int r = 0; r < 3; ++r) {
+            double sum = 0.0;
+            for (int c = 0; c < 16; ++c) {
+                sum += B[r][c] * u_elem[c];
+            }
+            strain[r] = sum;
+        }
+
+        // Stress = D * strain
+        std::array<double, 3> stress{};
+        for (int r = 0; r < 3; ++r) {
+            double sum = 0.0;
+            for (int c = 0; c < 3; ++c) {
+                sum += D[r][c] * strain[c];
+            }
+            stress[r] = sum;
+        }
+
+        return stress;
     }
 };
 

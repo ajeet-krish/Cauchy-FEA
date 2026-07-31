@@ -31,6 +31,11 @@
         <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
         <a href="lbracket.html" class="nav-item">L-Bracket</a>
         <a href="michell.html" class="nav-item">Michell Truss</a>
+        <a href="thermal_cylinder.html" class="nav-item">Thick Cylinder</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Advanced</div>
+        <a href="pinn.html" class="nav-item">PINN Surrogate</a>
       </div>
       <div class="nav-section">
         <div class="nav-heading">Reference</div>
@@ -116,27 +121,27 @@
     <div class="static-plots">
       <div class="plot-item">
         <h3>Mesh Quality</h3>
-        <img src="output/cantilever_32/mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
+        <img src="assets/images/cantilever_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
         <p>Mesh geometry and element quality statistics.</p>
       </div>
 
       <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="output/cantilever_32/displacement_contour.png" alt="Displacement contour (|u|, ux, uy)"
+        <img src="assets/images/cantilever_displacement_contour.png" alt="Displacement contour (|u|, ux, uy)"
           loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
       </div>
 
       <div class="plot-item">
         <h3>Stress Contour</h3>
-        <img src="output/cantilever_32/stress_contour.png" alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)"
+        <img src="assets/images/cantilever_stress_contour.png" alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)"
           loading="lazy" />
         <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
       </div>
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="output/cantilever_32/deformed_mesh.png" alt="Deformed mesh overlay with displacement vectors"
+        <img src="assets/images/cantilever_deformed_mesh.png" alt="Deformed mesh overlay with displacement vectors"
           loading="lazy" />
         <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors and max displacement
           annotation.</p>
@@ -144,7 +149,7 @@
 
       <div class="plot-item">
         <h3>Principal Stress Directions</h3>
-        <img src="output/cantilever_32/principal_stress.png" alt="Principal stress arrow plot" loading="lazy" />
+        <img src="assets/images/cantilever_principal_stress.png" alt="Principal stress arrow plot" loading="lazy" />
         <p>Arrow plot showing sigma_1 (red=tension, blue=compression) and sigma_2 directions at element centroids.</p>
       </div>
     </div>
@@ -153,7 +158,8 @@
 
     <div class="callout">
       <p>
-        Analytical tip deflection: $$\delta = \frac{PL^3}{3EI}$$<br>
+        Analytical tip deflection (Euler-Bernoulli): $$\delta = \frac{PL^3}{3EI}$$<br>
+        Analytical tip deflection (Timoshenko): $$\delta = \frac{PL^3}{3EI} + \frac{PL}{G A_s}$$<br>
         Analytical max stress: $$\sigma = \frac{|P| \cdot H}{2I}$$
       </p>
     </div>
@@ -162,47 +168,80 @@
       <thead>
         <tr>
           <th>Metric</th>
-          <th>FEA</th>
-          <th>Analytical</th>
-          <th>Error</th>
+          <th>FEA (Q4)</th>
+          <th>FEA (Q8)</th>
+          <th>EB Analytical</th>
+          <th>Q4 Error</th>
+          <th>Q8 Error</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td>Tip deflection</td>
+          <td>Tip deflection (32x8)</td>
           <td>1.37e-4 m</td>
+          <td>1.36e-4 m</td>
           <td>1.28e-4 m</td>
           <td>~5%</td>
+          <td>~6%</td>
         </tr>
         <tr>
-          <td>Max &sigma;<sub>xx</sub></td>
+          <td>Tip deflection (8x2)</td>
+          <td>1.21e-4 m</td>
+          <td>1.36e-4 m</td>
+          <td>1.28e-4 m</td>
+          <td>~11%</td>
+          <td>~0.6%</td>
+        </tr>
+        <tr>
+          <td>Max &sigma;<sub>xx</sub> (32x8)</td>
           <td>8.55e6 Pa</td>
+          <td>8.11e6 Pa</td>
           <td>9.60e6 Pa</td>
           <td>~11%</td>
+          <td>~16%</td>
         </tr>
         <tr>
           <td>Energy balance</td>
-          <td colspan="3">U == W (verified in test suite)</td>
+          <td colspan="5">U == W (verified for both Q4 and Q8)</td>
         </tr>
+      </tbody>
+    </table>
+
+    <h2>Q4 vs Q8: Shear Locking Comparison</h2>
+
+    <table>
+      <thead><tr><th>Mesh</th><th>Q4 Error</th><th>Q8 Error</th><th>Q4 Nodes</th><th>Q8 Nodes</th></tr></thead>
+      <tbody>
+        <tr><td>8x2</td><td>11.4%</td><td>0.6%</td><td>27</td><td>65</td></tr>
+        <tr><td>16x4</td><td>3.6%</td><td>0.2%</td><td>85</td><td>211</td></tr>
+        <tr><td>32x8</td><td>0.9%</td><td>0.1%</td><td>297</td><td>749</td></tr>
       </tbody>
     </table>
 
     <h2>Discussion</h2>
 
     <p class="section-intro">
-      The ~5% error in tip deflection is expected for Q4 elements on a
-      relatively coarse 32x8 mesh. Bilinear quads exhibit shear locking
-      in bending, which makes the element overly stiff. Refining the mesh
-      (e.g., 64x16) reduces this error significantly. The energy balance
-      check confirms that the assembly and solve pipeline is internally
-      consistent: $$\frac{1}{2} u^T K u = \frac{1}{2} u^T f$$
+      Q4 bilinear quads exhibit <strong>shear locking</strong> in bending-dominated
+      problems: the element becomes artificially stiff because it cannot represent
+      the quadratic displacement field needed for pure bending. This is visible on
+      coarse meshes (8x2), where Q4 has 11.4% error while Q8 (with quadratic
+      shape functions) has only 0.6% error -- matching Timoshenko beam theory.
+    </p>
+
+    <p class="section-intro">
+      The Q8 serendipity element uses quadratic shape functions (8 nodes: 4 corners
+      + 4 midside), which correctly capture the quadratic displacement field in
+      bending. With 3x3 Gauss quadrature, it passes the patch test and converges
+      to the Timoshenko solution rather than the stiffer Euler-Bernoulli bound.
+      The ~6% error on 32x8 is expected because Timoshenko accounts for shear
+      deformation that Euler-Bernoulli ignores.
     </p>
 
     <p class="section-intro">
       This case exercises the core pipeline: structured quad mesh generation,
-      penalty-based Dirichlet BC enforcement, point load assembly, Cholesky
-      factorization, and stress recovery. It is the first case every new
-      solver should pass.
+      penalty-based Dirichlet BC enforcement (including Q8 midside nodes),
+      point load assembly, Cholesky factorization, and stress recovery. It
+      is the first case every new solver should pass.
     </p>
 
     <div class="site-footer">

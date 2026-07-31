@@ -34,6 +34,10 @@
         <a href="thermal_cylinder.html" class="nav-item">Thick Cylinder</a>
       </div>
       <div class="nav-section">
+        <div class="nav-heading">Advanced</div>
+        <a href="pinn.html" class="nav-item">PINN Surrogate</a>
+      </div>
+      <div class="nav-section">
         <div class="nav-heading">Reference</div>
         <a href="theory.html" class="nav-item">Theory &amp; Formulation</a>
         <a href="implementation.html" class="nav-item">Implementation</a>
@@ -60,14 +64,14 @@
       </p>
       <p class="subtitle">
         Cauchy is a custom 2D structural solver written in C++20. It uses
-        bilinear quad (Q4) elements with Gauss quadrature, sparse matrix
-        assembly, and direct/iterative solvers to compute displacement and
-        stress fields. The solver validates against 6 classical benchmark
-        cases with analytical references.
+        bilinear quad (Q4) and serendipity (Q8) elements with Gauss quadrature,
+        sparse matrix assembly, direct/iterative solvers, and adaptive mesh
+        refinement driven by the Zienkiewicz-Zhu error estimator. The solver
+        validates against 6 classical benchmark cases with analytical references.
       </p>
       <div class="status-badge">
         <span class="dot"></span>
-        Validated on 6 benchmark cases
+        Validated on 6 benchmarks + adaptive refinement
       </div>
     </section>
 
@@ -77,7 +81,7 @@
 
       <a href="cantilever.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/data/thumbnails/cantilever_deformed.png" 
+          <img src="assets/images/cantilever_deformed.png" 
                alt="Cantilever deformed mesh" 
                loading="lazy" />
         </div>
@@ -90,7 +94,7 @@
 
       <a href="cook.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/data/thumbnails/cook_deformed.png" 
+          <img src="assets/images/cook_deformed.png" 
                alt="Cook's membrane deformed mesh" 
                loading="lazy" />
         </div>
@@ -103,7 +107,7 @@
 
       <a href="patch.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/data/thumbnails/patch_deformed.png" 
+          <img src="assets/images/patch_deformed.png" 
                alt="Patch test deformed mesh" 
                loading="lazy" />
         </div>
@@ -116,7 +120,7 @@
 
       <a href="plate_hole.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/data/thumbnails/plate_hole_deformed.png" 
+          <img src="assets/images/plate_hole_deformed.png" 
                alt="Plate with hole deformed mesh" 
                loading="lazy" />
         </div>
@@ -129,7 +133,7 @@
 
       <a href="lbracket.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/data/thumbnails/lbracket_deformed.png" 
+          <img src="assets/images/lbracket_deformed.png" 
                alt="L-bracket deformed mesh" 
                loading="lazy" />
         </div>
@@ -142,7 +146,7 @@
 
       <a href="michell.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/data/thumbnails/michell_deformed.png" 
+          <img src="assets/images/michell_deformed.png" 
                alt="Michell truss deformed mesh" 
                loading="lazy" />
         </div>
@@ -155,7 +159,7 @@
 
       <a href="thermal_cylinder.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/data/thumbnails/thermal_cylinder_deformed.png" 
+          <img src="assets/images/thermal_cylinder_deformed.png" 
                alt="Thermal cylinder deformed mesh" 
                loading="lazy" />
         </div>
@@ -166,6 +170,19 @@
         </div>
       </a>
 
+      <a href="pinn.html" class="case-card">
+        <div class="case-thumb">
+          <img src="assets/images/pinn_cantilever_pinn_uy.png" 
+               alt="PINN prediction" 
+               loading="lazy" />
+        </div>
+        <div class="case-info">
+          <h3>PINN Surrogate Model</h3>
+          <p>Physics-Informed Neural Network for real-time 2D elasticity prediction. Browser deployment via ONNX Runtime.</p>
+          <span class="case-link">View PINN &rarr;</span>
+        </div>
+      </a>
+
     </div>
 
     <h2>Key Features</h2>
@@ -173,8 +190,8 @@
     <div class="feature-grid">
 
       <div class="feature-item">
-        <h4>Bar + Q4 Elements</h4>
-        <p>Two-node truss elements and 4-node bilinear quads with full 2x2 Gauss integration.</p>
+        <h4>Bar + Q4 + Q8 Elements</h4>
+        <p>Two-node truss, 4-node bilinear quad, and 8-node serendipity quad with full Gauss integration (2x2 for Q4, 3x3 for Q8).</p>
       </div>
 
       <div class="feature-item">
@@ -189,7 +206,17 @@
 
       <div class="feature-item">
         <h4>Stress Recovery</h4>
-        <p>Element-centered stress, node-averaged smoothing, Von Mises and principal stresses.</p>
+        <p>Element-centered stress, node-averaged smoothing, Von Mises and principal stresses. Q8 uses 2x2 Gauss averaging.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>ZZ Error Estimator</h4>
+        <p>Zienkiewicz-Zhu superconvergent patch recovery (SPR) for a posteriori error estimation. Drives adaptive mesh refinement.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Adaptive h-Refinement</h4>
+        <p>Red-green refinement with element marking. Concentrates DOFs where error is highest, achieving 10-14x node reduction.</p>
       </div>
 
       <div class="feature-item">
@@ -212,11 +239,12 @@
       </thead>
       <tbody>
         <tr><td><code>fea_types.hpp</code></td><td>Core types, enums, globals</td><td>Material, Node, Mesh, CaseType</td></tr>
-        <tr><td><code>elements.hpp</code></td><td>Element stiffness matrices</td><td>BarElement, Q4Element</td></tr>
+        <tr><td><code>elements.hpp</code></td><td>Element stiffness matrices</td><td>BarElement, Q4Element, Q8Element, T3Element</td></tr>
         <tr><td><code>sparse.hpp</code></td><td>Sparse matrix formats</td><td>COOMatrix, CSRMatrix, DenseMatrix</td></tr>
         <tr><td><code>solver.hpp</code></td><td>Linear solvers</td><td>CholeskySolver, CGSolver</td></tr>
-        <tr><td><code>mesh.hpp</code></td><td>Mesh generation</td><td>generate_structured_quad, generate_lbracket</td></tr>
+        <tr><td><code>mesh.hpp</code></td><td>Mesh generation</td><td>generate_structured_quad, generate_structured_quad8, generate_lbracket</td></tr>
         <tr><td><code>postprocess.hpp</code></td><td>Stress recovery, JSON output</td><td>ElementStress, write_meta_json</td></tr>
+        <tr><td><code>adaptivity.hpp</code></td><td>ZZ error estimator, adaptive refinement</td><td>SPRResult, ElementError, refine_mesh, adaptive_loop</td></tr>
         <tr><td><code>convergence.hpp</code></td><td>GCI computation, h-refinement</td><td>GCIResult, run_study</td></tr>
         <tr><td><code>fea.hpp</code></td><td>Assembly + solve pipeline</td><td>assemble, solve, compute_strain_energy</td></tr>
       </tbody>
@@ -229,7 +257,9 @@
         <code>cmake -B build && cmake --build build -j$(sysctl -n hw.ncpu)</code><br>
         <code>./build/FEA_Cantilever 32</code> &mdash; cantilever beam (32x8 mesh)<br>
         <code>./build/FEA_Cook 32</code> &mdash; Cook's membrane (32x32 mesh)<br>
-        <code>./build/FEA_Tests</code> &mdash; run 19 Google Test cases
+        <code>./build/FEA_PlateHole 16 --q8</code> &mdash; plate with hole (Q8 elements)<br>
+        <code>./build/FEA_AdaptHole 8 --iters 4</code> &mdash; adaptive refinement<br>
+        <code>./build/FEA_Tests</code> &mdash; run 22 Google Test cases
       </p>
     </div>
 

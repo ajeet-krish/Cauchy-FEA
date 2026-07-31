@@ -31,6 +31,20 @@ enum class CaseType { CANTILEVER, MICHELL, COOK, LBRACKET, PATCH, PLATE_HOLE, TH
 // Plane stress vs plane strain
 enum class PlaneType { STRESS, STRAIN };
 
+// Convert CaseType to string for JSON output
+inline const char* case_name(CaseType c) {
+    switch (c) {
+        case CaseType::CANTILEVER:      return "cantilever";
+        case CaseType::MICHELL:          return "michell";
+        case CaseType::COOK:             return "cook";
+        case CaseType::LBRACKET:         return "lbracket";
+        case CaseType::PATCH:            return "patch";
+        case CaseType::PLATE_HOLE:       return "plate_hole";
+        case CaseType::THERMAL_CYLINDER: return "thermal_cylinder";
+    }
+    return "unknown";
+}
+
 // Global config (inline globals like LBM-2D)
 inline CaseType g_case = CaseType::CANTILEVER;
 inline AnalysisType g_analysis = AnalysisType::STATIC;
@@ -115,6 +129,7 @@ struct NeumannBC {
 struct Mesh {
     std::vector<Node> nodes;
     std::vector<std::array<int, 4>> quad_elements;    // Q4 connectivity (CCW)
+    std::vector<std::array<int, 8>> quad8_elements;   // Q8 connectivity (CCW, corners+midside)
     std::vector<std::array<int, 3>> tri_elements;     // T3 connectivity (CCW)
     std::vector<std::array<int, 2>> bar_elements;     // Bar connectivity
     std::vector<double> bar_areas;                     // Cross-sectional area per bar
@@ -127,6 +142,7 @@ struct Mesh {
 
     int num_nodes() const { return static_cast<int>(nodes.size()); }
     int num_quads() const { return static_cast<int>(quad_elements.size()); }
+    int num_quad8s() const { return static_cast<int>(quad8_elements.size()); }
     int num_tris() const { return static_cast<int>(tri_elements.size()); }
     int num_bars() const { return static_cast<int>(bar_elements.size()); }
     int num_dofs() const { return num_nodes() * DOF_PER_NODE; }

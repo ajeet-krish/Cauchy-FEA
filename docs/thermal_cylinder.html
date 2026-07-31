@@ -34,6 +34,10 @@
         <a href="thermal_cylinder.html" class="nav-item active">Thick Cylinder</a>
       </div>
       <div class="nav-section">
+        <div class="nav-heading">Advanced</div>
+        <a href="pinn.html" class="nav-item">PINN Surrogate</a>
+      </div>
+      <div class="nav-section">
         <div class="nav-heading">Reference</div>
         <a href="theory.html" class="nav-item">Theory &amp; Formulation</a>
         <a href="implementation.html" class="nav-item">Implementation</a>
@@ -88,31 +92,31 @@
     <div class="static-plots">
       <div class="plot-item">
         <h3>Mesh Quality</h3>
-        <img src="output/thermal_cylinder/mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
+        <img src="assets/images/thermal_cylinder_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
         <p>Mesh geometry and element quality statistics.</p>
       </div>
 
       <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="output/thermal_cylinder/displacement_contour.png" alt="Displacement contour (|u|, ux, uy)" loading="lazy" />
+        <img src="assets/images/thermal_cylinder_displacement_contour.png" alt="Displacement contour (|u|, ux, uy)" loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
       </div>
 
       <div class="plot-item">
         <h3>Stress Contour</h3>
-        <img src="output/thermal_cylinder/stress_contour.png" alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)" loading="lazy" />
+        <img src="assets/images/thermal_cylinder_stress_contour.png" alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)" loading="lazy" />
         <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
       </div>
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="output/thermal_cylinder/deformed_mesh.png" alt="Deformed mesh overlay with displacement vectors" loading="lazy" />
+        <img src="assets/images/thermal_cylinder_deformed_mesh.png" alt="Deformed mesh overlay with displacement vectors" loading="lazy" />
         <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors and thermal expansion.</p>
       </div>
 
       <div class="plot-item">
         <h3>Principal Stress Directions</h3>
-        <img src="output/thermal_cylinder/principal_stress.png" alt="Principal stress arrow plot" loading="lazy" />
+        <img src="assets/images/thermal_cylinder_principal_stress.png" alt="Principal stress arrow plot" loading="lazy" />
         <p>Arrow plot showing sigma_1 (red=tension, blue=compression) and sigma_2 directions at element centroids.</p>
       </div>
     </div>

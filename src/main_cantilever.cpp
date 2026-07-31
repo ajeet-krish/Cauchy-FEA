@@ -43,12 +43,14 @@ int main(int argc, char* argv[]) {
     int nx = 32, ny = 8;
     bool use_cg = false;
     bool run_convergence = false;
+    bool use_q8 = false;
     if (argc > 1) nx = std::atoi(argv[1]);
     ny = nx / 4;
     if (ny < 2) ny = 2;
     for (int i = 2; i < argc; ++i) {
         if (std::string(argv[i]) == "--cg") use_cg = true;
         if (std::string(argv[i]) == "--convergence") run_convergence = true;
+        if (std::string(argv[i]) == "--q8") use_q8 = true;
     }
 
     g_nx = nx;
@@ -114,14 +116,15 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "=== FEA-2D: Cantilever Beam ===" << std::endl;
-    std::cout << "Mesh: " << nx << "x" << ny << std::endl;
+    std::cout << "Mesh: " << nx << "x" << ny << (use_q8 ? " (Q8)" : " (Q4)") << std::endl;
 
     double L = 1.0;
     double H = 0.25;
     double P = -1000.0;
     double t = 0.01;
 
-    auto m = mesh::generate_structured_quad(L, H, nx, ny);
+    auto m = use_q8 ? mesh::generate_structured_quad8(L, H, nx, ny)
+                     : mesh::generate_structured_quad(L, H, nx, ny);
     m.mat = Material::steel();
     m.mat.t = t;
     m.plane = PlaneType::STRESS;
@@ -130,6 +133,17 @@ int main(int argc, char* argv[]) {
         int node = j * (nx + 1);
         m.dirichlet.push_back({node, 0, 0.0});
         m.dirichlet.push_back({node, 1, 0.0});
+    }
+
+    // For Q8, also constrain vertical midside nodes on the left edge
+    if (use_q8) {
+        int num_corners = (nx + 1) * (ny + 1);
+        int num_hmid = nx * (ny + 1);
+        for (int j = 0; j <= ny; ++j) {
+            int vmid = num_corners + num_hmid + j * (nx + 1);
+            m.dirichlet.push_back({vmid, 0, 0.0});
+            m.dirichlet.push_back({vmid, 1, 0.0});
+        }
     }
 
     int tip_node = ny * (nx + 1) + nx;
@@ -161,7 +175,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Energy balance: U=" << U << ", W=" << W
               << ", error=" << std::abs(U - W) / (std::abs(W) + 1e-30) * 100.0 << "%" << std::endl;
 
-    std::string outdir = "output/cantilever_" + std::to_string(nx);
+    std::string outdir = "output/cantilever_" + std::to_string(nx) + (use_q8 ? "_q8" : "");
     std::filesystem::create_directories(outdir);
     postprocess::write_meta_json(outdir + "/meta.json", m, result.displacement, result.stresses,
                                  result.cg_iterations, result.solve_time_ms);

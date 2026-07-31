@@ -46,6 +46,25 @@ inline COOMatrix assemble(const Mesh& m) {
             }
         }
 
+        // Assemble Q8 elements
+        #pragma omp for nowait
+        for (int e = 0; e < m.num_quad8s(); ++e) {
+            const auto& elem = m.quad8_elements[e];
+            std::vector<Node> elem_nodes(8);
+            for (int i = 0; i < 8; ++i) {
+                elem_nodes[i] = m.nodes[elem[i]];
+            }
+
+            auto Ke = elements::Q8Element::stiffness(elem_nodes, m.mat, m.plane);
+            auto dof_idx = elements::Q8Element::dof_indices(elem);
+
+            for (int i = 0; i < 16; ++i) {
+                for (int j = 0; j < 16; ++j) {
+                    K_local.add(dof_idx[i], dof_idx[j], Ke[i][j]);
+                }
+            }
+        }
+
         // Assemble T3 elements
         #pragma omp for nowait
         for (int e = 0; e < m.num_tris(); ++e) {

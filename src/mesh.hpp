@@ -452,6 +452,82 @@ inline Mesh generate_structured_quad(
 }
 
 // ------------------------------------------------------------------
+// Generate a structured Q8 (8-node serendipity) mesh
+// Same node layout as Q4 but adds midside nodes at edge midpoints
+// ------------------------------------------------------------------
+inline Mesh generate_structured_quad8(
+    double Lx, double Ly, int nx, int ny,
+    double grading_x = 1.0, double grading_y = 1.0) {
+
+    Mesh m;
+
+    // Step 1: Generate Q4 mesh first (for corner nodes)
+    auto q4_mesh = generate_structured_quad(Lx, Ly, nx, ny, grading_x, grading_y);
+
+    // Q8 node numbering: corners (0-3) same as Q4, then midside (4-7)
+    // Node layout: (nx+1)*(ny+1) corners + nx*(ny+1) horiz mid + (nx+1)*ny vert mid + nx*ny center
+    int num_corners = (nx + 1) * (ny + 1);
+    int num_hmid = nx * (ny + 1);           // horizontal midside nodes
+    int num_vmid = (nx + 1) * ny;           // vertical midside nodes
+    int num_total = num_corners + num_hmid + num_vmid;
+
+    m.nodes.resize(num_total);
+
+    // Copy corner nodes
+    for (int i = 0; i < num_corners; ++i) {
+        m.nodes[i] = q4_mesh.nodes[i];
+    }
+
+    // Create midside nodes on horizontal edges (between columns)
+    // Node index: corner + j*nx + i
+    for (int j = 0; j <= ny; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            int left = j * (nx + 1) + i;
+            int right = left + 1;
+            int mid_idx = num_corners + j * nx + i;
+            m.nodes[mid_idx] = {
+                (q4_mesh.nodes[left].x + q4_mesh.nodes[right].x) / 2.0,
+                (q4_mesh.nodes[left].y + q4_mesh.nodes[right].y) / 2.0
+            };
+        }
+    }
+
+    // Create midside nodes on vertical edges (between rows)
+    for (int j = 0; j < ny; ++j) {
+        for (int i = 0; i <= nx; ++i) {
+            int bottom = j * (nx + 1) + i;
+            int top = bottom + (nx + 1);
+            int mid_idx = num_corners + num_hmid + j * (nx + 1) + i;
+            m.nodes[mid_idx] = {
+                (q4_mesh.nodes[bottom].x + q4_mesh.nodes[top].x) / 2.0,
+                (q4_mesh.nodes[bottom].y + q4_mesh.nodes[top].y) / 2.0
+            };
+        }
+    }
+
+    // Create Q8 elements
+    m.quad8_elements.resize(nx * ny);
+    for (int j = 0; j < ny; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            int n0 = j * (nx + 1) + i;                    // bottom-left
+            int n1 = j * (nx + 1) + (i + 1);              // bottom-right
+            int n2 = (j + 1) * (nx + 1) + (i + 1);       // top-right
+            int n3 = (j + 1) * (nx + 1) + i;              // top-left
+
+            // Midside nodes
+            int n4 = num_corners + j * nx + i;             // bottom midside
+            int n5 = num_corners + num_hmid + j * (nx + 1) + (i + 1); // right midside
+            int n6 = num_corners + (j + 1) * nx + i;      // top midside
+            int n7 = num_corners + num_hmid + j * (nx + 1) + i;       // left midside
+
+            m.quad8_elements[j * nx + i] = { n0, n1, n2, n3, n4, n5, n6, n7 };
+        }
+    }
+
+    return m;
+}
+
+// ------------------------------------------------------------------
 // Generate a structured quad mesh for an L-bracket
 // The L-shape is defined by cutting out a rectangle from a larger one
 // Full domain: [0, Lx] x [0, Ly]
@@ -633,6 +709,78 @@ inline Mesh load_json(const std::string& filepath) {
             }
         } else {
             ++i;
+        }
+    }
+
+    return m;
+}
+
+// ------------------------------------------------------------------
+// Generate a Cook's membrane Q8 mesh (trapezoidal panel)
+// Standard geometry: L=48, h_left=44, h_right=60
+// ------------------------------------------------------------------
+inline Mesh generate_cook_quad8(double L, double h_left, double h_right,
+    int nx, int ny) {
+
+    Mesh m;
+    int num_corners = (nx + 1) * (ny + 1);
+    int num_hmid = nx * (ny + 1);
+    int num_vmid = (nx + 1) * ny;
+    m.nodes.resize(num_corners + num_hmid + num_vmid);
+
+    // Corner nodes: row-major
+    for (int j = 0; j <= ny; ++j) {
+        double eta = static_cast<double>(j) / ny;
+        for (int i = 0; i <= nx; ++i) {
+            double xi = static_cast<double>(i) / nx;
+            double x = L * xi;
+            double h = h_left + (h_right - h_left) * xi;
+            double y = h * (eta - 0.5);
+            m.nodes[j * (nx + 1) + i] = {x, y};
+        }
+    }
+
+    // Horizontal midside nodes: between corner pairs in x
+    for (int j = 0; j <= ny; ++j) {
+        double eta = static_cast<double>(j) / ny;
+        for (int i = 0; i < nx; ++i) {
+            double xi = (i + 0.5) / nx;
+            double x = L * xi;
+            double h = h_left + (h_right - h_left) * xi;
+            double y = h * (eta - 0.5);
+            int mid_idx = num_corners + j * nx + i;
+            m.nodes[mid_idx] = {x, y};
+        }
+    }
+
+    // Vertical midside nodes: between corner pairs in y
+    for (int j = 0; j < ny; ++j) {
+        double eta = (j + 0.5) / ny;
+        for (int i = 0; i <= nx; ++i) {
+            double xi = static_cast<double>(i) / nx;
+            double x = L * xi;
+            double h = h_left + (h_right - h_left) * xi;
+            double y = h * (eta - 0.5);
+            int mid_idx = num_corners + num_hmid + j * (nx + 1) + i;
+            m.nodes[mid_idx] = {x, y};
+        }
+    }
+
+    // Q8 elements: CCW corner ordering
+    m.quad8_elements.resize(nx * ny);
+    for (int j = 0; j < ny; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            int n0 = j * (nx + 1) + i;
+            int n1 = j * (nx + 1) + (i + 1);
+            int n2 = (j + 1) * (nx + 1) + (i + 1);
+            int n3 = (j + 1) * (nx + 1) + i;
+
+            int n4 = num_corners + j * nx + i;
+            int n5 = num_corners + num_hmid + j * (nx + 1) + (i + 1);
+            int n6 = num_corners + (j + 1) * nx + i;
+            int n7 = num_corners + num_hmid + j * (nx + 1) + i;
+
+            m.quad8_elements[j * nx + i] = {n0, n1, n2, n3, n4, n5, n6, n7};
         }
     }
 

@@ -79,6 +79,28 @@
     </div>
     <p class="section-intro">
       Node ordering: 0=(-1,-1), 1=(+1,-1), 2=(+1,+1), 3=(-1,+1) (CCW).
+      Evaluated using 2x2 Gauss quadrature.
+    </p>
+
+    <h2>Q8 Shape Functions (Serendipity)</h2>
+    <p class="section-intro">
+      The 8-node serendipity element uses quadratic shape functions with
+      4 corner nodes and 4 midside nodes. This eliminates the internal
+      node of a Q9 Lagrange element while retaining quadratic completeness:
+    </p>
+    <div class="eq-box">
+      Corners: $$ N_i = \frac{1}{4}(1 + \xi_i \xi)(1 + \eta_i \eta)(\xi_i \xi + \eta_i \eta - 1) $$
+    </div>
+    <div class="eq-box">
+      Horizontal midside (xi=0): $$ N_i = \frac{1}{2}(1 - \xi^2)(1 + \eta_i \eta) $$
+    </div>
+    <div class="eq-box">
+      Vertical midside (eta=0): $$ N_i = \frac{1}{2}(1 + \xi_i \xi)(1 - \eta^2) $$
+    </div>
+    <p class="section-intro">
+      Node ordering (CCW): corners 0-3, horizontal midside 4-7, vertical midside 8-11.
+      Evaluated using 3x3 Gauss quadrature with points at +/-sqrt(3/5) and 0,
+      weights 5/9, 8/9, 5/9.
     </p>
 
     <h2>Jacobian &amp; B-Matrix</h2>
@@ -238,6 +260,44 @@
     <p class="section-intro">
       Cauchy uses Jacobi (diagonal) preconditioning and terminates when
       the residual drops below 1e-10.
+    </p>
+
+    <h2>ZZ Error Estimator (Zienkiewicz-Zhu)</h2>
+    <p class="section-intro">
+      The ZZ error estimator uses superconvergent patch recovery (SPR) to compute
+      a smoothed stress field sigma* from the FE solution sigma_h. The element-wise
+      error indicator is:
+    </p>
+    <div class="eq-box">
+      $$ \eta_e = \sqrt{\int_{\Omega_e} |\sigma^* - \sigma_h|^2 \, d\Omega} $$
+    </div>
+    <p class="section-intro">
+      <strong>SPR Recovery</strong>: For each node, average the Gauss-point stresses from
+      surrounding elements using inverse-distance weighting. This produces a
+      superconvergent stress field that converges at a higher rate than the FE solution.
+    </p>
+    <p class="section-intro">
+      <strong>Marking Strategy</strong>: "Largest first" -- sort elements by error indicator
+      descending, mark the top elements until the sum of marked errors exceeds
+      theta * total_error (theta = 0.5 default).
+    </p>
+    <p class="section-intro">
+      <strong>Adaptive Loop</strong>: Solve -> recover -> estimate -> mark -> refine -> repeat.
+      The error estimator drives mesh refinement toward regions of high stress gradient,
+      achieving similar accuracy with 10-14x fewer nodes than uniform refinement.
+    </p>
+
+    <h2>Red-Green h-Refinement</h2>
+    <p class="section-intro">
+      Marked elements undergo geometric subdivision:
+    </p>
+    <ul>
+      <li><strong>Red refinement</strong>: Split a quad into 4 equal sub-quads (add 5 nodes: center + 4 edge midpoints)</li>
+      <li><strong>Green refinement</strong>: Transition zone -- split into 2 triangles or quads to maintain conforming edges</li>
+    </ul>
+    <p class="section-intro">
+      After refinement, elements inside geometric cutouts (e.g., the circular hole)
+      are removed, and the mesh is re-conformed.
     </p>
 
     <div class="site-footer"><p>Cauchy -- 2D Finite Element Structural Solver</p></div>

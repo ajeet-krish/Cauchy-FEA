@@ -46,11 +46,12 @@
       </thead>
       <tbody>
         <tr><td><code>fea_types.hpp</code></td><td>216</td><td>Core types, enums, globals, JSON parser</td><td>Material, Node, Mesh, CaseType, PlaneType</td></tr>
-        <tr><td><code>elements.hpp</code></td><td>203</td><td>Element stiffness matrices</td><td>BarElement (4x4), Q4Element (8x8)</td></tr>
+        <tr><td><code>elements.hpp</code></td><td>380</td><td>Element stiffness matrices</td><td>BarElement, Q4Element, Q8Element, T3Element</td></tr>
         <tr><td><code>sparse.hpp</code></td><td>170</td><td>Sparse matrix formats</td><td>COOMatrix, CSRMatrix, DenseMatrix</td></tr>
         <tr><td><code>solver.hpp</code></td><td>173</td><td>Linear solvers</td><td>CholeskySolver, CGSolver</td></tr>
-        <tr><td><code>mesh.hpp</code></td><td>268</td><td>Mesh generation</td><td>generate_structured_quad, generate_lbracket, load_json</td></tr>
+        <tr><td><code>mesh.hpp</code></td><td>400</td><td>Mesh generation</td><td>generate_structured_quad, generate_structured_quad8, generate_cook_quad8, load_json</td></tr>
         <tr><td><code>postprocess.hpp</code></td><td>288</td><td>Stress recovery, JSON output</td><td>ElementStress, compute_all_stresses</td></tr>
+        <tr><td><code>adaptivity.hpp</code></td><td>350</td><td>ZZ error estimator, adaptive refinement</td><td>SPRResult, ElementError, refine_mesh, adaptive_loop</td></tr>
         <tr><td><code>convergence.hpp</code></td><td>140</td><td>GCI computation, h-refinement wrapper</td><td>GCIResult, ConvergenceSample, run_study</td></tr>
         <tr><td><code>fea.hpp</code></td><td>240</td><td>Assembly + solve pipeline</td><td>assemble, solve, compute_strain_energy</td></tr>
       </tbody>
@@ -59,11 +60,12 @@
     <h2>Include Hierarchy</h2>
     <pre><code>fea.hpp
   fea_types.hpp    (types, enums, globals)
-  elements.hpp     (bar + Q4 stiffness matrices)
+  elements.hpp     (bar + Q4 + Q8 + T3 stiffness matrices)
   sparse.hpp       (COO/CSR sparse matrix)
   solver.hpp       (Cholesky + CG)
-  mesh.hpp         (structured quad mesher + JSON input)
+  mesh.hpp         (structured quad mesher + Q8 generators + JSON input)
   postprocess.hpp  (stress recovery, Von Mises)
+  adaptivity.hpp   (ZZ SPR, error indicators, red-green refinement)
   convergence.hpp  (GCI, h-refinement)</code></pre>
 
     <h2>Entry Point Pattern</h2>
@@ -71,10 +73,10 @@
       Each <code>main_*.cpp</code> follows a consistent 7-step pipeline:
     </p>
     <ol>
-      <li>Set globals (<code>g_nx</code>, <code>g_ny</code>, <code>g_case</code>)</li>
-      <li>Generate or load mesh</li>
+      <li>Set globals (<code>g_nx</code>, <code>g_ny</code>, <code>g_case</code>, <code>g_analysis</code>)</li>
+      <li>Generate or load mesh (Q4 or Q8 via <code>--q8</code> flag)</li>
       <li>Assemble global stiffness matrix (COO, OpenMP parallel)</li>
-      <li>Apply boundary conditions (penalty method)</li>
+      <li>Apply boundary conditions (penalty method, including Q8 midside nodes)</li>
       <li>Solve (Cholesky or Conjugate Gradient)</li>
       <li>Post-process (stress recovery, energy balance)</li>
       <li>Write JSON output, report statistics</li>
@@ -89,15 +91,34 @@
       </p>
     </div>
 
-    <h2>Testing</h2>
+    <h2>Adaptive Refinement Pipeline</h2>
     <p class="section-intro">
-      19 Google Test cases across 9 test suites:
+      The adaptivity module (<code>adaptivity.hpp</code>) implements:
+    </p>
+    <ol>
+      <li><strong>SPR Recovery</strong>: Weighted average of Gauss-point stresses at nodes from surrounding elements</li>
+      <li><strong>Error Indicators</strong>: Element-wise = integral of |recovered - FE stress|^2</li>
+      <li><strong>Marking</strong>: "Largest first" strategy with threshold theta (0.5 default)</li>
+      <li><strong>Red-Green Refinement</strong>: Split marked Q4 elements into 4 (red) or 2 (green), add midside nodes</li>
+      <li><strong>Adaptive Loop</strong>: Solve -> recover -> estimate -> mark -> refine -> repeat</li>
+    </ol>
+
+    <div class="callout">
+      <p>
+        <code>./build/FEA_AdaptHole 8 --iters 4</code><br>
+        Runs 4 adaptive iterations on the plate-with-hole case, writing<br>
+        <code>output/adapt_hole_adaptive_convergence.json</code> for visualization.
+      </p>
+    </div>
+    <p class="section-intro">
+      22 Google Test cases across 10 test suites:
     </p>
     <table>
       <thead><tr><th>Suite</th><th>Tests</th><th>What It Validates</th></tr></thead>
       <tbody>
         <tr><td>BarElementTest</td><td>2</td><td>Stiffness matrix correctness, symmetry</td></tr>
         <tr><td>Q4ElementTest</td><td>4</td><td>Shape functions, Jacobian, stiffness symmetry, negative Jacobian detection</td></tr>
+        <tr><td>Q8ElementTest</td><td>3</td><td>Shape functions, 3x3 Gauss, 16x16 stiffness symmetry</td></tr>
         <tr><td>SparseMatrixTest</td><td>3</td><td>COO-to-CSR conversion, SpMV, duplicate merging</td></tr>
         <tr><td>CholeskyTest</td><td>2</td><td>Identity and diagonal system solves</td></tr>
         <tr><td>CGTest</td><td>2</td><td>Diagonal system convergence, real FE system convergence</td></tr>

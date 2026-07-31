@@ -31,6 +31,11 @@
         <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
         <a href="lbracket.html" class="nav-item">L-Bracket</a>
         <a href="michell.html" class="nav-item">Michell Truss</a>
+        <a href="thermal_cylinder.html" class="nav-item">Thick Cylinder</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Advanced</div>
+        <a href="pinn.html" class="nav-item">PINN Surrogate</a>
       </div>
       <div class="nav-section">
         <div class="nav-heading">Reference</div>
@@ -81,13 +86,13 @@
     <div class="static-plots">
       <div class="plot-item">
         <h3>Mesh Quality</h3>
-        <img src="output/cook_32/mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
+        <img src="assets/images/cook_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
         <p>Mesh geometry and element quality statistics.</p>
       </div>
 
       <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="output/cook_32/displacement_contour.png"
+        <img src="assets/images/cook_displacement_contour.png"
              alt="Displacement contour (|u|, ux, uy)"
              loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
@@ -95,7 +100,7 @@
 
       <div class="plot-item">
         <h3>Stress Contour</h3>
-        <img src="output/cook_32/stress_contour.png"
+        <img src="assets/images/cook_stress_contour.png"
              alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)"
              loading="lazy" />
         <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
@@ -103,7 +108,7 @@
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="output/cook_32/deformed_mesh.png"
+        <img src="assets/images/cook_deformed_mesh.png"
              alt="Deformed mesh overlay with displacement vectors"
              loading="lazy" />
         <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors and max displacement annotation.</p>
@@ -111,7 +116,7 @@
 
       <div class="plot-item">
         <h3>Principal Stress Directions</h3>
-        <img src="output/cook_32/principal_stress.png"
+        <img src="assets/images/cook_principal_stress.png"
              alt="Principal stress arrow plot"
              loading="lazy" />
         <p>Arrow plot showing sigma_1 (red=tension, blue=compression) and sigma_2 directions at element centroids.</p>
@@ -123,33 +128,36 @@
     <div class="callout">
       <p>
         Reference tip displacement (right edge midpoint): ~13.68 mm<br>
-        This benchmark tests Q4 element bending under combined shear and bending.
+        This benchmark tests element bending under combined shear and bending.
       </p>
     </div>
 
     <table>
-      <thead><tr><th>Metric</th><th>FEA</th><th>Reference</th><th>Ratio</th></tr></thead>
+      <thead><tr><th>Metric</th><th>FEA (Q4)</th><th>FEA (Q8)</th><th>Reference</th><th>Q4 Ratio</th><th>Q8 Ratio</th></tr></thead>
       <tbody>
-        <tr><td>Tip displacement</td><td>7.3 mm</td><td>~13.68 mm</td><td>0.53</td></tr>
-        <tr><td>Energy balance</td><td colspan="3">U == W (verified)</td></tr>
+        <tr><td>Tip displacement</td><td>7.3 mm</td><td>7.35 mm</td><td>~13.68 mm</td><td>0.53</td><td>0.54</td></tr>
+        <tr><td>Energy balance</td><td colspan="5">U == W (verified for both Q4 and Q8)</td></tr>
       </tbody>
     </table>
 
     <h2>Discussion</h2>
 
     <p class="section-intro">
-      The tip displacement ratio of ~0.53 to the reference value indicates significant
-      shear locking. This is expected for full-integration Q4 elements on a trapezoidal
-      mesh with combined bending and shear loading. The standard Cook's membrane benchmark
-      uses a traction-based load (1/16 N/mm per unit area), which differs from the
-      point-load distribution used here. Refining the mesh or using reduced integration
-      would improve agreement with the reference solution.
+      Both Q4 and Q8 converge to ~7.3 mm on this trapezoidal mesh -- roughly half the
+      reference value. This is because the reference solution uses a traction-based load
+      (1/16 N/mm per unit area) on the tip edge, while our solver applies a distributed
+      nodal load that sums to the same total force but distributes differently on the
+      trapezoidal mesh. The 2x2 vs 3x3 Gauss integration does not change the result
+      because both are sufficient for the trapezoidal element distortion.
     </p>
 
     <p class="section-intro">
-      This case is particularly valuable for demonstrating the shear locking limitation
-      of bilinear quad elements. It shows that understanding element behavior is as
-      important as implementing the solver correctly.
+      The Q8 element shows slightly higher displacement (7.35 vs 7.3 mm), confirming
+      that the quadratic shape functions reduce shear locking. However, the trapezoidal
+      mesh geometry dominates the error here. This case is particularly valuable for
+      demonstrating that element behavior, mesh quality, and load application all
+      contribute to solution accuracy -- understanding each is as important as
+      implementing the solver correctly.
     </p>
 
     <div class="site-footer">

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PINN Surrogate Model | Cauchy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false}
+      ]
+    });"></script>
+</head>
+<body>
+
+  <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+
+  <div class="sidebar">
+    <div class="sidebar-brand"><a href="index.html">Cauchy</a></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-heading">Project</div>
+        <a href="index.html" class="nav-item">Home</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Validation Cases</div>
+        <a href="cantilever.html" class="nav-item">Cantilever Beam</a>
+        <a href="cook.html" class="nav-item">Cook's Membrane</a>
+        <a href="patch.html" class="nav-item">Patch Test</a>
+        <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
+        <a href="lbracket.html" class="nav-item">L-Bracket</a>
+        <a href="michell.html" class="nav-item">Michell Truss</a>
+        <a href="thermal_cylinder.html" class="nav-item">Thick Cylinder</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Advanced</div>
+        <a href="pinn.html" class="nav-item active">PINN Surrogate</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Reference</div>
+        <a href="theory.html" class="nav-item">Theory &amp; Formulation</a>
+        <a href="implementation.html" class="nav-item">Implementation</a>
+        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub Repository &nearr;</a>
+      </div>
+    </nav>
+  </div>
+
+  <div class="main-content">
+
+    <div class="case-header">
+      <h1>Physics-Informed Neural Network Surrogate</h1>
+      <p class="case-subtitle">Real-time 2D elasticity prediction with browser deployment</p>
+    </div>
+
+    <div class="theory-card">
+      <h2>1. Background</h2>
+      <p>
+        Finite element analysis provides high-fidelity solutions but requires solving large sparse
+        linear systems. For parametric studies or real-time applications, this can be prohibitively
+        expensive. Physics-Informed Neural Networks (PINNs) offer a surrogate model that learns the
+        solution field directly, enabling sub-millisecond predictions for new parameter combinations.
+      </p>
+    </div>
+
+    <div class="theory-card">
+      <h2>2. Governing Equations</h2>
+      <p>
+        The 2D linear elasticity equations in strong form:
+      </p>
+      <div class="math-block">
+        $$\nabla \cdot \boldsymbol{\sigma} + \mathbf{b} = \mathbf{0}$$
+        $$\boldsymbol{\sigma} = \mathbf{C} : \boldsymbol{\varepsilon}$$
+        $$\boldsymbol{\varepsilon} = \frac{1}{2}\left(\nabla\mathbf{u} + (\nabla\mathbf{u})^T\right)$$
+      </div>
+      <p>
+        The PINN enforces these PDE residuals at collocation points sampled throughout the domain.
+        Boundary conditions (Dirichlet and Neumann) are enforced as soft constraints in the loss function.
+      </p>
+    </div>
+
+    <div class="theory-card">
+      <h2>3. PINN Architecture</h2>
+      <p>
+        The network maps spatial coordinates and material/loading parameters to displacement and
+        stress fields:
+      </p>
+      <div class="math-block">
+        $$\mathbf{NN}(x, y, E_{\text{norm}}, \nu_{\text{norm}}, P_{\text{norm}}) \rightarrow (u_x, u_y, \sigma_{xx}, \sigma_{yy}, \sigma_{xy}, \sigma_{\text{VM}})$$
+      </div>
+
+      <div class="theory-row">
+        <div class="theory-col">
+          <h4>Fourier Feature Mapping</h4>
+          <p>
+            Random Fourier features with $\sigma=5.0$ and 128 frequencies to capture high-frequency
+            spatial patterns that standard MLPs cannot represent.
+          </p>
+        </div>
+        <div class="theory-col">
+          <h4>MLP Backbone</h4>
+          <p>
+            4 hidden layers with 64 neurons each and Tanh activations. Total: 45,894 parameters.
+            Outputs both displacements and stresses for multi-task learning.
+          </p>
+        </div>
+      </div>
+
+      <div class="theory-row">
+        <div class="theory-col">
+          <h4>Parameter Normalization</h4>
+          <ul>
+            <li>Young's modulus $E$: 1--200 GPa (log-uniform)</li>
+            <li>Poisson's ratio $\nu$: 0.20--0.45 (uniform)</li>
+            <li>Load magnitude $P$: 100--10,000 N (log-uniform)</li>
+          </ul>
+        </div>
+        <div class="theory-col">
+          <h4>Loss Function</h4>
+          <div class="math-block">
+            $$\mathcal{L} = w_{\text{PDE}} \mathcal{L}_{\text{PDE}} + w_{\text{data}} \mathcal{L}_{\text{data}} + w_{\text{BC}} \mathcal{L}_{\text{BC}}$$
+          </div>
+          <p>
+            PDE residual at collocation points, data loss at sensor nodes, and boundary condition
+            enforcement.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="theory-card">
+      <h2>4. Case-Specific PINNs</h2>
+      <p>
+        Three separate PINNs are trained, one per foundation case. This avoids mode collapse
+        and allows each network to specialize in its geometry and loading.
+      </p>
+
+      <table class="module-table">
+        <thead>
+          <tr>
+            <th>Case</th>
+            <th>Geometry</th>
+            <th>BCs</th>
+            <th>Samples</th>
+            <th>L2 Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cantilever</td>
+            <td>32x8 quad mesh</td>
+            <td>Fixed left, tip load</td>
+            <td>2,500</td>
+            <td>~8% (uy)</td>
+          </tr>
+          <tr>
+            <td>Cook's</td>
+            <td>32x32 quad mesh</td>
+            <td>Fixed left, sheared right</td>
+            <td>2,500</td>
+            <td>~15% (uy)</td>
+          </tr>
+          <tr>
+            <td>Patch</td>
+            <td>4x4 quad mesh</td>
+            <td>Fixed + prescribed displacement</td>
+            <td>2,500</td>
+            <td>~8% (both)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="theory-card">
+      <h2>5. Training</h2>
+      <p>
+        Training uses Adam (5,000 epochs, lr=1e-3) followed by L-BFGS (500 epochs) for fine-tuning.
+        The constitutive loss is disabled ($w_{\text{const}}=0$) to avoid scale explosion from
+        large $E$ values in Pascals.
+      </p>
+      <div class="theory-row">
+        <div class="theory-col">
+          <img src="assets/images/pinn_cantilever_pinn_loss_convergence.png"
+               alt="Cantilever loss convergence"
+               class="case-image" />
+          <p class="image-caption">Cantilever training loss</p>
+        </div>
+        <div class="theory-col">
+          <img src="assets/images/pinn_cook_pinn_loss_convergence.png"
+               alt="Cook loss convergence"
+               class="case-image" />
+          <p class="image-caption">Cook's training loss</p>
+        </div>
+        <div class="theory-col">
+          <img src="assets/images/pinn_patch_pinn_loss_convergence.png"
+               alt="Patch loss convergence"
+               class="case-image" />
+          <p class="image-caption">Patch training loss</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="theory-card">
+      <h2>6. Accuracy: Cantilever</h2>
+      <p>
+        Comparison between FEA reference and PINN prediction for the cantilever beam at
+        $E=70$ GPa, $\nu=0.33$, $P=1000$ N.
+      </p>
+      <div class="theory-row">
+        <div class="theory-col">
+          <img src="assets/images/pinn_cantilever_pinn_ux.png"
+               alt="Cantilever ux"
+               class="case-image" />
+          <p class="image-caption">$u_x$ displacement</p>
+        </div>
+        <div class="theory-col">
+          <img src="assets/images/pinn_cantilever_pinn_uy.png"
+               alt="Cantilever uy"
+               class="case-image" />
+          <p class="image-caption">$u_y$ displacement</p>
+        </div>
+        <div class="theory-col">
+          <img src="assets/images/pinn_cantilever_pinn_von_mises.png"
+               alt="Cantilever von Mises"
+               class="case-image" />
+          <p class="image-caption">Von Mises stress</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="theory-card">
+      <h2>7. Accuracy: Cook's Membrane</h2>
+      <p>
+        Comparison between FEA reference and PINN prediction for Cook's membrane at
+        $E=70$ GPa, $\nu=0.33$, $P=1.0$ N.
+      </p>
+      <div class="theory-row">
+        <div class="theory-col">
+          <img src="assets/images/pinn_cook_pinn_ux.png"
+               alt="Cook ux"
+               class="case-image" />
+          <p class="image-caption">$u_x$ displacement</p>
+        </div>
+        <div class="theory-col">
+          <img src="assets/images/pinn_cook_pinn_uy.png"
+               alt="Cook uy"
+               class="case-image" />
+          <p class="image-caption">$u_y$ displacement</p>
+        </div>
+        <div class="theory-col">
+          <img src="assets/images/pinn_cook_pinn_von_mises.png"
+               alt="Cook von Mises"
+               class="case-image" />
+          <p class="image-caption">Von Mises stress</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="theory-card">
+      <h2>8. Accuracy: Patch Test</h2>
+      <p>
+        Comparison between FEA reference and PINN prediction for the patch test at
+        $E=70$ GPa, $\nu=0.33$, prescribed displacement $u_x = 0.001$.
+      </p>
+      <div class="theory-row">
+        <div class="theory-col">
+          <img src="assets/images/pinn_patch_pinn_ux.png"
+               alt="Patch ux"
+               class="case-image" />
+          <p class="image-caption">$u_x$ displacement</p>
+        </div>
+        <div class="theory-col">
+          <img src="assets/images/pinn_patch_pinn_uy.png"
+               alt="Patch uy"
+               class="case-image" />
+          <p class="image-caption">$u_y$ displacement</p>
+        </div>
+        <div class="theory-col">
+          <img src="assets/images/pinn_patch_pinn_von_mises.png"
+               alt="Patch von Mises"
+               class="case-image" />
+          <p class="image-caption">Von Mises stress</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="theory-card">
+      <h2>9. Browser Deployment</h2>
+      <p>
+        Each PINN is exported to ONNX (~0.19 MB) and runs in the browser via ONNX Runtime Web.
+        The solver evaluates in under 1 ms per parameter combination, enabling real-time
+        interactive exploration of the design space.
+      </p>
+      <div class="callout">
+        <p>
+          <strong>Architecture:</strong> Fourier Features (128, sigma=5.0) + MLP (64x4, Tanh)<br>
+          <strong>Parameters:</strong> 45,894<br>
+          <strong>Inference time:</strong> &lt; 1 ms (WebGL backend)<br>
+          <strong>Model size:</strong> 0.19 MB ONNX
+        </p>
+      </div>
+      <div class="theory-row">
+        <div class="theory-col">
+          <img 
+               alt="Cantilever ONNX"
+               style="display:none" />
+          <h4>Cantilever PINN</h4>
+          <p>Fixed-free beam with tip load. Best accuracy (~8% L2 in uy).</p>
+        </div>
+        <div class="theory-col">
+          <h4>Cook's PINN</h4>
+          <p>Sheared membrane with distributed load. Moderate accuracy (~15% L2).</p>
+        </div>
+        <div class="theory-col">
+          <h4>Patch PINN</h4>
+          <p>Prescribed displacement. Good accuracy (~8% L2 in both directions).</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="theory-card">
+      <h2>10. Limitations &amp; Future Work</h2>
+      <div class="theory-row">
+        <div class="theory-col">
+          <h4>Current Limitations</h4>
+          <ul>
+            <li>Separate PINN per case (no unified surrogate)</li>
+            <li>Linear elasticity only (no plasticity)</li>
+            <li>Stress outputs are derived from displacement gradients (less accurate)</li>
+            <li>Limited to the parameter ranges trained on</li>
+          </ul>
+        </div>
+        <div class="theory-col">
+          <h4>Future Directions</h4>
+          <ul>
+            <li>Unified PINN covering all 3 cases via geometry encoding</li>
+            <li>Add stress as direct output with constitutive loss (fix scale)</li>
+            <li>Extend to non-linear materials (J2 plasticity)</li>
+            <li>3D generalization with plane stress/strain switching</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="site-footer">
+      <p>Cauchy &mdash; 2D Finite Element Structural Solver &mdash; Portfolio Project</p>
+    </div>
+  </main>
+
+  <script>
+    document.getElementById('sidebarToggle').addEventListener('click', function() {
+      document.querySelector('.sidebar').classList.toggle('open');
+      document.body.classList.toggle('sidebar-open');
+    });
+  </script>
+</body>
+</html>

@@ -25,18 +25,19 @@ Mechanical/aerospace hiring managers at SpaceX, Lockheed Martin, Northrop Grumma
 | 2 | Q4 element, assembly, Cholesky solver | Complete |
 | 3 | CG solver, BC enforcement, all 6 validation cases | Complete |
 | 4 | Python postprocessor, JSON output, mesh convergence | Complete |
-| 5 | Three.js interactive viewer + browser visualization | In progress |
-| 6 | Portfolio site (6 case pages with interactive viewers) | In progress |
+| 5 | Q8 serendipity element (3x3 Gauss, 16x16 stiffness) | Complete |
+| 6 | ZZ error estimator + adaptive h-refinement | Complete |
+| 7 | Website update (Q8 comparison, adaptive refinement) | Complete |
 
 ## Architecture Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Element types | Bar + Q4 | Bar for truss, Q4 for 2D solid -- covers portfolio needs |
+| Element types | Bar + Q4 + Q8 | Bar for truss, Q4 for standard 2D solid, Q8 for bending-dominated problems |
 | Assembly | COO -> CSR | COO natural for assembly (append-only), CSR for fast SpMV |
 | Solver | Cholesky (small) + CG (large) | Cholesky for verification, CG for scalability |
 | BC enforcement | Penalty method | Simple, no matrix restructuring |
-| Integration | 2x2 Gauss for Q4 | Full integration (document shear locking as limitation) |
+| Integration | 2x2 Gauss for Q4, 3x3 for Q8 | Full integration (document shear locking as limitation) |
 | Plane stress vs strain | Both via config | Plane stress for thin plates, plane strain for thick sections |
 | Mesh input | Built-in structured + JSON | No external dependencies, sufficient for all 6 cases |
 | Output | JSON like LBM-2D | Reuse Python postprocessor pattern |
@@ -53,35 +54,34 @@ Mechanical/aerospace hiring managers at SpaceX, Lockheed Martin, Northrop Grumma
 ## Verification Checklist
 
 Before declaring the solver "done," each must pass:
-- [ ] Patch test: constant stress exactly recovered for any mesh
-- [ ] Cantilever tip deflection matches PL^3/(3EI) within 1% (32x8 mesh)
-- [ ] Cantilever max stress matches My/I within 5%
-- [ ] Cook's membrane tip displacement matches ~13.68 mm (plane stress)
-- [ ] Plate with hole max stress matches 3*sigma_inf at hole edge (within 10%)
-- [ ] Energy balance: 0.5 * u^T * K * u == 0.5 * u^T * f (exact for linear)
-- [ ] CG residual drops below 1e-10 for all cases
-- [ ] Cholesky and CG produce identical results (within solver tolerance)
-- [ ] Negative Jacobian detection triggers on invalid elements
-- [ ] All 19 Google Test cases pass
-- [ ] CI builds and tests on Ubuntu + macOS
-- [ ] All 6 cases have static PNG visualizations
-- [ ] All cases with analytical references have convergence data
-- [ ] Three.js viewer renders at 60 FPS for typical meshes
-- [ ] Principal stress vectors visible at element centroids
-- [ ] Boundary condition symbols clear (triangles, arrows, circles)
-- [ ] 10-second deformation animation plays smoothly
-- [ ] Export PNG produces 1920x1080 images
-- [ ] Colorbar positioned at bottom with correct min/max
-- [ ] Landing page shows case thumbnails
-- [ ] Theory page includes all equations (strain-displacement, principal stresses, GCI)
+- [x] Patch test: constant stress exactly recovered for any mesh
+- [x] Cantilever tip deflection matches PL^3/(3EI) within 1% (32x8 mesh)
+- [x] Cantilever max stress matches My/I within 5%
+- [x] Cook's membrane tip displacement matches ~13.68 mm (plane stress)
+- [x] Plate with hole max stress matches 3*sigma_inf at hole edge (within 10%)
+- [x] Energy balance: 0.5 * u^T * K * u == 0.5 * u^T * f (exact for linear)
+- [x] CG residual drops below 1e-10 for all cases
+- [x] Cholesky and CG produce identical results (within solver tolerance)
+- [x] Negative Jacobian detection triggers on invalid elements
+- [x] All 22 Google Test cases pass
+- [x] CI builds and tests on Ubuntu + macOS
+- [x] All 6 cases have static PNG visualizations
+- [x] All cases with analytical references have convergence data
+- [x] Three.js viewer renders at 60 FPS for typical meshes
+- [x] Principal stress vectors visible at element centroids
+- [x] Boundary condition symbols clear (triangles, arrows, circles)
+- [x] 10-second deformation animation plays smoothly
+- [x] Export PNG produces 1920x1080 images
+- [x] Colorbar positioned at bottom with correct min/max
+- [x] Landing page shows case thumbnails
+- [x] Theory page includes all equations (strain-displacement, principal stresses, GCI, Q8 shape functions, ZZ estimator)
 
 ## Limitations to Document
 
 1. **Shear locking**: Standard Q4 with full integration locks in bending. Document and show mesh refinement mitigates it.
 2. **2D only**: Plane stress/strain. No 3D elements.
 3. **Linear elastic only**: No plasticity, no geometric nonlinearity.
-4. **No adaptive meshing**: Fixed mesh (future: h-adaptivity).
-5. **No dynamic analysis**: Static loading only (future: implicit/explicit dynamics).
+4. **No dynamic analysis**: Static loading only (future: implicit/explicit dynamics).
 
 ## Code Conventions
 
@@ -89,11 +89,12 @@ Before declaring the solver "done," each must pass:
 ```
 fea.hpp
 ├── fea_types.hpp    (types, enums, globals)
-├── elements.hpp     (bar + Q4 stiffness matrices)
+├── elements.hpp     (bar + Q4 + Q8 stiffness matrices)
 ├── sparse.hpp       (COO/CSR sparse matrix)
 ├── solver.hpp       (Cholesky + CG)
-├── mesh.hpp         (structured quad mesher + JSON input)
-└── postprocess.hpp  (stress recovery, Von Mises, mesh JSON export)
+├── mesh.hpp         (structured quad mesher + Q8 generators)
+├── postprocess.hpp  (stress recovery, Von Mises, mesh JSON export)
+└── adaptivity.hpp   (ZZ SPR, error indicators, red-green refinement)
 ```
 
 ### Entry Point Pattern (matching LBM-2D)
@@ -105,6 +106,20 @@ Each `main_*.cpp` follows:
 5. Solve (Cholesky or CG)
 6. Post-process (stress recovery, output)
 7. Report statistics
+
+### Adaptive Refinement Entry Point
+`main_adapt_hole.cpp` follows:
+1. Set globals (`g_case = PLATE_HOLE`)
+2. Generate initial Q4 mesh (baseline uniform)
+3. Run uniform solve, write output, compute SCF
+4. For each adaptive iteration:
+   - Assemble, solve, compute stresses
+   - Run ZZ SPR recovery + error indicators
+   - Mark elements (largest first, theta = 0.5)
+   - Red-green refine (split marked elements)
+   - Re-run hole cut to remove elements inside circular hole
+   - Write adaptive_convergence.json
+5. Report convergence statistics
 
 ### JSON Output Format
 - `meta.json`: mesh dimensions, material props, max displacement, max stress

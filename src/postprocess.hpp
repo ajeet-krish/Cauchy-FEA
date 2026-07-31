@@ -228,13 +228,132 @@ inline ElementStress compute_t3_stress(
 }
 
 // ------------------------------------------------------------------
+// Compute element stress from Q8 element displacement
+// Uses 2x2 Gauss point averaging (superconvergent points for Q8)
+// Center point evaluation is wrong for Q8: corner node shape
+// function derivatives are zero at the center.
+// ------------------------------------------------------------------
+inline ElementStress compute_q8_stress(
+    const std::vector<Node>& elem_nodes,
+    const std::array<double, 16>& u_elem,
+    const Material& mat,
+    PlaneType plane) {
+
+    auto D = mat.d_matrix(plane);
+    static const double SQRT3_INV = 0.5773502691896257; // 1/sqrt(3)
+    static const double GP2[2] = { -SQRT3_INV, SQRT3_INV };
+
+    // Average stress at 2x2 Gauss points
+    double avg_sigma_xx = 0.0, avg_sigma_yy = 0.0, avg_sigma_xy = 0.0;
+
+    for (int gi = 0; gi < 2; ++gi) {
+        for (int gj = 0; gj < 2; ++gj) {
+            double xi = GP2[gi], eta = GP2[gj];
+            double J11 = 0.0, J12 = 0.0, J21 = 0.0, J22 = 0.0;
+
+            // Reuse elements.hpp shape_deriv for these Gauss points
+            // But we need it inline here since elements.hpp is separate
+            for (int i = 0; i < 8; ++i) {
+                double dN_dxi = 0.0, dN_deta = 0.0;
+                if (i < 4) {
+                    static const double XI[4]  = { -1.0,  1.0,  1.0, -1.0 };
+                    static const double ETA[4] = { -1.0, -1.0,  1.0,  1.0 };
+                    double xi_i = XI[i], eta_i = ETA[i];
+                    dN_dxi  = 0.25 * xi_i * (1.0 + eta_i * eta) * (2.0 * xi_i * xi + eta_i * eta);
+                    dN_deta = 0.25 * eta_i * (1.0 + xi_i * xi) * (xi_i * xi + 2.0 * eta_i * eta);
+                } else {
+                    double xi2 = xi * xi, eta2 = eta * eta;
+                    switch (i) {
+                        case 4: dN_dxi = -xi * (1.0 - eta); dN_deta = -0.5 * (1.0 - xi2); break;
+                        case 5: dN_dxi =  0.5 * (1.0 - eta2); dN_deta = -eta * (1.0 + xi); break;
+                        case 6: dN_dxi = -xi * (1.0 + eta); dN_deta =  0.5 * (1.0 - xi2); break;
+                        case 7: dN_dxi = -0.5 * (1.0 - eta2); dN_deta = -eta * (1.0 - xi); break;
+                    }
+                }
+                J11 += dN_dxi * elem_nodes[i].x;
+                J12 += dN_dxi * elem_nodes[i].y;
+                J21 += dN_deta * elem_nodes[i].x;
+                J22 += dN_deta * elem_nodes[i].y;
+            }
+
+            double detJ = J11 * J22 - J12 * J21;
+            double invJ11 =  J22 / detJ;
+            double invJ12 = -J12 / detJ;
+            double invJ21 = -J21 / detJ;
+            double invJ22 =  J11 / detJ;
+
+            // B matrix at this Gauss point
+            double eps_xx = 0.0, eps_yy = 0.0, gamma_xy = 0.0;
+            for (int i = 0; i < 8; ++i) {
+                double dN_dxi = 0.0, dN_deta = 0.0;
+                if (i < 4) {
+                    static const double XI[4]  = { -1.0,  1.0,  1.0, -1.0 };
+                    static const double ETA[4] = { -1.0, -1.0,  1.0,  1.0 };
+                    double xi_i = XI[i], eta_i = ETA[i];
+                    dN_dxi  = 0.25 * xi_i * (1.0 + eta_i * eta) * (2.0 * xi_i * xi + eta_i * eta);
+                    dN_deta = 0.25 * eta_i * (1.0 + xi_i * xi) * (xi_i * xi + 2.0 * eta_i * eta);
+                } else {
+                    double xi2 = xi * xi, eta2 = eta * eta;
+                    switch (i) {
+                        case 4: dN_dxi = -xi * (1.0 - eta); dN_deta = -0.5 * (1.0 - xi2); break;
+                        case 5: dN_dxi =  0.5 * (1.0 - eta2); dN_deta = -eta * (1.0 + xi); break;
+                        case 6: dN_dxi = -xi * (1.0 + eta); dN_deta =  0.5 * (1.0 - xi2); break;
+                        case 7: dN_dxi = -0.5 * (1.0 - eta2); dN_deta = -eta * (1.0 - xi); break;
+                    }
+                }
+                double dNdx = invJ11 * dN_dxi + invJ12 * dN_deta;
+                double dNdy = invJ21 * dN_dxi + invJ22 * dN_deta;
+
+                int col = 2 * i;
+                eps_xx    += dNdx * u_elem[col];
+                eps_xx    += 0.0 * u_elem[col + 1];
+                eps_yy    += 0.0 * u_elem[col];
+                eps_yy    += dNdy * u_elem[col + 1];
+                gamma_xy  += dNdy * u_elem[col];
+                gamma_xy  += dNdx * u_elem[col + 1];
+            }
+
+            avg_sigma_xx += D[0][0] * eps_xx + D[0][1] * eps_yy + D[0][2] * gamma_xy;
+            avg_sigma_yy += D[1][0] * eps_xx + D[1][1] * eps_yy + D[1][2] * gamma_xy;
+            avg_sigma_xy += D[2][0] * eps_xx + D[2][1] * eps_yy + D[2][2] * gamma_xy;
+        }
+    }
+
+    double npoints = 4.0;
+    ElementStress s;
+    s.sigma_xx = avg_sigma_xx / npoints;
+    s.sigma_yy = avg_sigma_yy / npoints;
+    s.sigma_xy = avg_sigma_xy / npoints;
+
+    // Principal stresses and Von Mises
+    double avg = (s.sigma_xx + s.sigma_yy) / 2.0;
+    double R = std::sqrt(((s.sigma_xx - s.sigma_yy) / 2.0) * ((s.sigma_xx - s.sigma_yy) / 2.0)
+                         + s.sigma_xy * s.sigma_xy);
+    double s1 = avg + R;
+    double s2 = avg - R;
+    s.sigma_1 = s1;
+    s.sigma_2 = s2;
+
+    if (plane == PlaneType::STRESS) {
+        s.von_mises = std::sqrt(s1 * s1 - s1 * s2 + s2 * s2);
+    } else {
+        double s3 = mat.nu * (s.sigma_xx + s.sigma_yy);
+        s.von_mises = std::sqrt(0.5 * ((s1 - s2) * (s1 - s2) +
+                                        (s2 - s3) * (s2 - s3) +
+                                        (s3 - s1) * (s3 - s1)));
+    }
+
+    return s;
+}
+
+// ------------------------------------------------------------------
 // Compute all element stresses
 // ------------------------------------------------------------------
 inline std::vector<ElementStress> compute_all_stresses(
     const Mesh& m,
     const std::vector<double>& u) {
 
-    int total_elements = m.num_quads() + m.num_tris();
+    int total_elements = m.num_quads() + m.num_quad8s() + m.num_tris();
     std::vector<ElementStress> stresses(total_elements);
 
     // Build temperature arrays if available
@@ -258,6 +377,22 @@ inline std::vector<ElementStress> compute_all_stresses(
         stresses[e] = compute_q4_stress(elem_nodes, u_elem, m.mat, m.plane, temps, m.T_ref);
     }
 
+    // Compute Q8 stresses
+    #pragma omp parallel for
+    for (int e = 0; e < m.num_quad8s(); ++e) {
+        const auto& elem = m.quad8_elements[e];
+        std::vector<Node> elem_nodes(8);
+        std::array<double, 16> u_elem;
+
+        for (int i = 0; i < 8; ++i) {
+            elem_nodes[i] = m.nodes[elem[i]];
+            u_elem[2 * i]     = u[dof_index(elem[i], 0)];
+            u_elem[2 * i + 1] = u[dof_index(elem[i], 1)];
+        }
+
+        stresses[m.num_quads() + e] = compute_q8_stress(elem_nodes, u_elem, m.mat, m.plane);
+    }
+
     // Compute T3 stresses
     #pragma omp parallel for
     for (int e = 0; e < m.num_tris(); ++e) {
@@ -273,7 +408,7 @@ inline std::vector<ElementStress> compute_all_stresses(
             if (has_temps) temps[i] = m.temperature[elem[i]];
         }
 
-        stresses[m.num_quads() + e] = compute_t3_stress(elem_nodes, u_elem, m.mat, m.plane, temps, m.T_ref);
+        stresses[m.num_quads() + m.num_quad8s() + e] = compute_t3_stress(elem_nodes, u_elem, m.mat, m.plane, temps, m.T_ref);
     }
 
     return stresses;
@@ -309,10 +444,24 @@ inline std::vector<NodeStress> average_stresses_to_nodes(
         }
     }
 
+    // Average Q8 element stresses to nodes
+    for (int e = 0; e < m.num_quad8s(); ++e) {
+        const auto& elem = m.quad8_elements[e];
+        int idx = m.num_quads() + e;
+        for (int i = 0; i < 8; ++i) {
+            int n = elem[i];
+            node_stress[n].sigma_xx += elem_stresses[idx].sigma_xx;
+            node_stress[n].sigma_yy += elem_stresses[idx].sigma_yy;
+            node_stress[n].sigma_xy += elem_stresses[idx].sigma_xy;
+            node_stress[n].von_mises += elem_stresses[idx].von_mises;
+            node_stress[n].count++;
+        }
+    }
+
     // Average T3 element stresses to nodes
     for (int e = 0; e < m.num_tris(); ++e) {
         const auto& elem = m.tri_elements[e];
-        int idx = m.num_quads() + e;
+        int idx = m.num_quads() + m.num_quad8s() + e;
         for (int i = 0; i < 3; ++i) {
             int n = elem[i];
             node_stress[n].sigma_xx += elem_stresses[idx].sigma_xx;
@@ -368,7 +517,7 @@ inline void write_stress_json(
     const Mesh& m,
     const std::vector<ElementStress>& stresses) {
 
-    int total_elements = m.num_quads() + m.num_tris();
+    int total_elements = m.num_quads() + m.num_quad8s() + m.num_tris();
     std::ofstream f(filepath);
     f << std::fixed << std::setprecision(6);
     f << "{\n";
@@ -417,6 +566,7 @@ inline void write_meta_json(
     std::ofstream f(filepath);
     f << std::fixed << std::setprecision(6);
     f << "{\n";
+    f << "  \"case\": \"" << case_name(g_case) << "\",\n";
     f << "  \"num_nodes\": " << m.num_nodes() << ",\n";
     f << "  \"num_elements\": " << (m.num_quads() + m.num_tris()) << ",\n";
     f << "  \"num_quads\": " << m.num_quads() << ",\n";
@@ -459,8 +609,9 @@ inline void write_mesh_json(
     f << std::fixed << std::setprecision(6);
     f << "{\n";
     f << "  \"num_nodes\": " << m.num_nodes() << ",\n";
-    f << "  \"num_elements\": " << (m.num_quads() + m.num_tris()) << ",\n";
+    f << "  \"num_elements\": " << (m.num_quads() + m.num_quad8s() + m.num_tris()) << ",\n";
     f << "  \"num_quads\": " << m.num_quads() << ",\n";
+    f << "  \"num_quad8s\": " << m.num_quad8s() << ",\n";
     f << "  \"num_tris\": " << m.num_tris() << ",\n";
     f << "  \"nodes\": [\n";
     for (int i = 0; i < m.num_nodes(); ++i) {
@@ -485,6 +636,21 @@ inline void write_mesh_json(
         f << "\n";
     }
     f << "  ],\n";
+    // Output Q8 elements
+    f << "  \"quad8_elements\": [\n";
+    for (int i = 0; i < m.num_quad8s(); ++i) {
+        f << "    {\"n0\": " << m.quad8_elements[i][0]
+          << ", \"n1\": " << m.quad8_elements[i][1]
+          << ", \"n2\": " << m.quad8_elements[i][2]
+          << ", \"n3\": " << m.quad8_elements[i][3]
+          << ", \"n4\": " << m.quad8_elements[i][4]
+          << ", \"n5\": " << m.quad8_elements[i][5]
+          << ", \"n6\": " << m.quad8_elements[i][6]
+          << ", \"n7\": " << m.quad8_elements[i][7] << "}";
+        if (i < m.num_quad8s() - 1) f << ",";
+        f << "\n";
+    }
+    f << "  ],\n";
     // Output T3 elements with quality
     f << "  \"tri_elements\": [\n";
     for (int i = 0; i < m.num_tris(); ++i) {
@@ -504,7 +670,28 @@ inline void write_mesh_json(
     f << "    \"min_jacobian_ratio\": " << mq.min_jacobian_ratio << ",\n";
     f << "    \"max_aspect_ratio\": " << mq.max_aspect_ratio << ",\n";
     f << "    \"max_skewness\": " << mq.max_skewness << "\n";
-    f << "  }\n";
+    f << "  },\n";
+    // Output boundary conditions
+    f << "  \"dirichlet\": [\n";
+    for (int i = 0; i < static_cast<int>(m.dirichlet.size()); ++i) {
+        const auto& bc = m.dirichlet[i];
+        f << "    {\"node\": " << bc.node
+          << ", \"dof\": " << bc.dof
+          << ", \"value\": " << bc.value << "}";
+        if (i < static_cast<int>(m.dirichlet.size()) - 1) f << ",";
+        f << "\n";
+    }
+    f << "  ],\n";
+    f << "  \"neumann\": [\n";
+    for (int i = 0; i < static_cast<int>(m.neumann.size()); ++i) {
+        const auto& bc = m.neumann[i];
+        f << "    {\"node\": " << bc.node
+          << ", \"dof\": " << bc.dof
+          << ", \"value\": " << bc.value << "}";
+        if (i < static_cast<int>(m.neumann.size()) - 1) f << ",";
+        f << "\n";
+    }
+    f << "  ]\n";
     f << "}\n";
 }
 

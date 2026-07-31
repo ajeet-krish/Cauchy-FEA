@@ -31,6 +31,11 @@
         <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
         <a href="lbracket.html" class="nav-item">L-Bracket</a>
         <a href="michell.html" class="nav-item active">Michell Truss</a>
+        <a href="thermal_cylinder.html" class="nav-item">Thick Cylinder</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Advanced</div>
+        <a href="pinn.html" class="nav-item">PINN Surrogate</a>
       </div>
       <div class="nav-section">
         <div class="nav-heading">Reference</div>
@@ -79,14 +84,8 @@
 
     <div class="static-plots">
       <div class="plot-item">
-        <h3>Mesh Quality</h3>
-        <img src="output/michell/mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
-        <p>Mesh geometry and element quality statistics.</p>
-      </div>
-
-      <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="output/michell/displacement_contour.png" 
+        <img src="assets/images/michell_displacement_contour.png" 
              alt="Displacement contour (|u|, ux, uy)" 
              loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
@@ -94,7 +93,7 @@
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="output/michell/deformed_mesh.png" 
+        <img src="assets/images/michell_deformed_mesh.png" 
              alt="Deformed mesh overlay with displacement vectors" 
              loading="lazy" />
         <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors showing truss deflection under load.</p>
