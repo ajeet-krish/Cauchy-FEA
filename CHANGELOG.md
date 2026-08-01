@@ -4,6 +4,15 @@
 ### Added
 - Qt Desktop Application structure in `src/desktop/`.
 - CMake configuration for Qt 6 desktop application (`CAUCHY_DESKTOP` option).
+- macOS `.app` bundle support (`MACOSX_BUNDLE TRUE` in CMake).
+- Install target for macOS (`cmake --install` copies to /Applications).
+- **StressHistogram** plot widget: element stress distribution (sigma_xx, sigma_yy, von_mises).
+- **EnergyBalanceChart** plot widget: strain energy vs work done comparison bar chart.
+- **DisplacementLineChart** plot widget: displacement profile along mesh edge.
+- **LoadDisplacementChart** plot widget: applied force vs max displacement (accumulates across solves).
+- **ErrorHeatmap** plot widget: per-element ZZ error indicator as colored overlay with pan/zoom.
+- **ConvergenceChart** wired into bottom dock tab widget.
+- Bottom dock QTabWidget with 6 analysis plot tabs in main window.
 
 ### Fixed
 - Fixed compilation errors in `src/desktop/` components:

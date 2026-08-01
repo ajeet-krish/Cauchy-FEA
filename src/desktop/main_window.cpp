@@ -63,6 +63,7 @@ MainWindow::MainWindow(QWidget* parent)
     createMenuBar();
     createToolbars();
     createStatusBar();
+    createBottomPlots();
 
     // Connect solver panel signals
     connect(m_solverPanel, &SolverPanel::runClicked,
@@ -196,9 +197,38 @@ void MainWindow::onSolveFinished(const fea::SolveResult& result, const Mesh& mes
 
     m_viewport->setMeshAndResults(mesh, result);
     m_resultModel->setData(result, mesh, ResultTableType::DISPLACEMENT);
-
-    // Update solver panel with results
     m_solverPanel->setResult(result);
+
+    // Store for plot access
+    m_lastMesh = mesh;
+    m_lastResult = result;
+
+    // Update stress histogram
+    m_stressHist->setData(result.stresses);
+
+    // Update energy balance
+    EnergyBalanceData ed;
+    ed.strain_energy = fea::compute_strain_energy(result.K_csr, result.displacement);
+    ed.work_done = fea::compute_work_done(result.f, result.displacement);
+    ed.valid = true;
+    m_energyChart->setData(ed);
+
+    // Update displacement line chart
+    m_dispLineChart->setData(mesh, result);
+
+    // Update load-displacement chart
+    double maxDisp = 0.0;
+    for (int i = 0; i < mesh.num_nodes(); ++i) {
+        double ux = result.displacement[2 * i];
+        double uy = result.displacement[2 * i + 1];
+        double d = std::sqrt(ux * ux + uy * uy);
+        if (d > maxDisp) maxDisp = d;
+    }
+    double totalForce = 0.0;
+    for (const auto& bc : mesh.neumann) {
+        totalForce += std::abs(bc.value);
+    }
+    m_ldChart->addPoint(totalForce, maxDisp);
 }
 
 void MainWindow::onSolverError(const QString& errorMessage) {
@@ -316,4 +346,28 @@ void MainWindow::onPlayAnimation() {
 
 void MainWindow::onResetAnimation() {
     // TODO: Reset animation
+}
+
+void MainWindow::createBottomPlots() {
+    m_plotTabs = new QTabWidget(this);
+    m_plotTabs->setMinimumHeight(220);
+
+    m_stressHist = new StressHistogram(this);
+    m_energyChart = new EnergyBalanceChart(this);
+    m_dispLineChart = new DisplacementLineChart(this);
+    m_ldChart = new LoadDisplacementChart(this);
+    m_errorHeatmap = new ErrorHeatmap(this);
+    m_convChart = new ConvergenceChart(this);
+
+    m_plotTabs->addTab(m_stressHist, "Stress Distribution");
+    m_plotTabs->addTab(m_energyChart, "Energy Balance");
+    m_plotTabs->addTab(m_dispLineChart, "Displacement Profile");
+    m_plotTabs->addTab(m_ldChart, "Load-Displacement");
+    m_plotTabs->addTab(m_errorHeatmap, "Error Map");
+    m_plotTabs->addTab(m_convChart, "Convergence");
+
+    QDockWidget* plotsDock = new QDockWidget("Analysis Plots", this);
+    plotsDock->setWidget(m_plotTabs);
+    plotsDock->setAllowedAreas(Qt::BottomDockWidgetArea);
+    addDockWidget(Qt::BottomDockWidgetArea, plotsDock);
 }

@@ -28,7 +28,7 @@ Mechanical/aerospace hiring managers at SpaceX, Lockheed Martin, Northrop Grumma
 | 5 | Q8 serendipity element (3x3 Gauss, 16x16 stiffness) | Complete |
 | 6 | ZZ error estimator + adaptive h-refinement | Complete |
 | 7 | Website update (Q8 comparison, adaptive refinement) | Complete |
-| 8 | Desktop FEA application (Qt 6) | Planned |
+| 8 | Desktop FEA application (Qt 6) | In Progress |
 
 ## Architecture Decisions
 
@@ -51,6 +51,8 @@ Mechanical/aerospace hiring managers at SpaceX, Lockheed Martin, Northrop Grumma
 | Animation duration | 10 seconds | Allows reader to fully understand deformation effects |
 | Export resolution | 1920x1080 | Full HD for portfolio presentation |
 | Colorbar position | Bottom | Does not obscure mesh, clear min/max labels |
+| Desktop plotting | Custom QPainter widgets | No external charting dependency; matches dark theme |
+| Desktop packaging | macOS .app bundle (MACOSX_BUNDLE) | Native double-click launch; install to /Applications |
 
 ## Verification Checklist
 
@@ -269,7 +271,7 @@ src/
 │   ├── mesh_editor.cpp
 │   ├── solver_panel.hpp          # Right dock: solver controls + results
 │   ├── solver_panel.cpp
-│   ├── viewport_widget.hpp       # Central: 3D viewport (QWebEngineView or QOpenGLWidget)
+│   ├── viewport_widget.hpp       # Central: 2D mesh viewport (QPainter)
 │   ├── viewport_widget.cpp
 │   ├── result_model.hpp          # QAbstractItemModel for stress/displacement tables
 │   ├── result_model.cpp
@@ -277,8 +279,18 @@ src/
 │   ├── solver_runner.cpp
 │   ├── project_io.hpp            # Save/load .cauchy project files
 │   ├── project_io.cpp
-│   ├── convergence_chart.hpp     # Qt Charts convergence plot widget
+│   ├── convergence_chart.hpp     # Log-log convergence plot widget
 │   ├── convergence_chart.cpp
+│   ├── stress_histogram.hpp      # Element stress distribution histogram
+│   ├── stress_histogram.cpp
+│   ├── energy_balance_chart.hpp  # Strain energy vs work done bar chart
+│   ├── energy_balance_chart.cpp
+│   ├── displacement_line_chart.hpp # Displacement profile along mesh edge
+│   ├── displacement_line_chart.cpp
+│   ├── load_displacement_chart.hpp # Applied force vs max displacement
+│   ├── load_displacement_chart.cpp
+│   ├── error_heatmap.hpp         # ZZ error indicator per-element heatmap
+│   ├── error_heatmap.cpp
 │   ├── probe_tool.hpp            # Click-to-probe stress/displacement at a point
 │   ├── probe_tool.cpp
 │   ├── mesh_quality_overlay.hpp  # Aspect ratio / Jacobian heatmap overlay
@@ -293,6 +305,19 @@ src/
 docs/                             # Portfolio website (unchanged)
 scripts/                          # Python postprocessing (unchanged)
 ```
+
+### Bottom Plot Panel
+
+The main window includes a collapsible bottom dock with a QTabWidget holding 6 analysis plots:
+
+| Tab | Widget | What it shows |
+|-----|--------|---------------|
+| Stress Distribution | StressHistogram | Histogram of sigma_xx, sigma_yy, von_mises across elements |
+| Energy Balance | EnergyBalanceChart | Bar chart comparing strain energy 0.5*u^T*K*u vs work 0.5*f^T*u |
+| Displacement Profile | DisplacementLineChart | uy along top edge of mesh (FEA data points + line) |
+| Load-Displacement | LoadDisplacementChart | Applied force vs max displacement (accumulates across solves) |
+| Error Map | ErrorHeatmap | Per-element ZZ error indicator as colored overlay |
+| Convergence | ConvergenceChart | Log-log mesh refinement convergence (GCI, observed order) |
 
 ### Solver Bridge API
 
@@ -366,15 +391,22 @@ SolveResult run_case(const SolveConfig& config);
 
 ### Desktop App Verification Checklist
 
-- [ ] Solver runs asynchronously without blocking UI
-- [ ] Mesh generation produces correct mesh for all 6 cases
-- [ ] BC editor assigns and persists boundary conditions correctly
+- [x] Solver runs asynchronously without blocking UI
+- [x] Mesh generation produces correct mesh for all 6 cases
+- [x] BC editor assigns and persists boundary conditions correctly
 - [ ] Results visualization matches web viewer output
 - [ ] Convergence study produces correct GCI and order of convergence
 - [ ] Project save/load round-trips correctly
 - [ ] Error handling shows user-friendly messages for invalid inputs
 - [ ] Probe tool reads correct stress/displacement values at clicked points
 - [ ] Mesh quality overlay correctly identifies invalid elements
-- [ ] Cross-platform build passes on Ubuntu + macOS
+- [x] Cross-platform build passes on macOS (tested)
 - [ ] Installer packages build correctly for all target platforms
-- [ ] All existing 22 Google Test cases still pass
+- [x] All existing 22 Google Test cases still pass
+- [x] Stress histogram displays sigma_xx, sigma_yy, von_mises distributions
+- [x] Energy balance chart shows strain energy vs work done
+- [x] Displacement line chart plots uy along top edge
+- [x] Load-displacement chart accumulates across multiple solves
+- [x] Error heatmap renders per-element ZZ error indicators
+- [x] Convergence chart wired into bottom dock
+- [x] macOS .app bundle builds and launches correctly

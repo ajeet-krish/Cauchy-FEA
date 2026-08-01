@@ -126,6 +126,11 @@ if(CAUCHY_DESKTOP)
     src/desktop/probe_tool.cpp
     src/desktop/mesh_quality_overlay.cpp
     src/desktop/about_dialog.cpp
+    src/desktop/stress_histogram.cpp
+    src/desktop/energy_balance_chart.cpp
+    src/desktop/displacement_line_chart.cpp
+    src/desktop/load_displacement_chart.cpp
+    src/desktop/error_heatmap.cpp
   )
 
   set(DESKTOP_HEADERS
@@ -141,6 +146,11 @@ if(CAUCHY_DESKTOP)
     src/desktop/probe_tool.hpp
     src/desktop/mesh_quality_overlay.hpp
     src/desktop/about_dialog.hpp
+    src/desktop/stress_histogram.hpp
+    src/desktop/energy_balance_chart.hpp
+    src/desktop/displacement_line_chart.hpp
+    src/desktop/load_displacement_chart.hpp
+    src/desktop/error_heatmap.hpp
   )
 
   add_executable(cauchy-desktop ${DESKTOP_SOURCES} ${DESKTOP_HEADERS})
@@ -152,10 +162,14 @@ if(CAUCHY_DESKTOP)
   # macOS bundle
   if(APPLE)
     set_target_properties(cauchy-desktop PROPERTIES
+      MACOSX_BUNDLE TRUE
       MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/desktop/Info.plist
       MACOSX_BUNDLE_BUNDLE_NAME "Cauchy"
       MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+      MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+      MACOSX_BUNDLE_GUI_IDENTIFIER "com.cauchy.fea2d"
     )
+    install(TARGETS cauchy-desktop BUNDLE DESTINATION /Applications)
   endif()
 
   # Linux .desktop file
@@ -163,5 +177,6 @@ if(CAUCHY_DESKTOP)
     install(FILES desktop/cauchy.desktop
       DESTINATION share/applications
     )
+    install(TARGETS cauchy-desktop DESTINATION bin)
   endif()
 endif()

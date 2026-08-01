@@ -1,4 +1,5 @@
 build/
+build-desktop/
 output/
 docs/output/
 docs/assets/data/

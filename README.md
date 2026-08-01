@@ -227,7 +227,8 @@ Cauchy Desktop (Qt 6)
 │   ├── Status bar (solver progress, mesh stats)
 │   ├── Left dock: Mesh & BC editor
 │   ├── Right dock: Properties & results
-│   └── Central: 3D viewport (QOpenGLWidget / QWebEngineView)
+│   ├── Central: 2D viewport (QPainter mesh renderer)
+│   └── Bottom dock: Analysis plots (QTabWidget, 6 tabs)
 │
 ├── Solver Bridge (native C++ link, no IPC)
 │   ├── Mesh model (mirrors fea::Mesh)
@@ -237,17 +238,24 @@ Cauchy Desktop (Qt 6)
 │   └── Result model (QAbstractItemModel for tables)
 │
 ├── Visualization Engine
-│   ├── 3D viewport (reuse Three.js via QWebEngineView, or native OpenGL)
-│   ├── Contour mapping (same colormap JS logic)
-│   ├── Mesh quality overlay
-│   ├── Probe tool (click to read values)
-│   └── Animation controller
+│   ├── 2D viewport (QPainter with pan/zoom)
+│   ├── Contour mapping (turbo, viridis, hot, coolwarm, RdBu_r)
+│   ├── Principal stress arrows (element-based)
+│   ├── Boundary condition symbols (triangles, arrows)
+│   └── Mesh quality overlay
+│
+├── Analysis Plots (bottom dock, collapsible)
+│   ├── Stress Histogram: sigma_xx, sigma_yy, von_mises distributions
+│   ├── Energy Balance: strain energy vs work done bar chart
+│   ├── Displacement Profile: uy along mesh edge
+│   ├── Load-Displacement: force vs max displacement
+│   ├── Error Map: per-element ZZ error indicator heatmap
+│   └── Convergence: log-log mesh refinement with GCI
 │
 ├── File I/O
 │   ├── Project file (.cauchy) -- JSON-based archive
-│   ├── Mesh import (JSON, Gmsh .msh, VTK .vtu)
-│   ├── Results export (JSON, CSV, VTU)
-│   └── Screenshot/PNG export
+│   ├── Screenshot/PNG export
+│   └── Results export
 │
 └── Solver Backend (existing C++ headers, linked directly)
     ├── fea_types.hpp
@@ -270,30 +278,33 @@ in a `QThread` to keep the UI responsive.
 ### GUI Layout
 
 ```
-+----------------------------------------------------------+
-|  File  Edit  Solve  View  Help                           |  <- Menu bar
-+------+-------------------------------------------+-------+
-| Mesh |  Node: 297    Elem: 256    DOF: 594         | Props|
-| Edit |  Material: Steel (E=200GPa, nu=0.3)       |      |
-|      |                                           |      |
-| BC   |  [Dirichlet]  Fixed left edge (x=0)       |      |
-|      |  [Neumann]    Force right edge: -1000 N   |      |
-|      |                                           |      |
-| Mesh |  [Generate]  [Refine]  [Coarsen]          |      |
-| Ops  |  [Import...]  [Export...]                 |      |
-|      |                                           |      |
-| Solve|  [Run Cholesky]  [Run CG]  [Convergence]  |      |
-|      |  [Adaptive]  [Reset]                     |      |
-+------+-------------------------------------------+-------+
-|                                                          |
-|              3D Viewport (Three.js / OpenGL)            |
-|                                                          |
-|  [Undeformed] [Deformed] [Edges] [Arrows] [Boundary]   |
-|  Contour: [Von Mises v]  Scale: [====|====]  100x     |
-|  [Animate 10s]  [Export PNG]                            |
-+----------------------------------------------------------+
-|  Status: Ready | Mesh: 297 nodes | Solver: Cholesky OK  |
-+----------------------------------------------------------+
++------------------------------------------------------------------+
+|  File  Edit  Solve  View  Help                                    |  <- Menu bar
++------+-------------------------------------------+----------------+
+| Mesh |  Node: 297    Elem: 256    DOF: 594         | Props         |
+| Edit |  Material: Steel (E=200GPa, nu=0.3)       |               |
+|      |                                           |               |
+| BC   |  [Dirichlet]  Fixed left edge (x=0)       |               |
+|      |  [Neumann]    Force right edge: -1000 N   |               |
+|      |                                           |               |
+| Mesh |  [Generate]  [Refine]  [Coarsen]          |               |
+| Ops  |  [Import...]  [Export...]                 |               |
+|      |                                           |               |
+| Solve|  [Run Cholesky]  [Run CG]  [Convergence]  |               |
+|      |  [Adaptive]  [Reset]                     |               |
++------+-------------------------------------------+----------------+
+|                                                                  |
+|              2D Viewport (QPainter mesh renderer)                |
+|                                                                  |
+|  [Undeformed] [Deformed] [Edges] [Arrows] [Boundary]           |
+|  Contour: [Von Mises v]  Scale: [====|====]  100x             |
+|  [Export PNG]                                                    |
++------------------------------------------------------------------+
+| [Stress Dist] [Energy Balance] [Disp Profile] [Load-Disp] [Error Map] [Convergence] |
+|  (bottom dock: collapsible tab widget with 6 analysis plots)    |
++------------------------------------------------------------------+
+|  Status: Ready | Mesh: 297 nodes | Solver: Cholesky OK          |
++------------------------------------------------------------------+
 ```
 
 ### Development Phases
@@ -333,10 +344,16 @@ in a `QThread` to keep the UI responsive.
 
 ```bash
 # Requires Qt 6 installed
-cmake -B build -DCAUCHY_DESKTOP=ON
-cmake --build build -j$(sysctl -n hw.ncpu)
-./build/cauchy-desktop
+cmake -B build-desktop -DCAUCHY_DESKTOP=ON
+cmake --build build-desktop -j$(sysctl -n hw.ncpu)
+
+# Launch (macOS)
+open build-desktop/cauchy-desktop.app
+
+# Install to /Applications (macOS)
+cmake --install build-desktop
 ```
 
-The desktop app is an optional build target. The default build (`cmake -B build`)
-produces only the CLI solvers and tests.
+The desktop app builds as a macOS `.app` bundle (`Cauchy.app`) that can be
+double-clicked from Finder or dragged to /Applications. On Linux, it builds
+as a standard executable with an install target for `/usr/local/bin`.

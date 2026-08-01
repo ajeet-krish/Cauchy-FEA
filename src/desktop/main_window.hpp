@@ -7,6 +7,12 @@
 #include "solver_panel.hpp"
 #include "result_model.hpp"
 #include "solver_runner.hpp"
+#include "convergence_chart.hpp"
+#include "stress_histogram.hpp"
+#include "energy_balance_chart.hpp"
+#include "displacement_line_chart.hpp"
+#include "load_displacement_chart.hpp"
+#include "error_heatmap.hpp"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -38,6 +44,7 @@ private:
     void createMenuBar();
     void createToolbars();
     void createStatusBar();
+    void createBottomPlots();
 
     ViewportWidget* m_viewport = nullptr;
     MeshEditor* m_meshEditor = nullptr;
@@ -48,5 +55,16 @@ private:
     QLabel* m_statusLabel = nullptr;
     QLabel* m_scaleLabel = nullptr;
 
+    // Plot widgets
+    QTabWidget* m_plotTabs = nullptr;
+    StressHistogram* m_stressHist = nullptr;
+    EnergyBalanceChart* m_energyChart = nullptr;
+    DisplacementLineChart* m_dispLineChart = nullptr;
+    LoadDisplacementChart* m_ldChart = nullptr;
+    ErrorHeatmap* m_errorHeatmap = nullptr;
+    ConvergenceChart* m_convChart = nullptr;
+
     SolveConfig m_config;
+    Mesh m_lastMesh;
+    fea::SolveResult m_lastResult;
 };
