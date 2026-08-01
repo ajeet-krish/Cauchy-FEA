@@ -168,8 +168,17 @@ if(CAUCHY_DESKTOP)
       MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
       MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
       MACOSX_BUNDLE_GUI_IDENTIFIER "com.cauchy.fea2d"
+      MACOSX_BUNDLE_ICON_FILE "icon.icns"
     )
     install(TARGETS cauchy-desktop BUNDLE DESTINATION /Applications)
+
+    # Copy icon into the .app bundle Resources folder
+    add_custom_command(TARGET cauchy-desktop POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_SOURCE_DIR}/desktop/icon.icns
+        $<TARGET_FILE_DIR:cauchy-desktop>/../Resources/icon.icns
+      COMMENT "Copying app icon to bundle Resources"
+    )
   endif()
 
   # Linux .desktop file
@@ -179,4 +188,18 @@ if(CAUCHY_DESKTOP)
     )
     install(TARGETS cauchy-desktop DESTINATION bin)
   endif()
+
+  # Convenience targets
+  add_custom_target(run-desktop
+    COMMAND ./cauchy-desktop
+    DEPENDS cauchy-desktop
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Running Cauchy FEA desktop app"
+  )
+
+  add_custom_target(install-desktop
+    COMMAND cmake --install ${CMAKE_BINARY_DIR} --prefix /Applications
+    DEPENDS cauchy-desktop
+    COMMENT "Installing Cauchy FEA to /Applications"
+  )
 endif()

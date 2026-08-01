@@ -6,6 +6,9 @@
 - CMake configuration for Qt 6 desktop application (`CAUCHY_DESKTOP` option).
 - macOS `.app` bundle support (`MACOSX_BUNDLE TRUE` in CMake).
 - Install target for macOS (`cmake --install` copies to /Applications).
+- App icon (`desktop/icon.icns`) embedded in .app bundle Resources.
+- `build-desktop.sh` one-command build + install + launch script.
+- CMake convenience targets: `run-desktop`, `install-desktop`.
 - **StressHistogram** plot widget: element stress distribution (sigma_xx, sigma_yy, von_mises).
 - **EnergyBalanceChart** plot widget: strain energy vs work done comparison bar chart.
 - **DisplacementLineChart** plot widget: displacement profile along mesh edge.

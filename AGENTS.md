@@ -310,10 +310,13 @@ src/
 └── desktop/
     ├── resources.qrc             # Qt resource system (icons, styles)
     ├── cauchy.desktop            # Linux .desktop file
-    └── Info.plist                # macOS .plist file
+    ├── Info.plist                # macOS .plist file
+    ├── icon.icns                 # macOS app icon (512x512, generated from PNG)
+    └── icon.png                  # Source PNG for app icon
 
 docs/                             # Portfolio website (unchanged)
 scripts/                          # Python postprocessing (unchanged)
+build-desktop.sh                  # One-command build + install + launch script
 ```
 
 ### Bottom Plot Panel

@@ -343,8 +343,11 @@ in a `QThread` to keep the UI responsive.
 ### Build (Desktop App)
 
 ```bash
-# Requires Qt 6 installed
-cmake -B build-desktop -DCAUCHY_DESKTOP=ON
+# One-command build, install, and launch (macOS)
+./build-desktop.sh
+
+# Or manually:
+cmake -B build-desktop -DCAUCHY_DESKTOP=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build build-desktop -j$(sysctl -n hw.ncpu)
 
 # Launch (macOS)
@@ -354,9 +357,8 @@ open build-desktop/cauchy-desktop.app
 cmake --install build-desktop
 ```
 
-The desktop app builds as a macOS `.app` bundle (`Cauchy.app`) that can be
-double-clicked from Finder or dragged to /Applications. On Linux, it builds
-as a standard executable with an install target for `/usr/local/bin`.
+The desktop app bundles as a native macOS `.app` with icon, double-clickable
+from Finder, and installable to `/Applications` via `cmake --install`.
 
 ### Why Qt Widgets Over Alternatives
 

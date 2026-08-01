@@ -5,7 +5,7 @@
     <key>CFBundleExecutable</key>
     <string>cauchy-desktop</string>
     <key>CFBundleIconFile</key>
-    <string></string>
+    <string>icon.icns</string>
     <key>CFBundleIdentifier</key>
     <string>com.cauchy.fea2d</string>
     <key>CFBundleName</key>
@@ -14,7 +14,11 @@
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
 </dict>
 </plist>
