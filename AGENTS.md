@@ -248,14 +248,24 @@ for hiring managers. The desktop application is the actual working tool.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| GUI framework | Qt 6 (QWidgets + QOpenGLWidget) | Industry standard C++ GUI, native look, cross-platform, CMake-native |
-| 3D rendering | QWebEngineView (Three.js) + native QOpenGLWidget fallback | Reuse existing web viewer; native OpenGL for performance-critical paths |
+| GUI framework | Qt 6 (QWidgets) | Direct C++ solver link, industry recognition, cross-platform .app bundle |
+| 2D rendering | QPainter (CPU) | Sufficient for 2D mesh + plots; no GPU dependency |
 | Solver integration | Direct C++ link (no IPC) | Eliminates JSON serialization overhead; direct access to data structures |
 | Async execution | QThread with progress signals | Keeps UI responsive during solver runs |
 | Project format | JSON (.cauchy) | Same format as existing pipeline; human-readable |
-| Plotting | Qt Charts or QCustomPlot | Native Qt charting; no external JS dependency |
-| Packaging | CPack (DEB/RPM/DMG/NSIS) | Cross-platform installers from same CMake tree |
+| Plotting | Custom QPainter widgets | No external charting dependency; matches dark theme |
+| Packaging | MACOSX_BUNDLE + install target | Native .app launch; `cmake --install` copies to /Applications |
 | License | MIT (same as solver) | Consistent with existing project |
+
+### Why Not ImGui / Tauri / Flutter
+
+| Framework | Why Not for Cauchy |
+|-----------|-------------------|
+| Dear ImGui | No native file dialogs, no dock widgets, custom-only look, less industry recognition |
+| Rust + Tauri | C++/Rust FFI overhead makes no sense for solver-heavy app; two languages to maintain |
+| Flutter | Dart/C++ FFI adds complexity; Material Design looks like a phone app on desktop |
+| wxWidgets | Sparse documentation, no built-in plotting, manual packaging on macOS |
+| GTK | Poor macOS/Windows support, C API is painful from C++, tiny scientific ecosystem |
 
 ### Desktop App File Structure
 
@@ -364,7 +374,7 @@ SolveResult run_case(const SolveConfig& config);
 ### Desktop App Code Conventions
 
 - C++20, same as solver backend
-- Qt 6 APIs (Qt6Core, Qt6Gui, Qt6Widgets, Qt6WebEngineWidgets)
+- Qt 6 APIs (Qt6Core, Qt6Gui, Qt6Widgets)
 - 4-space indentation, K&R braces (same as solver)
 - `snake_case` for locals, `PascalCase` for classes/structs
 - `g_` prefix for inline globals (e.g., `g_app`, `g_main_window`)

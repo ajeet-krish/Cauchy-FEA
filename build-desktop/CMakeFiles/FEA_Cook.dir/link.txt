@@ -1,1 +1,0 @@
-/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/FEA_Cook.dir/src/main_cook.cpp.o -o FEA_Cook  /opt/homebrew/opt/libomp/lib/libomp.dylib

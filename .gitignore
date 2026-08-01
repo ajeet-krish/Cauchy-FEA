@@ -1,11 +1,17 @@
+# Build directories
 build/
 build-desktop/
+
+# Simulation output
 output/
 docs/output/
 docs/assets/data/
 docs/assets/videos/*.mp4
+
+# OS files
 **/.DS_Store
 
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -18,3 +24,10 @@ pinn/models/
 
 # OpenCode
 .cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

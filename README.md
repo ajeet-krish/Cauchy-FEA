@@ -357,3 +357,35 @@ cmake --install build-desktop
 The desktop app builds as a macOS `.app` bundle (`Cauchy.app`) that can be
 double-clicked from Finder or dragged to /Applications. On Linux, it builds
 as a standard executable with an install target for `/usr/local/bin`.
+
+### Why Qt Widgets Over Alternatives
+
+The desktop app evaluates several native GUI frameworks before selecting
+Qt Widgets. The decision is driven by one critical constraint: the solver
+is a C++20 header-only library that must link directly into the GUI
+process (no IPC, no serialization).
+
+| Framework | Solver Integration | Plotting | GPU Viewport | Dev Speed | Native Look | Packaging |
+|-----------|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Qt Widgets (chosen)** | Direct C++ link | Custom QPainter | QPainter (CPU) | Medium | Good | Excellent (.app) |
+| Dear ImGui | Direct C++ link | ImPlot (built-in) | OpenGL (GPU) | Very Fast | Custom only | Manual |
+| Rust + Tauri | FFI required | JS libraries | WebGL (via webview) | Slow (2 langs) | Web look | Excellent |
+| Qt Quick/QML | Direct C++ link | QML Chart | GPU scene graph | Medium | Custom | Excellent |
+| wxWidgets | Direct C++ link | Manual DC | N/A | Medium | Excellent | Manual |
+
+**Qt Widgets wins because:**
+1. **Zero FFI overhead.** `SolveResult` passes from `QThread` to viewport
+   as a C++ struct. No JSON serialization, no `extern "C"` wrappers.
+2. **Industry recognition.** Qt is used at ANSYS, COMSOL, ParaView, Salome.
+   Hiring managers in aerospace/defense recognize it immediately.
+3. **QPainter is sufficient.** 2D mesh rendering and 6 analysis plots don't
+   need GPU acceleration. Custom QPainter widgets match the dark theme.
+4. **Cross-platform from one CMake tree.** macOS .app bundle, Linux .desktop,
+   Windows NSIS -- all configured with `MACOSX_BUNDLE TRUE`.
+5. **QThread for async.** Clean signal/slot across threads. The solver runs
+   in a background thread without blocking the UI.
+
+**Dear ImGui would be faster to develop** (~500 lines for a full GUI vs
+~3000 lines in Qt), but loses native file dialogs, dock widgets, and
+industry recognition. **Tauri would reuse web skills** but adds Rust/C++
+FFI overhead that makes no sense for a solver-heavy app.

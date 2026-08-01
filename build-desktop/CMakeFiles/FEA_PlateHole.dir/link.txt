@@ -1,1 +1,0 @@
-/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/FEA_PlateHole.dir/src/main_plate_hole.cpp.o -o FEA_PlateHole  /opt/homebrew/opt/libomp/lib/libomp.dylib
