@@ -61,6 +61,18 @@ add_executable(FEA_ThermalCylinder src/main_thermal.cpp ${FEA_HEADERS})
 target_include_directories(FEA_ThermalCylinder PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(FEA_ThermalCylinder PRIVATE OpenMP::OpenMP_CXX)
 
+add_executable(FEA_Cantilever3D src/main_cantilever_3d.cpp ${FEA_HEADERS})
+target_include_directories(FEA_Cantilever3D PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(FEA_Cantilever3D PRIVATE OpenMP::OpenMP_CXX)
+
+add_executable(FEA_PlateHole3D src/main_plate_hole_3d.cpp ${FEA_HEADERS})
+target_include_directories(FEA_PlateHole3D PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(FEA_PlateHole3D PRIVATE OpenMP::OpenMP_CXX)
+
+add_executable(FEA_Lame3D src/main_lame_3d.cpp ${FEA_HEADERS})
+target_include_directories(FEA_Lame3D PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(FEA_Lame3D PRIVATE OpenMP::OpenMP_CXX)
+
 # ------------------------------------------------------------------
 # Unit tests (Google Test)
 # ------------------------------------------------------------------
@@ -106,7 +118,7 @@ add_custom_target(serve-docs
 option(CAUCHY_DESKTOP "Build the Qt 6 desktop FEA application" OFF)
 
 if(CAUCHY_DESKTOP)
-  find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets)
+  find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets WebEngineWidgets)
 
   set(CMAKE_AUTOMOC ON)
   set(CMAKE_AUTORCC ON)
@@ -119,6 +131,7 @@ if(CAUCHY_DESKTOP)
     src/desktop/mesh_editor.cpp
     src/desktop/solver_panel.cpp
     src/desktop/viewport_widget.cpp
+    src/desktop/viewport_3d.cpp
     src/desktop/result_model.cpp
     src/desktop/solver_runner.cpp
     src/desktop/project_io.cpp
@@ -139,6 +152,7 @@ if(CAUCHY_DESKTOP)
     src/desktop/mesh_editor.hpp
     src/desktop/solver_panel.hpp
     src/desktop/viewport_widget.hpp
+    src/desktop/viewport_3d.hpp
     src/desktop/result_model.hpp
     src/desktop/solver_runner.hpp
     src/desktop/project_io.hpp
@@ -153,10 +167,12 @@ if(CAUCHY_DESKTOP)
     src/desktop/error_heatmap.hpp
   )
 
-  add_executable(cauchy-desktop ${DESKTOP_SOURCES} ${DESKTOP_HEADERS})
+  set(DESKTOP_RESOURCES src/desktop/resources.qrc)
+
+  add_executable(cauchy-desktop ${DESKTOP_SOURCES} ${DESKTOP_HEADERS} ${DESKTOP_RESOURCES})
   target_include_directories(cauchy-desktop PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
   target_link_libraries(cauchy-desktop PRIVATE
-    Qt6::Core Qt6::Gui Qt6::Widgets Qt6::OpenGLWidgets OpenMP::OpenMP_CXX
+    Qt6::Core Qt6::Gui Qt6::Widgets Qt6::OpenGLWidgets Qt6::WebEngineWidgets OpenMP::OpenMP_CXX
   )
 
   # macOS bundle

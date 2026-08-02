@@ -9,15 +9,24 @@
 #include <sstream>
 
 // ==========================================================================
-// 2D FINITE ELEMENT ANALYSIS -- Type definitions and global config
+// FINITE ELEMENT ANALYSIS -- Type definitions and global config
 // ==========================================================================
 
 // Mesh dimensions (runtime variables, set by entry point)
 inline int g_nx = 20;
 inline int g_ny = 20;
 
-// Degrees of freedom per node (2D: u_x, u_y)
-constexpr int DOF_PER_NODE = 2;
+// Spatial dimension (2 or 3, set by entry point)
+inline int g_dim = 2;
+
+// Degrees of freedom per node (2D: u_x, u_y; 3D: u_x, u_y, u_z)
+inline int DOF_PER_NODE = 2;
+
+// Set dimension and DOFs atomically
+inline void set_dimension(int dim) {
+    g_dim = dim;
+    DOF_PER_NODE = dim;
+}
 
 // Element type selection
 enum class ElementType { BAR, Q4, T3 };
@@ -26,7 +35,7 @@ enum class ElementType { BAR, Q4, T3 };
 enum class AnalysisType { STATIC, BUCKLING };
 
 // Simulation case type (drives behavior like LBM's g_case)
-enum class CaseType { CANTILEVER, MICHELL, COOK, LBRACKET, PATCH, PLATE_HOLE, THERMAL_CYLINDER };
+enum class CaseType { CANTILEVER, MICHELL, COOK, LBRACKET, PATCH, PLATE_HOLE, THERMAL_CYLINDER, CANTILEVER_3D, PLATE_HOLE_3D, LAME_3D };
 
 // Plane stress vs plane strain
 enum class PlaneType { STRESS, STRAIN };
@@ -41,6 +50,9 @@ inline const char* case_name(CaseType c) {
         case CaseType::PATCH:            return "patch";
         case CaseType::PLATE_HOLE:       return "plate_hole";
         case CaseType::THERMAL_CYLINDER: return "thermal_cylinder";
+        case CaseType::CANTILEVER_3D:    return "cantilever_3d";
+        case CaseType::PLATE_HOLE_3D:    return "plate_hole_3d";
+        case CaseType::LAME_3D:          return "lame_3d";
     }
     return "unknown";
 }
@@ -99,13 +111,26 @@ struct Material {
         }
         return D;
     }
+
+    // Create 3D D matrix (full isotropic constitutive law, no plane assumption)
+    std::array<std::array<double, 6>, 6> d_matrix_3d() const {
+        double factor = E / ((1.0 + nu) * (1.0 - 2.0 * nu));
+        std::array<std::array<double, 6>, 6> D{};
+        D[0][0] = factor * (1.0 - nu);  D[0][1] = factor * nu;        D[0][2] = factor * nu;
+        D[1][0] = factor * nu;          D[1][1] = factor * (1.0 - nu); D[1][2] = factor * nu;
+        D[2][0] = factor * nu;          D[2][1] = factor * nu;          D[2][2] = factor * (1.0 - nu);
+        D[3][3] = factor * (1.0 - 2.0 * nu) / 2.0;
+        D[4][4] = factor * (1.0 - 2.0 * nu) / 2.0;
+        D[5][5] = factor * (1.0 - 2.0 * nu) / 2.0;
+        return D;
+    }
 };
 
 // ------------------------------------------------------------------
 // Node with coordinates
 // ------------------------------------------------------------------
 struct Node {
-    double x, y;
+    double x, y, z = 0.0;
 };
 
 // ------------------------------------------------------------------
@@ -133,6 +158,8 @@ struct Mesh {
     std::vector<std::array<int, 3>> tri_elements;     // T3 connectivity (CCW)
     std::vector<std::array<int, 2>> bar_elements;     // Bar connectivity
     std::vector<double> bar_areas;                     // Cross-sectional area per bar
+    std::vector<std::array<int, 8>> hex_elements;     // H8 connectivity
+    std::vector<std::array<int, 4>> tet_elements;     // T4 connectivity
     std::vector<DirichletBC> dirichlet;
     std::vector<NeumannBC> neumann;
     std::vector<double> temperature;                  // Nodal temperatures (K or C)
@@ -145,11 +172,14 @@ struct Mesh {
     int num_quad8s() const { return static_cast<int>(quad8_elements.size()); }
     int num_tris() const { return static_cast<int>(tri_elements.size()); }
     int num_bars() const { return static_cast<int>(bar_elements.size()); }
+    int num_hexes() const { return static_cast<int>(hex_elements.size()); }
+    int num_tets() const { return static_cast<int>(tet_elements.size()); }
     int num_dofs() const { return num_nodes() * DOF_PER_NODE; }
+    bool is_3d() const { return g_dim == 3; }
 };
 
 // ------------------------------------------------------------------
-// Helper: DOF index for node i, component d (0=x, 1=y)
+// Helper: DOF index for node i, component d (0=x, 1=y, 2=z)
 // ------------------------------------------------------------------
 inline int dof_index(int node, int dof) {
     return node * DOF_PER_NODE + dof;
