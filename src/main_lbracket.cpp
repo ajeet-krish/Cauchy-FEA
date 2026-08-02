@@ -65,14 +65,14 @@ int main(int argc, char* argv[]) {
     // Solve
     auto result = fea::solve(m, use_cg);
 
-    std::filesystem::create_directories("output/lbracket");
-    postprocess::write_meta_json("output/lbracket/meta.json", m, result.displacement, result.stresses,
+    std::filesystem::create_directories("output/lbracket/simulations");
+    postprocess::write_meta_json("output/lbracket/simulations/meta.json", m, result.displacement, result.stresses,
                                  result.cg_iterations, result.solve_time_ms);
-    postprocess::write_displacement_json("output/lbracket/displacement.json", m, result.displacement);
-    postprocess::write_stress_json("output/lbracket/stress.json", m, result.stresses);
-    postprocess::write_mesh_json("output/lbracket/mesh.json", m);
+    postprocess::write_displacement_json("output/lbracket/simulations/displacement.json", m, result.displacement);
+    postprocess::write_stress_json("output/lbracket/simulations/stress.json", m, result.stresses);
+    postprocess::write_mesh_json("output/lbracket/simulations/mesh.json", m);
 
-    std::cout << "Output written to output/lbracket/" << std::endl;
+    std::cout << "Output written to output/lbracket/simulations/" << std::endl;
 
     // Convergence study
     if (convergence_mode) {

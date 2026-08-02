@@ -1,6 +1,7 @@
 #pragma once
 #include "fea_types.hpp"
 #include "elements.hpp"
+#include "elements_3d.hpp"
 #include "sparse.hpp"
 #include "solver.hpp"
 #include "mesh.hpp"
@@ -100,6 +101,36 @@ inline COOMatrix assemble(const Mesh& m) {
                     K_local.add(dof_idx[i], dof_idx[j], Ke[i][j]);
                 }
             }
+        }
+
+        // Assemble H8 (hexahedron) elements
+        #pragma omp for nowait
+        for (int e = 0; e < m.num_hexes(); ++e) {
+            const auto& elem = m.hex_elements[e];
+            std::array<Node, 8> elem_nodes;
+            for (int i = 0; i < 8; ++i) elem_nodes[i] = m.nodes[elem[i]];
+
+            auto Ke = elements::H8Element::stiffness(elem_nodes, m.mat);
+            auto dof_idx = elements::H8Element::dof_indices(elem);
+
+            for (int i = 0; i < 24; ++i)
+                for (int j = 0; j < 24; ++j)
+                    K_local.add(dof_idx[i], dof_idx[j], Ke[i][j]);
+        }
+
+        // Assemble T4 (tetrahedron) elements
+        #pragma omp for nowait
+        for (int e = 0; e < m.num_tets(); ++e) {
+            const auto& elem = m.tet_elements[e];
+            std::array<Node, 4> elem_nodes;
+            for (int i = 0; i < 4; ++i) elem_nodes[i] = m.nodes[elem[i]];
+
+            auto Ke = elements::T4Element::stiffness(elem_nodes, m.mat);
+            auto dof_idx = elements::T4Element::dof_indices(elem);
+
+            for (int i = 0; i < 12; ++i)
+                for (int j = 0; j < 12; ++j)
+                    K_local.add(dof_idx[i], dof_idx[j], Ke[i][j]);
         }
 
         #pragma omp critical
@@ -276,7 +307,8 @@ inline SolveResult solve(Mesh& m, bool use_cg = false) {
     for (int i = 0; i < m.num_nodes(); ++i) {
         double ux = u[dof_index(i, 0)];
         double uy = u[dof_index(i, 1)];
-        double d = std::sqrt(ux * ux + uy * uy);
+        double uz = (g_dim == 3) ? u[dof_index(i, 2)] : 0.0;
+        double d = std::sqrt(ux * ux + uy * uy + uz * uz);
         if (d > max_disp) max_disp = d;
     }
 

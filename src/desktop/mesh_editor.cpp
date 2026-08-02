@@ -23,6 +23,11 @@ MeshEditor::MeshEditor(QWidget* parent)
             this, &MeshEditor::caseChanged);
     connect(m_elemCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MeshEditor::caseChanged);
+    connect(m_elemCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int idx) {
+        bool is3d = (idx == 4 || idx == 5);
+        m_nzSpin->setVisible(is3d);
+        m_nzLabel->setVisible(is3d);
+    });
     connect(m_planeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MeshEditor::caseChanged);
     connect(m_ESpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
@@ -97,7 +102,8 @@ void MeshEditor::createMeshControls() {
     meshLayout->addRow("NY:", m_nySpin);
 
     m_elemCombo = new QComboBox(this);
-    m_elemCombo->addItems({"Q4 (Bilinear Quad)", "Q8 (Serendipity)", "T3 (Triangle)", "Bar (Truss)"});
+    m_elemCombo->addItems({"Q4 (Bilinear Quad)", "Q8 (Serendipity)", "T3 (Triangle)", "Bar (Truss)",
+                           "H8 (Hexahedron)", "T4 (Tetrahedron)"});
     meshLayout->addRow("Element Type:", m_elemCombo);
 
     m_planeCombo = new QComboBox(this);
@@ -106,6 +112,14 @@ void MeshEditor::createMeshControls() {
 
     m_q8Check = new QCheckBox("Use Q8 elements", this);
     meshLayout->addRow(m_q8Check);
+
+    m_nzSpin = new QSpinBox(this);
+    m_nzSpin->setRange(1, 64);
+    m_nzSpin->setValue(2);
+    m_nzLabel = new QLabel("NZ:", this);
+    meshLayout->addRow(m_nzLabel, m_nzSpin);
+    m_nzSpin->setVisible(false);
+    m_nzLabel->setVisible(false);
 
     m_mainLayout->addWidget(meshGroup);
 }
@@ -139,7 +153,9 @@ PlaneType MeshEditor::planeType() const {
 
 int MeshEditor::meshSizeX() const { return m_nxSpin->value(); }
 int MeshEditor::meshSizeY() const { return m_nySpin->value(); }
+int MeshEditor::meshSizeZ() const { return m_nzSpin->value(); }
 bool MeshEditor::useQ8() const { return m_q8Check->isChecked(); }
+bool MeshEditor::is3D() const { return m_elemCombo->currentIndex() == 4 || m_elemCombo->currentIndex() == 5; }
 double MeshEditor::youngsModulus() const { return m_ESpin->value(); }
 double MeshEditor::poissonsRatio() const { return m_nuSpin->value(); }
 double MeshEditor::thickness() const { return m_tSpin->value(); }

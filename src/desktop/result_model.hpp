@@ -7,6 +7,7 @@ enum class ResultTableType { DISPLACEMENT, STRESS };
 
 class ResultModel : public QAbstractTableModel {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(ResultModel)
 public:
     explicit ResultModel(QObject* parent = nullptr);
 

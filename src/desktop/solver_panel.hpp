@@ -13,6 +13,7 @@ class QVBoxLayout;
 
 class SolverPanel : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(SolverPanel)
 public:
     explicit SolverPanel(QWidget* parent = nullptr);
 

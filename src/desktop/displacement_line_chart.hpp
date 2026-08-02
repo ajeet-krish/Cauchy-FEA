@@ -18,6 +18,7 @@ struct DispLineData {
 
 class DisplacementLineChart : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(DisplacementLineChart)
 public:
     explicit DisplacementLineChart(QWidget* parent = nullptr);
 

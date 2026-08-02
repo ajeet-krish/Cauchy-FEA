@@ -351,10 +351,101 @@ inline ElementQuality compute_t3_quality(const std::array<Node, 3>& nodes) {
 struct MeshQuality {
     std::vector<ElementQuality> quad_quality;
     std::vector<ElementQuality> tri_quality;
+    std::vector<ElementQuality> hex_quality;
+    std::vector<ElementQuality> tet_quality;
     double min_jacobian_ratio = 1.0;
     double max_aspect_ratio = 1.0;
     double max_skewness = 0.0;
 };
+
+// ------------------------------------------------------------------
+// Compute quality metrics for an H8 element
+// ------------------------------------------------------------------
+inline ElementQuality compute_h8_quality(const std::array<Node, 8>& nodes) {
+    ElementQuality q;
+
+    static const double GP = 1.0 / std::sqrt(3.0);
+    static const double GP3[2] = {-GP, GP};
+    static const double XI[8]   = {-1, 1, 1,-1,-1, 1, 1,-1};
+    static const double ETA[8]  = {-1,-1, 1, 1,-1,-1, 1, 1};
+    static const double ZETA[8] = {-1,-1,-1,-1, 1, 1, 1, 1};
+
+    double vol = 0.0;
+    double j_min = 1e20, j_max = -1e20;
+
+    for (int gi = 0; gi < 2; ++gi) {
+        for (int gj = 0; gj < 2; ++gj) {
+            for (int gk = 0; gk < 2; ++gk) {
+                double xi = GP3[gi], eta = GP3[gj], zeta = GP3[gk];
+                double J[3][3] = {};
+                for (int n = 0; n < 8; ++n) {
+                    double dN_dxi   = 0.125 * XI[n] * (1.0 + ETA[n] * eta) * (1.0 + ZETA[n] * zeta);
+                    double dN_deta  = 0.125 * (1.0 + XI[n] * xi) * ETA[n] * (1.0 + ZETA[n] * zeta);
+                    double dN_dzeta = 0.125 * (1.0 + XI[n] * xi) * (1.0 + ETA[n] * eta) * ZETA[n];
+                    J[0][0] += dN_dxi * nodes[n].x;   J[0][1] += dN_dxi * nodes[n].y;   J[0][2] += dN_dxi * nodes[n].z;
+                    J[1][0] += dN_deta * nodes[n].x;  J[1][1] += dN_deta * nodes[n].y;  J[1][2] += dN_deta * nodes[n].z;
+                    J[2][0] += dN_dzeta * nodes[n].x; J[2][1] += dN_dzeta * nodes[n].y; J[2][2] += dN_dzeta * nodes[n].z;
+                }
+                double detJ = J[0][0]*(J[1][1]*J[2][2] - J[1][2]*J[2][1])
+                            - J[0][1]*(J[1][0]*J[2][2] - J[1][2]*J[2][0])
+                            + J[0][2]*(J[1][0]*J[2][1] - J[1][1]*J[2][0]);
+                vol += detJ;
+                j_min = std::min(j_min, detJ);
+                j_max = std::max(j_max, detJ);
+            }
+        }
+    }
+    q.area = std::abs(vol);
+    q.jacobian_ratio = (j_max > 1e-20) ? j_min / j_max : 0.0;
+
+    static const int edges_h8[12][2] = {
+        {0,1},{1,2},{2,3},{3,0},{4,5},{5,6},{6,7},{7,4},{0,4},{1,5},{2,6},{3,7}
+    };
+    double e_min = 1e20, e_max = -1e20;
+    for (const auto& e : edges_h8) {
+        double dx = nodes[e[1]].x - nodes[e[0]].x;
+        double dy = nodes[e[1]].y - nodes[e[0]].y;
+        double dz = nodes[e[1]].z - nodes[e[0]].z;
+        double len = std::sqrt(dx*dx + dy*dy + dz*dz);
+        e_min = std::min(e_min, len);
+        e_max = std::max(e_max, len);
+    }
+    q.aspect_ratio = (e_min > 1e-20) ? e_max / e_min : 1e20;
+    q.skewness = 0.0;
+    return q;
+}
+
+// ------------------------------------------------------------------
+// Compute quality metrics for a T4 element
+// ------------------------------------------------------------------
+inline ElementQuality compute_t4_quality(const std::array<Node, 4>& nodes) {
+    ElementQuality q;
+
+    double vol = std::abs(
+        (nodes[1].x - nodes[0].x) * ((nodes[2].y - nodes[0].y) * (nodes[3].z - nodes[0].z) -
+                                       (nodes[3].y - nodes[0].y) * (nodes[2].z - nodes[0].z)) -
+        (nodes[1].y - nodes[0].y) * ((nodes[2].x - nodes[0].x) * (nodes[3].z - nodes[0].z) -
+                                       (nodes[3].x - nodes[0].x) * (nodes[2].z - nodes[0].z)) +
+        (nodes[1].z - nodes[0].z) * ((nodes[2].x - nodes[0].x) * (nodes[3].y - nodes[0].y) -
+                                       (nodes[3].x - nodes[0].x) * (nodes[2].y - nodes[0].y))
+    ) / 6.0;
+    q.area = vol;
+    q.jacobian_ratio = 1.0;
+
+    static const int edges_t4[6][2] = {{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
+    double e_min = 1e20, e_max = -1e20;
+    for (const auto& e : edges_t4) {
+        double dx = nodes[e[1]].x - nodes[e[0]].x;
+        double dy = nodes[e[1]].y - nodes[e[0]].y;
+        double dz = nodes[e[1]].z - nodes[e[0]].z;
+        double len = std::sqrt(dx*dx + dy*dy + dz*dz);
+        e_min = std::min(e_min, len);
+        e_max = std::max(e_max, len);
+    }
+    q.aspect_ratio = (e_min > 1e-20) ? e_max / e_min : 1e20;
+    q.skewness = 0.0;
+    return q;
+}
 
 inline MeshQuality compute_mesh_quality(const Mesh& m) {
     MeshQuality mq;
@@ -381,6 +472,28 @@ inline MeshQuality compute_mesh_quality(const Mesh& m) {
         mq.min_jacobian_ratio = std::min(mq.min_jacobian_ratio, mq.tri_quality[e].jacobian_ratio);
         mq.max_aspect_ratio = std::max(mq.max_aspect_ratio, mq.tri_quality[e].aspect_ratio);
         mq.max_skewness = std::max(mq.max_skewness, mq.tri_quality[e].skewness);
+    }
+
+    mq.hex_quality.resize(m.num_hexes());
+    for (int e = 0; e < m.num_hexes(); ++e) {
+        const auto& elem = m.hex_elements[e];
+        std::array<Node, 8> nodes;
+        for (int i = 0; i < 8; ++i) nodes[i] = m.nodes[elem[i]];
+        mq.hex_quality[e] = compute_h8_quality(nodes);
+        mq.min_jacobian_ratio = std::min(mq.min_jacobian_ratio, mq.hex_quality[e].jacobian_ratio);
+        mq.max_aspect_ratio = std::max(mq.max_aspect_ratio, mq.hex_quality[e].aspect_ratio);
+        mq.max_skewness = std::max(mq.max_skewness, mq.hex_quality[e].skewness);
+    }
+
+    mq.tet_quality.resize(m.num_tets());
+    for (int e = 0; e < m.num_tets(); ++e) {
+        const auto& elem = m.tet_elements[e];
+        std::array<Node, 4> nodes;
+        for (int i = 0; i < 4; ++i) nodes[i] = m.nodes[elem[i]];
+        mq.tet_quality[e] = compute_t4_quality(nodes);
+        mq.min_jacobian_ratio = std::min(mq.min_jacobian_ratio, mq.tet_quality[e].jacobian_ratio);
+        mq.max_aspect_ratio = std::max(mq.max_aspect_ratio, mq.tet_quality[e].aspect_ratio);
+        mq.max_skewness = std::max(mq.max_skewness, mq.tet_quality[e].skewness);
     }
 
     return mq;
@@ -785,6 +898,106 @@ inline Mesh generate_cook_quad8(double L, double h_left, double h_right,
     }
 
     return m;
+}
+
+// ------------------------------------------------------------------
+// Generate a structured hex (H8) mesh on [0,Lx] x [0,Ly] x [0,Lz]
+// ------------------------------------------------------------------
+inline Mesh generate_structured_hex(
+    double Lx, double Ly, double Lz,
+    int nx, int ny, int nz,
+    double grading_x = 1.0, double grading_y = 1.0, double grading_z = 1.0)
+{
+    Mesh m;
+    set_dimension(3);
+    int num_nodes_x = nx + 1;
+    int num_nodes_y = ny + 1;
+    int num_nodes_z = nz + 1;
+
+    std::vector<double> xc(num_nodes_x), yc(num_nodes_y), zc(num_nodes_z);
+
+    if (std::abs(grading_x - 1.0) < 1e-12) {
+        for (int i = 0; i <= nx; ++i) xc[i] = Lx * i / nx;
+    } else {
+        for (int i = 0; i <= nx; ++i) {
+            double t = static_cast<double>(i) / nx;
+            xc[i] = Lx * (std::pow(grading_x, t) - 1.0) / (grading_x - 1.0);
+        }
+    }
+    if (std::abs(grading_y - 1.0) < 1e-12) {
+        for (int j = 0; j <= ny; ++j) yc[j] = Ly * j / ny;
+    } else {
+        for (int j = 0; j <= ny; ++j) {
+            double t = static_cast<double>(j) / ny;
+            yc[j] = Ly * (std::pow(grading_y, t) - 1.0) / (grading_y - 1.0);
+        }
+    }
+    if (std::abs(grading_z - 1.0) < 1e-12) {
+        for (int k = 0; k <= nz; ++k) zc[k] = Lz * k / nz;
+    } else {
+        for (int k = 0; k <= nz; ++k) {
+            double t = static_cast<double>(k) / nz;
+            zc[k] = Lz * (std::pow(grading_z, t) - 1.0) / (grading_z - 1.0);
+        }
+    }
+
+    m.nodes.resize(num_nodes_x * num_nodes_y * num_nodes_z);
+    for (int k = 0; k <= nz; ++k)
+        for (int j = 0; j <= ny; ++j)
+            for (int i = 0; i <= nx; ++i) {
+                int idx = k * num_nodes_y * num_nodes_x + j * num_nodes_x + i;
+                m.nodes[idx] = { xc[i], yc[j], zc[k] };
+            }
+
+    m.hex_elements.resize(nx * ny * nz);
+    for (int k = 0; k < nz; ++k)
+        for (int j = 0; j < ny; ++j)
+            for (int i = 0; i < nx; ++i) {
+                int n0 = k * num_nodes_y * num_nodes_x + j * num_nodes_x + i;
+                int n1 = n0 + 1;
+                int n2 = n0 + 1 + num_nodes_x;
+                int n3 = n0 + num_nodes_x;
+                int n4 = n0 + num_nodes_y * num_nodes_x;
+                int n5 = n4 + 1;
+                int n6 = n4 + 1 + num_nodes_x;
+                int n7 = n4 + num_nodes_x;
+                m.hex_elements[k * ny * nx + j * nx + i] = { n0, n1, n2, n3, n4, n5, n6, n7 };
+            }
+
+    return m;
+}
+
+// ------------------------------------------------------------------
+// Convert hex mesh to tet mesh (6 tets per hex, Freudenthal subdivision)
+// ------------------------------------------------------------------
+inline Mesh hex_to_tet(const Mesh& hex_mesh) {
+    Mesh m = hex_mesh;
+    m.tet_elements.clear();
+    m.tet_elements.reserve(m.hex_elements.size() * 6);
+
+    for (const auto& h : m.hex_elements) {
+        m.tet_elements.push_back({h[0], h[1], h[2], h[6]});
+        m.tet_elements.push_back({h[0], h[2], h[3], h[6]});
+        m.tet_elements.push_back({h[0], h[1], h[5], h[6]});
+        m.tet_elements.push_back({h[0], h[4], h[5], h[6]});
+        m.tet_elements.push_back({h[0], h[3], h[4], h[6]});
+        m.tet_elements.push_back({h[0], h[4], h[7], h[6]});
+    }
+    m.hex_elements.clear();
+    return m;
+}
+
+// ------------------------------------------------------------------
+// Generate a structured tet mesh by refining a hex mesh
+// ------------------------------------------------------------------
+inline Mesh generate_structured_tet(
+    double Lx, double Ly, double Lz,
+    int nx, int ny, int nz,
+    double grading_x = 1.0, double grading_y = 1.0, double grading_z = 1.0)
+{
+    auto hex_mesh = generate_structured_hex(Lx, Ly, Lz, nx, ny, nz,
+                                            grading_x, grading_y, grading_z);
+    return hex_to_tet(hex_mesh);
 }
 
 }  // namespace mesh

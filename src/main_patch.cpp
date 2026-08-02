@@ -55,14 +55,14 @@ int main() {
     std::cout << "\nPatch test: " << (pass ? "PASSED" : "FAILED") << std::endl;
 
     // Write output
-    std::filesystem::create_directories("output/patch");
-    postprocess::write_meta_json("output/patch/meta.json", m, result.displacement, result.stresses,
+    std::filesystem::create_directories("output/patch/simulations");
+    postprocess::write_meta_json("output/patch/simulations/meta.json", m, result.displacement, result.stresses,
                                  result.cg_iterations, result.solve_time_ms);
-    postprocess::write_displacement_json("output/patch/displacement.json", m, result.displacement);
-    postprocess::write_stress_json("output/patch/stress.json", m, result.stresses);
-    postprocess::write_mesh_json("output/patch/mesh.json", m);
+    postprocess::write_displacement_json("output/patch/simulations/displacement.json", m, result.displacement);
+    postprocess::write_stress_json("output/patch/simulations/stress.json", m, result.stresses);
+    postprocess::write_mesh_json("output/patch/simulations/mesh.json", m);
 
-    std::cout << "Output written to output/patch/" << std::endl;
+    std::cout << "Output written to output/patch/simulations/" << std::endl;
 
     return pass ? 0 : 1;
 }

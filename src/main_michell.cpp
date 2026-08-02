@@ -52,12 +52,13 @@ int main() {
         std::cout << "  Node " << i << ": ux=" << ux << ", uy=" << uy << std::endl;
     }
 
-    std::filesystem::create_directories("output/michell");
-    postprocess::write_meta_json("output/michell/meta.json", m, result.displacement, result.stresses,
+    std::filesystem::create_directories("output/michell/simulations");
+    postprocess::write_meta_json("output/michell/simulations/meta.json", m, result.displacement, result.stresses,
                                  result.cg_iterations, result.solve_time_ms);
-    postprocess::write_displacement_json("output/michell/displacement.json", m, result.displacement);
-    postprocess::write_mesh_json("output/michell/mesh.json", m);
+    postprocess::write_displacement_json("output/michell/simulations/displacement.json", m, result.displacement);
+    postprocess::write_stress_json("output/michell/simulations/stress.json", m, result.stresses);
+    postprocess::write_mesh_json("output/michell/simulations/mesh.json", m);
 
-    std::cout << "Output written to output/michell/" << std::endl;
+    std::cout << "Output written to output/michell/simulations/" << std::endl;
     return 0;
 }

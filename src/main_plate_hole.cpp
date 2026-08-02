@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Energy balance: U=" << U << ", W=" << W
               << ", error=" << std::abs(U - W) / (std::abs(W) + 1e-30) * 100.0 << "%" << std::endl;
 
-    std::string outdir = "output/plate_hole" + std::string(use_q8 ? "_q8" : "");
+    std::string outdir = "output/plate_hole/simulations" + std::string(use_q8 ? "/q8" : "");
     std::filesystem::create_directories(outdir);
     postprocess::write_meta_json(outdir + "/meta.json", m, result.displacement, result.stresses,
                                  result.cg_iterations, result.solve_time_ms);

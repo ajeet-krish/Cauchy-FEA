@@ -9,6 +9,7 @@ struct SolveConfig {
     PlaneType plane_type = PlaneType::STRESS;
     int nx = 32;
     int ny = 8;
+    int nz = 2;
     bool use_q8 = false;
     bool use_cg = false;
     double E = 210e9;       // Pa (Steel)
@@ -16,10 +17,12 @@ struct SolveConfig {
     double t = 0.01;        // m
     bool use_adaptivity = false;
     int adaptive_iters = 3;
+    bool is_3d = false;     // H8 or T4 element type
 };
 
 class SolverRunner : public QThread {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(SolverRunner)
 public:
     explicit SolverRunner(QObject* parent = nullptr);
     ~SolverRunner() override = default;

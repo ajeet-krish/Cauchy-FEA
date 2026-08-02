@@ -19,18 +19,24 @@
 #include <QHeaderView>
 #include <QTextEdit>
 #include <QSplitter>
+#include <QStackedWidget>
 #include <QApplication>
 #include <QClipboard>
 #include <QImageWriter>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
-    setWindowTitle("Cauchy FEA -- 2D Finite Element Structural Solver");
+    setWindowTitle("Cauchy FEA -- 2D/3D Finite Element Structural Solver");
     resize(1400, 900);
 
-    // Central viewport
+    // Stacked widget for 2D/3D viewport switching
+    m_viewStack = new QStackedWidget(this);
     m_viewport = new ViewportWidget(this);
-    setCentralWidget(m_viewport);
+    m_viewport3d = new Viewport3DWidget(this);
+    m_viewStack->addWidget(m_viewport);    // index 0 = 2D
+    m_viewStack->addWidget(m_viewport3d);  // index 1 = 3D
+    m_viewStack->setCurrentIndex(0);
+    setCentralWidget(m_viewStack);
 
     // Solver runner
     m_solverRunner = new SolverRunner(this);
@@ -195,7 +201,16 @@ void MainWindow::onSolveFinished(const fea::SolveResult& result, const Mesh& mes
     m_progressBar->setVisible(false);
     m_statusLabel->setText("Solver finished successfully.");
 
-    m_viewport->setMeshAndResults(mesh, result);
+    // Switch viewport based on mesh dimension
+    bool is3d = mesh.is_3d();
+    switchViewport(is3d);
+
+    if (is3d) {
+        m_viewport3d->setMeshAndResults(mesh, result);
+    } else {
+        m_viewport->setMeshAndResults(mesh, result);
+    }
+
     m_resultModel->setData(result, mesh, ResultTableType::DISPLACEMENT);
     m_solverPanel->setResult(result);
 
@@ -213,14 +228,17 @@ void MainWindow::onSolveFinished(const fea::SolveResult& result, const Mesh& mes
     ed.valid = true;
     m_energyChart->setData(ed);
 
-    // Update displacement line chart
-    m_dispLineChart->setData(mesh, result);
+    // Update displacement line chart (2D only)
+    if (!is3d) {
+        m_dispLineChart->setData(mesh, result);
+    }
 
     // Update load-displacement chart
+    int dofPerNode = is3d ? 3 : 2;
     double maxDisp = 0.0;
     for (int i = 0; i < mesh.num_nodes(); ++i) {
-        double ux = result.displacement[2 * i];
-        double uy = result.displacement[2 * i + 1];
+        double ux = result.displacement[dofPerNode * i];
+        double uy = result.displacement[dofPerNode * i + 1];
         double d = std::sqrt(ux * ux + uy * uy);
         if (d > maxDisp) maxDisp = d;
     }
@@ -249,7 +267,9 @@ void MainWindow::onRunSolver() {
     m_config.plane_type = m_meshEditor->planeType();
     m_config.nx = m_meshEditor->meshSizeX();
     m_config.ny = m_meshEditor->meshSizeY();
+    m_config.nz = m_meshEditor->meshSizeZ();
     m_config.use_q8 = m_meshEditor->useQ8();
+    m_config.is_3d = m_meshEditor->is3D();
     m_config.use_cg = m_solverPanel->useCG();
     m_config.E = m_meshEditor->youngsModulus();
     m_config.nu = m_meshEditor->poissonsRatio();
@@ -302,7 +322,15 @@ void MainWindow::onExportPNG() {
 }
 
 void MainWindow::onResetView() {
-    m_viewport->resetView();
+    if (m_viewStack->currentIndex() == 1) {
+        m_viewport3d->resetView();
+    } else {
+        m_viewport->resetView();
+    }
+}
+
+void MainWindow::switchViewport(bool is3d) {
+    m_viewStack->setCurrentIndex(is3d ? 1 : 0);
 }
 
 void MainWindow::onContourFieldChanged(int index) {

@@ -11,6 +11,7 @@ enum class ColormapType { TURBO, VIRIDIS, HOT, COOLWARM, RDBU_R };
 
 class ViewportWidget : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(ViewportWidget)
 public:
     explicit ViewportWidget(QWidget* parent = nullptr);
     ~ViewportWidget() override = default;

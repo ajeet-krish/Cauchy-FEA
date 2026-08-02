@@ -324,7 +324,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Write output
-    std::string outdir = "output/adapt_plate_hole" + std::string(use_q8 ? "_q8" : "");
+    std::string outdir = "output/plate_hole/simulations/adapt" + std::string(use_q8 ? "_q8" : "");
     std::filesystem::create_directories(outdir);
 
     // Solve final mesh for output

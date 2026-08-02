@@ -134,14 +134,21 @@ int main(int argc, char* argv[]) {
     }
 
     // Analytical Lame solution (mechanical only)
-    double factor = p_i * a * a / (b * b - a * a);
-    double sigma_r_analytical = factor * (1.0 - b * b / (a * a));
-    double sigma_theta_analytical = factor * (1.0 + b * b / (a * a));
+    // At r=a: sigma_r = -p_i, sigma_theta = p_i*(b^2+a^2)/(b^2-a^2)
+    double sigma_r_analytical = -p_i;
+    double sigma_theta_analytical = p_i * (b*b + a*a) / (b*b - a*a);
+
+    // Find max sigma_r at inner boundary for comparison
+    double max_sigma_r = 0.0;
+    for (const auto& s : result.stresses) {
+        if (std::abs(s.sigma_xx) > max_sigma_r) max_sigma_r = std::abs(s.sigma_xx);
+    }
 
     std::cout << "\n--- Analytical vs FEA (mechanical only) ---" << std::endl;
-    std::cout << "sigma_r at r=a (FEA): " << max_stress << " Pa" << std::endl;
-    std::cout << "Analytical sigma_r at r=a: " << -sigma_r_analytical << " Pa" << std::endl;
+    std::cout << "sigma_r at r=a (FEA max |sigma_xx|): " << max_sigma_r << " Pa" << std::endl;
+    std::cout << "Analytical sigma_r at r=a: " << sigma_r_analytical << " Pa" << std::endl;
     std::cout << "Analytical sigma_theta at r=a: " << sigma_theta_analytical << " Pa" << std::endl;
+    std::cout << "Max von Mises stress: " << max_stress << " Pa" << std::endl;
 
     // Energy balance
     double U = fea::compute_strain_energy(result.K_csr, result.displacement);
@@ -149,14 +156,14 @@ int main(int argc, char* argv[]) {
     std::cout << "Energy balance: U=" << U << ", W=" << W
               << ", error=" << std::abs(U - W) / (std::abs(W) + 1e-30) * 100.0 << "%" << std::endl;
 
-    std::filesystem::create_directories("output/thermal_cylinder");
-    postprocess::write_meta_json("output/thermal_cylinder/meta.json", m, result.displacement, result.stresses,
+    std::filesystem::create_directories("output/thermal_cylinder/simulations");
+    postprocess::write_meta_json("output/thermal_cylinder/simulations/meta.json", m, result.displacement, result.stresses,
                                      result.cg_iterations, result.solve_time_ms);
-    postprocess::write_displacement_json("output/thermal_cylinder/displacement.json", m, result.displacement);
-    postprocess::write_stress_json("output/thermal_cylinder/stress.json", m, result.stresses);
-    postprocess::write_mesh_json("output/thermal_cylinder/mesh.json", m);
+    postprocess::write_displacement_json("output/thermal_cylinder/simulations/displacement.json", m, result.displacement);
+    postprocess::write_stress_json("output/thermal_cylinder/simulations/stress.json", m, result.stresses);
+    postprocess::write_mesh_json("output/thermal_cylinder/simulations/mesh.json", m);
 
-    std::cout << "Output written to output/thermal_cylinder/" << std::endl;
+    std::cout << "Output written to output/thermal_cylinder/simulations/" << std::endl;
 
     if (run_convergence) {
         std::cout << "\n=== Convergence Study ===" << std::endl;

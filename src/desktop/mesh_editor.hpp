@@ -7,9 +7,11 @@ class QComboBox;
 class QSpinBox;
 class QDoubleSpinBox;
 class QCheckBox;
+class QLabel;
 
 class MeshEditor : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MeshEditor)
 public:
     explicit MeshEditor(QWidget* parent = nullptr);
 
@@ -18,7 +20,9 @@ public:
     PlaneType planeType() const;
     int meshSizeX() const;
     int meshSizeY() const;
+    int meshSizeZ() const;
     bool useQ8() const;
+    bool is3D() const;
     double youngsModulus() const;
     double poissonsRatio() const;
     double thickness() const;
@@ -38,6 +42,8 @@ private:
     QComboBox* m_planeCombo = nullptr;
     QSpinBox* m_nxSpin = nullptr;
     QSpinBox* m_nySpin = nullptr;
+    QSpinBox* m_nzSpin = nullptr;
+    QLabel* m_nzLabel = nullptr;
     QCheckBox* m_q8Check = nullptr;
     QDoubleSpinBox* m_ESpin = nullptr;
     QDoubleSpinBox* m_nuSpin = nullptr;

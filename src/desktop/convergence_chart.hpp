@@ -19,6 +19,7 @@ struct ConvergenceData {
 
 class ConvergenceChart : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(ConvergenceChart)
 public:
     explicit ConvergenceChart(QWidget* parent = nullptr);
 

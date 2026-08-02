@@ -5,6 +5,7 @@
 
 class StressHistogram : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(StressHistogram)
 public:
     explicit StressHistogram(QWidget* parent = nullptr);
 

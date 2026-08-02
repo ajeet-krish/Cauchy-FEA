@@ -1,5 +1,6 @@
 #pragma once
 #include "fea_types.hpp"
+#include "elements_3d.hpp"
 #include "sparse.hpp"
 #include <vector>
 #include <array>
@@ -7,6 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
 
 // ==========================================================================
 // POSTPROCESSING -- Stress recovery, Von Mises, JSON output
@@ -15,15 +17,19 @@
 namespace postprocess {
 
 // ------------------------------------------------------------------
-// Element stress results for Q4
+// Element stress results
 // ------------------------------------------------------------------
 struct ElementStress {
     double sigma_xx = 0.0;
     double sigma_yy = 0.0;
+    double sigma_zz = 0.0;    // 3D only
     double sigma_xy = 0.0;
+    double sigma_yz = 0.0;    // 3D only
+    double sigma_xz = 0.0;    // 3D only
     double von_mises = 0.0;
-    double sigma_1 = 0.0;   // principal stress 1
-    double sigma_2 = 0.0;   // principal stress 2
+    double sigma_1 = 0.0;     // principal stress 1
+    double sigma_2 = 0.0;     // principal stress 2
+    double sigma_3 = 0.0;     // principal stress 3 (3D only)
 };
 
 // ------------------------------------------------------------------
@@ -347,13 +353,173 @@ inline ElementStress compute_q8_stress(
 }
 
 // ------------------------------------------------------------------
+// 3D Von Mises stress from 6-component stress tensor
+// ------------------------------------------------------------------
+inline double von_mises_3d(double sxx, double syy, double szz,
+                           double syz, double sxz, double sxy) {
+    return std::sqrt(0.5 * ((sxx - syy) * (sxx - syy) +
+                             (syy - szz) * (syy - szz) +
+                             (szz - sxx) * (szz - sxx)) +
+                     3.0 * (sxy * sxy + syz * syz + sxz * sxz));
+}
+
+// ------------------------------------------------------------------
+// 3D principal stresses via Cardano's formula (eigenvalues of 3x3 symmetric tensor)
+// Returns sorted: sigma_1 >= sigma_2 >= sigma_3
+// ------------------------------------------------------------------
+inline std::array<double, 3> principal_stresses_3d(
+    double sxx, double syy, double szz, double syz, double sxz, double sxy)
+{
+    double I1 = sxx + syy + szz;
+    double I2 = sxx*syy + syy*szz + szz*sxx - sxy*sxy - syz*syz - sxz*sxz;
+    double I3 = sxx*syy*szz + 2.0*sxy*syz*sxz
+              - sxx*syz*syz - syy*sxz*sxz - szz*sxy*sxy;
+
+    double p = I1 * I1 - 3.0 * I2;
+    double q = 2.0 * I1 * I1 * I1 - 9.0 * I1 * I2 + 27.0 * I3;
+    double p_val = std::max(p, 0.0);
+    double denom = 2.0 * std::pow(p_val, 1.5);
+
+    double phi = 0.0;
+    if (denom > 1e-30) {
+        double arg = q / denom;
+        arg = std::max(-1.0, std::min(1.0, arg));
+        phi = std::acos(arg);
+    }
+
+    double sqrt_p = std::sqrt(std::max(p, 0.0)) / 3.0;
+    double s1 = I1 / 3.0 + 2.0 * sqrt_p * std::cos(phi / 3.0);
+    double s2 = I1 / 3.0 + 2.0 * sqrt_p * std::cos((phi - 2.0 * M_PI) / 3.0);
+    double s3 = I1 / 3.0 + 2.0 * sqrt_p * std::cos((phi + 2.0 * M_PI) / 3.0);
+
+    // Sort descending
+    if (s1 < s2) std::swap(s1, s2);
+    if (s1 < s3) std::swap(s1, s3);
+    if (s2 < s3) std::swap(s2, s3);
+
+    return {s1, s2, s3};
+}
+
+// ------------------------------------------------------------------
+// Compute element stress from H8 element displacement
+// Uses 2x2x2 Gauss point averaging
+// ------------------------------------------------------------------
+inline ElementStress compute_h8_stress(
+    const std::array<Node, 8>& elem_nodes,
+    const std::array<double, 24>& u_elem,
+    const Material& mat)
+{
+    auto D = mat.d_matrix_3d();
+    static const double GP = 1.0 / std::sqrt(3.0);
+    static const double GP3[2] = {-GP, GP};
+
+    double avg[6] = {};  // sigma_xx, yy, zz, yz, xz, xy
+
+    for (int gi = 0; gi < 2; ++gi) {
+        for (int gj = 0; gj < 2; ++gj) {
+            for (int gk = 0; gk < 2; ++gk) {
+                double xi = GP3[gi], eta = GP3[gj], zeta = GP3[gk];
+
+                // Compute Jacobian and its inverse
+                std::array<double, 9> J{};
+                for (int n = 0; n < 8; ++n) {
+                    double dN_dxi   = 0.125 * elements::H8Element::XI[n] * (1.0 + elements::H8Element::ETA[n] * eta) * (1.0 + elements::H8Element::ZETA[n] * zeta);
+                    double dN_deta  = 0.125 * (1.0 + elements::H8Element::XI[n] * xi) * elements::H8Element::ETA[n] * (1.0 + elements::H8Element::ZETA[n] * zeta);
+                    double dN_dzeta = 0.125 * (1.0 + elements::H8Element::XI[n] * xi) * (1.0 + elements::H8Element::ETA[n] * eta) * elements::H8Element::ZETA[n];
+                    J[0] += dN_dxi * elem_nodes[n].x;   J[1] += dN_dxi * elem_nodes[n].y;   J[2] += dN_dxi * elem_nodes[n].z;
+                    J[3] += dN_deta * elem_nodes[n].x;  J[4] += dN_deta * elem_nodes[n].y;  J[5] += dN_deta * elem_nodes[n].z;
+                    J[6] += dN_dzeta * elem_nodes[n].x; J[7] += dN_dzeta * elem_nodes[n].y; J[8] += dN_dzeta * elem_nodes[n].z;
+                }
+                std::array<double, 9> invJ;
+                elements::H8Element::inv3(J, invJ);
+
+                // Compute strain = B * u
+                double eps[6] = {};
+                for (int n = 0; n < 8; ++n) {
+                    double dN_dxi   = 0.125 * elements::H8Element::XI[n] * (1.0 + elements::H8Element::ETA[n] * eta) * (1.0 + elements::H8Element::ZETA[n] * zeta);
+                    double dN_deta  = 0.125 * (1.0 + elements::H8Element::XI[n] * xi) * elements::H8Element::ETA[n] * (1.0 + elements::H8Element::ZETA[n] * zeta);
+                    double dN_dzeta = 0.125 * (1.0 + elements::H8Element::XI[n] * xi) * (1.0 + elements::H8Element::ETA[n] * eta) * elements::H8Element::ZETA[n];
+                    double dNdx = invJ[0]*dN_dxi + invJ[1]*dN_deta + invJ[2]*dN_dzeta;
+                    double dNdy = invJ[3]*dN_dxi + invJ[4]*dN_deta + invJ[5]*dN_dzeta;
+                    double dNdz = invJ[6]*dN_dxi + invJ[7]*dN_deta + invJ[8]*dN_dzeta;
+
+                    int c = 3 * n;
+                    eps[0] += dNdx * u_elem[c];
+                    eps[1] += dNdy * u_elem[c+1];
+                    eps[2] += dNdz * u_elem[c+2];
+                    eps[3] += dNdy * u_elem[c+2] + dNdz * u_elem[c+1];
+                    eps[4] += dNdx * u_elem[c+2] + dNdz * u_elem[c];
+                    eps[5] += dNdx * u_elem[c+1] + dNdy * u_elem[c];
+                }
+
+                // Stress = D * strain
+                double sigma[6] = {};
+                for (int r = 0; r < 6; ++r)
+                    for (int c = 0; c < 6; ++c)
+                        sigma[r] += D[r][c] * eps[c];
+
+                for (int r = 0; r < 6; ++r) avg[r] += sigma[r];
+            }
+        }
+    }
+
+    double inv_n = 1.0 / 8.0;
+    ElementStress s;
+    s.sigma_xx = avg[0] * inv_n;
+    s.sigma_yy = avg[1] * inv_n;
+    s.sigma_zz = avg[2] * inv_n;
+    s.sigma_yz = avg[3] * inv_n;
+    s.sigma_xz = avg[4] * inv_n;
+    s.sigma_xy = avg[5] * inv_n;
+
+    auto p = principal_stresses_3d(s.sigma_xx, s.sigma_yy, s.sigma_zz,
+                                   s.sigma_yz, s.sigma_xz, s.sigma_xy);
+    s.sigma_1 = p[0];
+    s.sigma_2 = p[1];
+    s.sigma_3 = p[2];
+    s.von_mises = von_mises_3d(s.sigma_xx, s.sigma_yy, s.sigma_zz,
+                                s.sigma_yz, s.sigma_xz, s.sigma_xy);
+    return s;
+}
+
+// ------------------------------------------------------------------
+// Compute element stress from T4 element displacement
+// Constant stress throughout element (linear tet)
+// ------------------------------------------------------------------
+inline ElementStress compute_t4_stress(
+    const std::array<Node, 4>& elem_nodes,
+    const std::array<double, 12>& u_elem,
+    const Material& mat)
+{
+    auto sigma = elements::T4Element::stress(elem_nodes, u_elem, mat);
+
+    ElementStress s;
+    s.sigma_xx = sigma[0];
+    s.sigma_yy = sigma[1];
+    s.sigma_zz = sigma[2];
+    s.sigma_yz = sigma[3];
+    s.sigma_xz = sigma[4];
+    s.sigma_xy = sigma[5];
+
+    auto p = principal_stresses_3d(s.sigma_xx, s.sigma_yy, s.sigma_zz,
+                                   s.sigma_yz, s.sigma_xz, s.sigma_xy);
+    s.sigma_1 = p[0];
+    s.sigma_2 = p[1];
+    s.sigma_3 = p[2];
+    s.von_mises = von_mises_3d(s.sigma_xx, s.sigma_yy, s.sigma_zz,
+                                s.sigma_yz, s.sigma_xz, s.sigma_xy);
+    return s;
+}
+
+// ------------------------------------------------------------------
 // Compute all element stresses
 // ------------------------------------------------------------------
 inline std::vector<ElementStress> compute_all_stresses(
     const Mesh& m,
     const std::vector<double>& u) {
 
-    int total_elements = m.num_quads() + m.num_quad8s() + m.num_tris();
+    int total_elements = m.num_quads() + m.num_quad8s() + m.num_tris()
+                       + m.num_hexes() + m.num_tets();
     std::vector<ElementStress> stresses(total_elements);
 
     // Build temperature arrays if available
@@ -411,6 +577,42 @@ inline std::vector<ElementStress> compute_all_stresses(
         stresses[m.num_quads() + m.num_quad8s() + e] = compute_t3_stress(elem_nodes, u_elem, m.mat, m.plane, temps, m.T_ref);
     }
 
+    // Compute H8 stresses
+    #pragma omp parallel for
+    for (int e = 0; e < m.num_hexes(); ++e) {
+        const auto& elem = m.hex_elements[e];
+        std::array<Node, 8> elem_nodes;
+        std::array<double, 24> u_elem;
+
+        for (int i = 0; i < 8; ++i) {
+            elem_nodes[i] = m.nodes[elem[i]];
+            u_elem[3 * i]     = u[dof_index(elem[i], 0)];
+            u_elem[3 * i + 1] = u[dof_index(elem[i], 1)];
+            u_elem[3 * i + 2] = u[dof_index(elem[i], 2)];
+        }
+
+        stresses[m.num_quads() + m.num_quad8s() + m.num_tris() + e] =
+            compute_h8_stress(elem_nodes, u_elem, m.mat);
+    }
+
+    // Compute T4 stresses
+    #pragma omp parallel for
+    for (int e = 0; e < m.num_tets(); ++e) {
+        const auto& elem = m.tet_elements[e];
+        std::array<Node, 4> elem_nodes;
+        std::array<double, 12> u_elem;
+
+        for (int i = 0; i < 4; ++i) {
+            elem_nodes[i] = m.nodes[elem[i]];
+            u_elem[3 * i]     = u[dof_index(elem[i], 0)];
+            u_elem[3 * i + 1] = u[dof_index(elem[i], 1)];
+            u_elem[3 * i + 2] = u[dof_index(elem[i], 2)];
+        }
+
+        stresses[m.num_quads() + m.num_quad8s() + m.num_tris() + m.num_hexes() + e] =
+            compute_t4_stress(elem_nodes, u_elem, m.mat);
+    }
+
     return stresses;
 }
 
@@ -420,7 +622,10 @@ inline std::vector<ElementStress> compute_all_stresses(
 struct NodeStress {
     double sigma_xx = 0.0;
     double sigma_yy = 0.0;
+    double sigma_zz = 0.0;
     double sigma_xy = 0.0;
+    double sigma_yz = 0.0;
+    double sigma_xz = 0.0;
     double von_mises = 0.0;
     int count = 0;
 };
@@ -438,7 +643,10 @@ inline std::vector<NodeStress> average_stresses_to_nodes(
             int n = elem[i];
             node_stress[n].sigma_xx += elem_stresses[e].sigma_xx;
             node_stress[n].sigma_yy += elem_stresses[e].sigma_yy;
+            node_stress[n].sigma_zz += elem_stresses[e].sigma_zz;
             node_stress[n].sigma_xy += elem_stresses[e].sigma_xy;
+            node_stress[n].sigma_yz += elem_stresses[e].sigma_yz;
+            node_stress[n].sigma_xz += elem_stresses[e].sigma_xz;
             node_stress[n].von_mises += elem_stresses[e].von_mises;
             node_stress[n].count++;
         }
@@ -452,7 +660,10 @@ inline std::vector<NodeStress> average_stresses_to_nodes(
             int n = elem[i];
             node_stress[n].sigma_xx += elem_stresses[idx].sigma_xx;
             node_stress[n].sigma_yy += elem_stresses[idx].sigma_yy;
+            node_stress[n].sigma_zz += elem_stresses[idx].sigma_zz;
             node_stress[n].sigma_xy += elem_stresses[idx].sigma_xy;
+            node_stress[n].sigma_yz += elem_stresses[idx].sigma_yz;
+            node_stress[n].sigma_xz += elem_stresses[idx].sigma_xz;
             node_stress[n].von_mises += elem_stresses[idx].von_mises;
             node_stress[n].count++;
         }
@@ -466,7 +677,44 @@ inline std::vector<NodeStress> average_stresses_to_nodes(
             int n = elem[i];
             node_stress[n].sigma_xx += elem_stresses[idx].sigma_xx;
             node_stress[n].sigma_yy += elem_stresses[idx].sigma_yy;
+            node_stress[n].sigma_zz += elem_stresses[idx].sigma_zz;
             node_stress[n].sigma_xy += elem_stresses[idx].sigma_xy;
+            node_stress[n].sigma_yz += elem_stresses[idx].sigma_yz;
+            node_stress[n].sigma_xz += elem_stresses[idx].sigma_xz;
+            node_stress[n].von_mises += elem_stresses[idx].von_mises;
+            node_stress[n].count++;
+        }
+    }
+
+    // Average H8 element stresses to nodes
+    for (int e = 0; e < m.num_hexes(); ++e) {
+        const auto& elem = m.hex_elements[e];
+        int idx = m.num_quads() + m.num_quad8s() + m.num_tris() + e;
+        for (int i = 0; i < 8; ++i) {
+            int n = elem[i];
+            node_stress[n].sigma_xx += elem_stresses[idx].sigma_xx;
+            node_stress[n].sigma_yy += elem_stresses[idx].sigma_yy;
+            node_stress[n].sigma_zz += elem_stresses[idx].sigma_zz;
+            node_stress[n].sigma_xy += elem_stresses[idx].sigma_xy;
+            node_stress[n].sigma_yz += elem_stresses[idx].sigma_yz;
+            node_stress[n].sigma_xz += elem_stresses[idx].sigma_xz;
+            node_stress[n].von_mises += elem_stresses[idx].von_mises;
+            node_stress[n].count++;
+        }
+    }
+
+    // Average T4 element stresses to nodes
+    for (int e = 0; e < m.num_tets(); ++e) {
+        const auto& elem = m.tet_elements[e];
+        int idx = m.num_quads() + m.num_quad8s() + m.num_tris() + m.num_hexes() + e;
+        for (int i = 0; i < 4; ++i) {
+            int n = elem[i];
+            node_stress[n].sigma_xx += elem_stresses[idx].sigma_xx;
+            node_stress[n].sigma_yy += elem_stresses[idx].sigma_yy;
+            node_stress[n].sigma_zz += elem_stresses[idx].sigma_zz;
+            node_stress[n].sigma_xy += elem_stresses[idx].sigma_xy;
+            node_stress[n].sigma_yz += elem_stresses[idx].sigma_yz;
+            node_stress[n].sigma_xz += elem_stresses[idx].sigma_xz;
             node_stress[n].von_mises += elem_stresses[idx].von_mises;
             node_stress[n].count++;
         }
@@ -476,7 +724,10 @@ inline std::vector<NodeStress> average_stresses_to_nodes(
         if (ns.count > 0) {
             ns.sigma_xx /= ns.count;
             ns.sigma_yy /= ns.count;
+            ns.sigma_zz /= ns.count;
             ns.sigma_xy /= ns.count;
+            ns.sigma_yz /= ns.count;
+            ns.sigma_xz /= ns.count;
             ns.von_mises /= ns.count;
         }
     }
@@ -496,12 +747,15 @@ inline void write_displacement_json(
     f << std::fixed << std::setprecision(6);
     f << "{\n";
     f << "  \"num_nodes\": " << m.num_nodes() << ",\n";
+    f << "  \"dim\": " << g_dim << ",\n";
     f << "  \"nodes\": [\n";
     for (int i = 0; i < m.num_nodes(); ++i) {
         f << "    {\"x\": " << m.nodes[i].x
           << ", \"y\": " << m.nodes[i].y
+          << ", \"z\": " << m.nodes[i].z
           << ", \"ux\": " << u[dof_index(i, 0)]
-          << ", \"uy\": " << u[dof_index(i, 1)] << "}";
+          << ", \"uy\": " << u[dof_index(i, 1)]
+          << ", \"uz\": " << ((g_dim == 3) ? u[dof_index(i, 2)] : 0.0) << "}";
         if (i < m.num_nodes() - 1) f << ",";
         f << "\n";
     }
@@ -517,19 +771,25 @@ inline void write_stress_json(
     const Mesh& m,
     const std::vector<ElementStress>& stresses) {
 
-    int total_elements = m.num_quads() + m.num_quad8s() + m.num_tris();
+    int total_elements = m.num_quads() + m.num_quad8s() + m.num_tris()
+                       + m.num_hexes() + m.num_tets();
     std::ofstream f(filepath);
     f << std::fixed << std::setprecision(6);
     f << "{\n";
     f << "  \"num_elements\": " << total_elements << ",\n";
+    f << "  \"dim\": " << g_dim << ",\n";
     f << "  \"elements\": [\n";
     for (int i = 0; i < total_elements; ++i) {
         f << "    {\"sigma_xx\": " << stresses[i].sigma_xx
           << ", \"sigma_yy\": " << stresses[i].sigma_yy
+          << ", \"sigma_zz\": " << stresses[i].sigma_zz
           << ", \"sigma_xy\": " << stresses[i].sigma_xy
+          << ", \"sigma_yz\": " << stresses[i].sigma_yz
+          << ", \"sigma_xz\": " << stresses[i].sigma_xz
           << ", \"von_mises\": " << stresses[i].von_mises
           << ", \"sigma_1\": " << stresses[i].sigma_1
-          << ", \"sigma_2\": " << stresses[i].sigma_2 << "}";
+          << ", \"sigma_2\": " << stresses[i].sigma_2
+          << ", \"sigma_3\": " << stresses[i].sigma_3 << "}";
         if (i < total_elements - 1) f << ",";
         f << "\n";
     }
@@ -553,7 +813,8 @@ inline void write_meta_json(
     for (int i = 0; i < m.num_nodes(); ++i) {
         double ux = u[dof_index(i, 0)];
         double uy = u[dof_index(i, 1)];
-        double d = std::sqrt(ux * ux + uy * uy);
+        double uz = (g_dim == 3) ? u[dof_index(i, 2)] : 0.0;
+        double d = std::sqrt(ux * ux + uy * uy + uz * uz);
         if (d > max_disp) max_disp = d;
     }
 
@@ -567,10 +828,13 @@ inline void write_meta_json(
     f << std::fixed << std::setprecision(6);
     f << "{\n";
     f << "  \"case\": \"" << case_name(g_case) << "\",\n";
+    f << "  \"dim\": " << g_dim << ",\n";
     f << "  \"num_nodes\": " << m.num_nodes() << ",\n";
-    f << "  \"num_elements\": " << (m.num_quads() + m.num_tris()) << ",\n";
+    f << "  \"num_elements\": " << (m.num_quads() + m.num_tris() + m.num_hexes() + m.num_tets()) << ",\n";
     f << "  \"num_quads\": " << m.num_quads() << ",\n";
     f << "  \"num_tris\": " << m.num_tris() << ",\n";
+    f << "  \"num_hexes\": " << m.num_hexes() << ",\n";
+    f << "  \"num_tets\": " << m.num_tets() << ",\n";
     f << "  \"num_dofs\": " << m.num_dofs() << ",\n";
     f << "  \"material\": {\n";
     f << "    \"E\": " << m.mat.E << ",\n";
@@ -579,7 +843,9 @@ inline void write_meta_json(
     f << "    \"t\": " << m.mat.t << ",\n";
     f << "    \"alpha\": " << m.mat.alpha << "\n";
     f << "  },\n";
-    f << "  \"plane\": \"" << (m.plane == PlaneType::STRESS ? "stress" : "strain") << "\",\n";
+    if (g_dim == 2) {
+        f << "  \"plane\": \"" << (m.plane == PlaneType::STRESS ? "stress" : "strain") << "\",\n";
+    }
     f << "  \"max_displacement\": " << max_disp << ",\n";
     f << "  \"max_von_mises\": " << max_stress << ",\n";
     f << "  \"cg_iterations\": " << cg_iterations << ",\n";
@@ -609,14 +875,18 @@ inline void write_mesh_json(
     f << std::fixed << std::setprecision(6);
     f << "{\n";
     f << "  \"num_nodes\": " << m.num_nodes() << ",\n";
-    f << "  \"num_elements\": " << (m.num_quads() + m.num_quad8s() + m.num_tris()) << ",\n";
+    f << "  \"dim\": " << g_dim << ",\n";
+    f << "  \"num_elements\": " << (m.num_quads() + m.num_quad8s() + m.num_tris() + m.num_hexes() + m.num_tets()) << ",\n";
     f << "  \"num_quads\": " << m.num_quads() << ",\n";
     f << "  \"num_quad8s\": " << m.num_quad8s() << ",\n";
     f << "  \"num_tris\": " << m.num_tris() << ",\n";
+    f << "  \"num_hexes\": " << m.num_hexes() << ",\n";
+    f << "  \"num_tets\": " << m.num_tets() << ",\n";
     f << "  \"nodes\": [\n";
     for (int i = 0; i < m.num_nodes(); ++i) {
         f << "    {\"x\": " << m.nodes[i].x
-          << ", \"y\": " << m.nodes[i].y << "}";
+          << ", \"y\": " << m.nodes[i].y
+          << ", \"z\": " << m.nodes[i].z << "}";
         if (i < m.num_nodes() - 1) f << ",";
         f << "\n";
     }
@@ -662,6 +932,38 @@ inline void write_mesh_json(
           << ", \"skewness\": " << mq.tri_quality[i].skewness
           << ", \"area\": " << mq.tri_quality[i].area << "}";
         if (i < m.num_tris() - 1) f << ",";
+        f << "\n";
+    }
+    f << "  ],\n";
+    // Output H8 elements with quality
+    f << "  \"hex_elements\": [\n";
+    for (int i = 0; i < m.num_hexes(); ++i) {
+        f << "    {\"n0\": " << m.hex_elements[i][0]
+          << ", \"n1\": " << m.hex_elements[i][1]
+          << ", \"n2\": " << m.hex_elements[i][2]
+          << ", \"n3\": " << m.hex_elements[i][3]
+          << ", \"n4\": " << m.hex_elements[i][4]
+          << ", \"n5\": " << m.hex_elements[i][5]
+          << ", \"n6\": " << m.hex_elements[i][6]
+          << ", \"n7\": " << m.hex_elements[i][7]
+          << ", \"jacobian_ratio\": " << mq.hex_quality[i].jacobian_ratio
+          << ", \"aspect_ratio\": " << mq.hex_quality[i].aspect_ratio
+          << ", \"volume\": " << mq.hex_quality[i].area << "}";
+        if (i < m.num_hexes() - 1) f << ",";
+        f << "\n";
+    }
+    f << "  ],\n";
+    // Output T4 elements with quality
+    f << "  \"tet_elements\": [\n";
+    for (int i = 0; i < m.num_tets(); ++i) {
+        f << "    {\"n0\": " << m.tet_elements[i][0]
+          << ", \"n1\": " << m.tet_elements[i][1]
+          << ", \"n2\": " << m.tet_elements[i][2]
+          << ", \"n3\": " << m.tet_elements[i][3]
+          << ", \"jacobian_ratio\": " << mq.tet_quality[i].jacobian_ratio
+          << ", \"aspect_ratio\": " << mq.tet_quality[i].aspect_ratio
+          << ", \"volume\": " << mq.tet_quality[i].area << "}";
+        if (i < m.num_tets() - 1) f << ",";
         f << "\n";
     }
     f << "  ],\n";

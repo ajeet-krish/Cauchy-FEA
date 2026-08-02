@@ -222,11 +222,11 @@ def evaluate_case(case_name, outdir):
     """Full evaluation for one case."""
     print(f'\n--- Evaluating {case_name} ---')
 
-    # Map case names to output directories
+    # Map case names to output directories (new structure: output/{case}/simulations/{mesh_size}/)
     case_dirs = {
-        'cantilever': 'cantilever_32',
-        'cook': 'cook_32',
-        'patch': 'patch',
+        'cantilever': os.path.join('cantilever', 'simulations', '32'),
+        'cook': os.path.join('cook', 'simulations', '32'),
+        'patch': os.path.join('patch', 'simulations'),
     }
     fea_dir = os.path.join(OUTPUT_DIR, case_dirs.get(case_name, case_name))
 

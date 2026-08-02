@@ -3,6 +3,7 @@
 #include <QDockWidget>
 #include <QProgressBar>
 #include "viewport_widget.hpp"
+#include "viewport_3d.hpp"
 #include "mesh_editor.hpp"
 #include "solver_panel.hpp"
 #include "result_model.hpp"
@@ -14,8 +15,11 @@
 #include "load_displacement_chart.hpp"
 #include "error_heatmap.hpp"
 
+class QStackedWidget;
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MainWindow)
 public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override = default;
@@ -45,8 +49,11 @@ private:
     void createToolbars();
     void createStatusBar();
     void createBottomPlots();
+    void switchViewport(bool is3d);
 
+    QStackedWidget* m_viewStack = nullptr;
     ViewportWidget* m_viewport = nullptr;
+    Viewport3DWidget* m_viewport3d = nullptr;
     MeshEditor* m_meshEditor = nullptr;
     SolverPanel* m_solverPanel = nullptr;
     SolverRunner* m_solverRunner = nullptr;

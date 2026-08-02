@@ -36,14 +36,14 @@ int main(int argc, char* argv[]) {
     g_ny = ny;
     g_case = CaseType::COOK;
 
-    // Standard Cook's membrane dimensions
-    double L = 48.0;       // mm (length in x-direction)
-    double h_left = 44.0;  // mm (height at left, fixed end)
-    double h_right = 60.0; // mm (height at right, loaded end)
-    double t = 1.0;        // mm (thickness)
+    // Standard Cook's membrane dimensions (in meters for SI consistency)
+    double L = 0.048;       // m (48 mm length in x-direction)
+    double h_left = 0.044;  // m (44 mm height at left, fixed end)
+    double h_right = 0.060; // m (60 mm height at right, loaded end)
+    double t = 0.001;       // m (1 mm thickness)
 
     Material mat;
-    mat.E = 1.0;       // MPa (normalized)
+    mat.E = 1.0e6;     // Pa (1.0 MPa, normalized)
     mat.nu = 1.0 / 3.0;
     mat.t = t;
 
@@ -143,7 +143,7 @@ int main(int argc, char* argv[]) {
               << ", error=" << std::abs(U - W) / (std::abs(W) + 1e-30) * 100.0 << "%" << std::endl;
 
     // Write output
-    std::string outdir = "output/cook_" + std::to_string(nx) + (use_q8 ? "_q8" : "");
+    std::string outdir = "output/cook/simulations/" + std::to_string(nx) + (use_q8 ? "_q8" : "");
     std::filesystem::create_directories(outdir);
     postprocess::write_meta_json(outdir + "/meta.json", m, result.displacement, result.stresses,
                                  result.cg_iterations, result.solve_time_ms);

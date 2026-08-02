@@ -5,6 +5,7 @@
 
 class ErrorHeatmap : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(ErrorHeatmap)
 public:
     explicit ErrorHeatmap(QWidget* parent = nullptr);
 

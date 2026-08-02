@@ -10,6 +10,7 @@ struct EnergyBalanceData {
 
 class EnergyBalanceChart : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(EnergyBalanceChart)
 public:
     explicit EnergyBalanceChart(QWidget* parent = nullptr);
 

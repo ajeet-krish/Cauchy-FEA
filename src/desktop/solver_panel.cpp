@@ -90,6 +90,7 @@ void SolverPanel::setResult(const fea::SolveResult& result) {
     stream << "CG iterations: " << result.cg_iterations << "\n";
     stream << "Converged: " << (result.cg_converged ? "Yes" : "No") << "\n";
     stream << "DOFs: " << result.displacement.size() << "\n";
+    stream << "Nodes: " << (result.displacement.size() / (result.displacement.size() > 0 ? std::max(1, static_cast<int>(result.stresses.size())) : 1)) << "\n";
     stream << "Elements: " << result.stresses.size() << "\n";
     m_resultsText->setPlainText(text);
 }

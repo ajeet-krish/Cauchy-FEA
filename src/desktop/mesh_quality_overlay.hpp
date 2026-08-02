@@ -4,6 +4,7 @@
 
 class MeshQualityOverlay : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MeshQualityOverlay)
 public:
     explicit MeshQualityOverlay(QWidget* parent = nullptr);
 

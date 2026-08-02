@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cauchy FEA 3D Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d1117; overflow: hidden; font-family: 'JetBrains Mono', monospace; }
+  #container { width: 100vw; height: 100vh; }
+  #info {
+    position: absolute; top: 10px; left: 10px; color: #8b949e;
+    font-size: 11px; pointer-events: none;
+  }
+  #colorbar {
+    position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
+    width: 20px; height: 200px; border: 1px solid #30363d;
+  }
+  #colorbar canvas { width: 20px; height: 200px; }
+  #cbmax, #cbmin {
+    position: absolute; right: 40px; color: #c9d1d9; font-size: 10px;
+  }
+  #cbmax { top: calc(50% - 100px); }
+  #cbmin { top: calc(50% + 90px); }
+</style>
+</head>
+<body>
+<div id="container"></div>
+<div id="info">Cauchy FEA 3D | Drag to rotate, scroll to zoom</div>
+<div id="colorbar"><canvas id="cbcanvas" width="20" height="200"></canvas></div>
+<div id="cbmax"></div>
+<div id="cbmin"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  let scene, camera, renderer, controls;
+  let meshGroup, edgesGroup;
+  let fieldMin = 0, fieldMax = 1;
+  let currentData = null;
+
+  function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0d1117);
+
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.001, 1000);
+    camera.position.set(2, 2, 2);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.getElementById('container').appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.8);
+    dl.position.set(1, 1, 1);
+    scene.add(dl);
+
+    meshGroup = new THREE.Group();
+    edgesGroup = new THREE.Group();
+    scene.add(meshGroup);
+    scene.add(edgesGroup);
+
+    window.addEventListener('resize', onResize);
+    window.addEventListener('message', onMessage);
+
+    animate();
+  }
+
+  function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  function onMessage(event) {
+    const msg = event.data;
+    if (msg.type === 'setData') {
+      currentData = msg.data;
+      buildMesh();
+    } else if (msg.type === 'setContour') {
+      if (currentData) buildMesh();
+    }
+  }
+
+  function buildMesh() {
+    while (meshGroup.children.length) meshGroup.remove(meshGroup.children[0]);
+    while (edgesGroup.children.length) edgesGroup.remove(edgesGroup.children[0]);
+
+    const data = currentData;
+    if (!data || !data.nodes || !data.elements) return;
+
+    const nodes = data.nodes;
+    const elements = data.elements;
+    const disp = data.displacement || [];
+    const stress = data.stress || {};
+    const field = data.contourField || 'von_mises';
+    const dispScale = data.dispScale || 100;
+
+    // Compute field values and range
+    let values = [];
+    fieldMin = Infinity;
+    fieldMax = -Infinity;
+
+    for (let e = 0; e < elements.length; e++) {
+      let val = 0;
+      if (field === 'von_mises' && stress.von_mises) val = stress.von_mises[e];
+      else if (field === 'sigma_xx' && stress.sigma_xx) val = stress.sigma_xx[e];
+      else if (field === 'sigma_yy' && stress.sigma_yy) val = stress.sigma_yy[e];
+      else if (field === 'sigma_zz' && stress.sigma_zz) val = stress.sigma_zz[e];
+      else if (field === 'sigma_1' && stress.sigma_1) val = stress.sigma_1[e];
+      else if (field === 'sigma_2' && stress.sigma_2) val = stress.sigma_2[e];
+      else if (field === 'displacement' && disp.length > 0) {
+        const n0 = elements[e][0];
+        const ux = disp[n0].ux || 0, uy = disp[n0].uy || 0, uz = disp[n0].uz || 0;
+        val = Math.sqrt(ux*ux + uy*uy + uz*uz);
+      }
+      values.push(val);
+      if (val < fieldMin) fieldMin = val;
+      if (val > fieldMax) fieldMax = val;
+    }
+    if (fieldMin === fieldMax) { fieldMin -= 0.5; fieldMax += 0.5; }
+
+    // Update colorbar
+    updateColorbar();
+
+    // Build element geometry
+    for (let e = 0; e < elements.length; e++) {
+      const conn = elements[e];
+      const t = (values[e] - fieldMin) / (fieldMax - fieldMin);
+      const color = turboColor(Math.max(0, Math.min(1, t)));
+
+      if (conn.length === 8) {
+        // H8 hexahedron - render as 6 quads
+        const faces = [
+          [0,1,2,3], [4,5,6,7], // bottom, top
+          [0,1,5,4], [2,3,7,6], // front, back
+          [0,3,7,4], [1,2,6,5]  // left, right
+        ];
+        for (const face of faces) {
+          const geo = new THREE.BufferGeometry();
+          const verts = [];
+          for (const fi of face) {
+            const ni = conn[fi];
+            let x = nodes[ni].x, y = nodes[ni].y, z = nodes[ni].z;
+            if (disp.length > ni) {
+              x += (disp[ni].ux || 0) * dispScale;
+              y += (disp[ni].uy || 0) * dispScale;
+              z += (disp[ni].uz || 0) * dispScale;
+            }
+            verts.push(x, y, z);
+          }
+          geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+          geo.setIndex([0,1,2, 0,2,3]);
+          geo.computeVertexNormals();
+          const mat = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
+          meshGroup.add(new THREE.Mesh(geo, mat));
+        }
+
+        // Edges
+        const edgeIdxs = [
+          [0,1],[1,2],[2,3],[3,0],
+          [4,5],[5,6],[6,7],[7,4],
+          [0,4],[1,5],[2,6],[3,7]
+        ];
+        for (const [i0,i1] of edgeIdxs) {
+          const n0 = conn[i0], n1 = conn[i1];
+          let x0=nodes[n0].x, y0=nodes[n0].y, z0=nodes[n0].z;
+          let x1=nodes[n1].x, y1=nodes[n1].y, z1=nodes[n1].z;
+          if (disp.length > n0) { x0+=(disp[n0].ux||0)*dispScale; y0+=(disp[n0].uy||0)*dispScale; z0+=(disp[n0].uz||0)*dispScale; }
+          if (disp.length > n1) { x1+=(disp[n1].ux||0)*dispScale; y1+=(disp[n1].uy||0)*dispScale; z1+=(disp[n1].uz||0)*dispScale; }
+          const geo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(x0,y0,z0), new THREE.Vector3(x1,y1,z1)
+          ]);
+          edgesGroup.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 })));
+        }
+      } else if (conn.length === 4) {
+        // T4 tetrahedron - render as 4 triangles
+        const faces = [[0,1,2],[0,1,3],[1,2,3],[0,2,3]];
+        for (const face of faces) {
+          const geo = new THREE.BufferGeometry();
+          const verts = [];
+          for (const fi of face) {
+            const ni = conn[fi];
+            let x=nodes[ni].x, y=nodes[ni].y, z=nodes[ni].z;
+            if(disp.length>ni){x+=(disp[ni].ux||0)*dispScale;y+=(disp[ni].uy||0)*dispScale;z+=(disp[ni].uz||0)*dispScale;}
+            verts.push(x,y,z);
+          }
+          geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+          geo.computeVertexNormals();
+          const mat = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
+          meshGroup.add(new THREE.Mesh(geo, mat));
+        }
+
+        // Edges
+        const edgeIdxs = [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
+        for (const [i0,i1] of edgeIdxs) {
+          const n0=conn[i0],n1=conn[i1];
+          let x0=nodes[n0].x,y0=nodes[n0].y,z0=nodes[n0].z;
+          let x1=nodes[n1].x,y1=nodes[n1].y,z1=nodes[n1].z;
+          if(disp.length>n0){x0+=(disp[n0].ux||0)*dispScale;y0+=(disp[n0].uy||0)*dispScale;z0+=(disp[n0].uz||0)*dispScale;}
+          if(disp.length>n1){x1+=(disp[n1].ux||0)*dispScale;y1+=(disp[n1].uy||0)*dispScale;z1+=(disp[n1].uz||0)*dispScale;}
+          const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x0,y0,z0),new THREE.Vector3(x1,y1,z1)]);
+          edgesGroup.add(new THREE.Line(geo, new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.15})));
+        }
+      }
+    }
+
+    // Fit camera
+    fitView();
+  }
+
+  function fitView() {
+    const data = currentData;
+    let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity,zmin=Infinity,zmax=-Infinity;
+    for (const n of data.nodes) {
+      if(n.x<xmin)xmin=n.x; if(n.x>xmax)xmax=n.x;
+      if(n.y<ymin)ymin=n.y; if(n.y>ymax)ymax=n.y;
+      if(n.z<zmin)zmin=n.z; if(n.z>zmax)zmax=n.z;
+    }
+    const cx=(xmin+xmax)/2, cy=(ymin+ymax)/2, cz=(zmin+zmax)/2;
+    const range = Math.max(xmax-xmin, ymax-ymin, zmax-zmin) || 1;
+    camera.position.set(cx+range*1.5, cy+range*1.5, cz+range*1.5);
+    camera.lookAt(cx, cy, cz);
+    controls.target.set(cx, cy, cz);
+    controls.update();
+  }
+
+  function turboColor(t) {
+    t = Math.max(0, Math.min(1, t));
+    let r,g,b;
+    if (t < 0.25) { const s=t/0.25; r=48*s; g=84*s; b=155+48*s; }
+    else if (t < 0.5) { const s=(t-0.25)/0.25; r=48+195*s; g=84+166*s; b=203-150*s; }
+    else if (t < 0.75) { const s=(t-0.5)/0.25; r=243-8*s; g=250-148*s; b=53-38*s; }
+    else { const s=(t-0.75)/0.25; r=235+20*s; g=102-94*s; b=15-15*s; }
+    return (Math.round(r)<<16)|(Math.round(g)<<8)|Math.round(b);
+  }
+
+  function updateColorbar() {
+    const canvas = document.getElementById('cbcanvas');
+    const ctx = canvas.getContext('2d');
+    for (let y = 0; y < 200; y++) {
+      const t = 1.0 - y / 199;
+      const c = turboColor(t);
+      ctx.fillStyle = '#' + c.toString(16).padStart(6,'0');
+      ctx.fillRect(0, y, 20, 1);
+    }
+    document.getElementById('cbmax').textContent = fieldMax.toExponential(2);
+    document.getElementById('cbmin').textContent = fieldMin.toExponential(2);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

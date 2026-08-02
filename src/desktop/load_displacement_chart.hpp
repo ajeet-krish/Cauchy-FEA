@@ -9,6 +9,7 @@ struct LDPoint {
 
 class LoadDisplacementChart : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(LoadDisplacementChart)
 public:
     explicit LoadDisplacementChart(QWidget* parent = nullptr);
 

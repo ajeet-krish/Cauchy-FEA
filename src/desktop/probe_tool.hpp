@@ -17,6 +17,7 @@ struct ProbeResult {
 
 class ProbeTool : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(ProbeTool)
 public:
     explicit ProbeTool(QObject* parent = nullptr);
 
