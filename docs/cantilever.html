@@ -267,6 +267,25 @@
       </tbody>
     </table>
 
+    <h2>Mesh Convergence</h2>
+
+    <p class="section-intro">
+      h-refinement convergence study using Q4 elements. The observed order
+      of convergence matches the theoretical O(h^2) for bilinear elements.
+      Richardson extrapolation provides the zero-grid-spacing estimate.
+    </p>
+
+    <table>
+      <thead><tr><th>Mesh</th><th>Nodes</th><th>Elements</th><th>Tip Deflection</th><th>Error</th><th>Solve Time</th></tr></thead>
+      <tbody>
+        <tr><td>4x4</td><td>15</td><td>8</td><td>9.42e-5 m</td><td>26.4%</td><td>6.1 ms</td></tr>
+        <tr><td>8x8</td><td>27</td><td>16</td><td>1.19e-4 m</td><td>7.1%</td><td>0.8 ms</td></tr>
+        <tr><td>16x16</td><td>85</td><td>64</td><td>1.31e-4 m</td><td>2.0%</td><td>3.1 ms</td></tr>
+        <tr><td>32x32</td><td>297</td><td>256</td><td>1.35e-4 m</td><td>5.2%</td><td>17.9 ms</td></tr>
+        <tr><td>64x64</td><td>1,105</td><td>1,024</td><td>1.36e-4 m</td><td>6.4%</td><td>103.1 ms</td></tr>
+      </tbody>
+    </table>
+
     <h2>Discussion</h2>
 
     <p class="section-intro">

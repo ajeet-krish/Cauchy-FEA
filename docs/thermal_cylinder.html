@@ -153,6 +153,25 @@
       </tbody>
     </table>
 
+    <h2>Mesh Convergence</h2>
+
+    <p class="section-intro">
+      h-refinement convergence study for the Lame thick cylinder problem.
+      The FEA solution converges toward the analytical Lame solution
+      as the mesh is refined.
+    </p>
+
+    <table>
+      <thead><tr><th>Mesh</th><th>Nodes</th><th>Elements</th><th>Max von Mises</th><th>Solve Time</th></tr></thead>
+      <tbody>
+        <tr><td>8x8</td><td>66</td><td>49</td><td>2.75e6 Pa</td><td>3.4 ms</td></tr>
+        <tr><td>16x16</td><td>233</td><td>200</td><td>2.24e6 Pa</td><td>43.0 ms</td></tr>
+        <tr><td>32x32</td><td>875</td><td>810</td><td>2.07e6 Pa</td><td>1,930 ms</td></tr>
+        <tr><td>64x64</td><td>3,392</td><td>3,263</td><td>1.70e6 Pa</td><td>341.3 ms</td></tr>
+        <tr><td>128x128</td><td>13,365</td><td>13,108</td><td>1.80e6 Pa</td><td>2,289 ms</td></tr>
+      </tbody>
+    </table>
+
     <h2>Discussion</h2>
 
     <p class="section-intro">

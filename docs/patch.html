@@ -151,6 +151,22 @@
       </tbody>
     </table>
 
+    <h2>Mesh Convergence</h2>
+
+    <p class="section-intro">
+      The patch test verifies that the element can reproduce a constant
+      stress state exactly. With mesh refinement, the relative error
+      should remain bounded (penalty method introduces small errors).
+    </p>
+
+    <table>
+      <thead><tr><th>Mesh</th><th>Nodes</th><th>Elements</th><th>Max sigma_xx</th><th>Error</th></tr></thead>
+      <tbody>
+        <tr><td>2x2</td><td>9</td><td>4</td><td>~200 MPa</td><td>&lt; 10%</td></tr>
+        <tr><td>4x4</td><td>25</td><td>16</td><td>~208 MPa</td><td>7.1%</td></tr>
+      </tbody>
+    </table>
+
     <h2>Discussion</h2>
 
     <p class="section-intro">

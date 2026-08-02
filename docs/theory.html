@@ -103,6 +103,42 @@
       weights 5/9, 8/9, 5/9.
     </p>
 
+    <h2>Q4 vs Q8: Element Comparison</h2>
+    <p class="section-intro">
+      All three major commercial FEA codes (Abaqus, ANSYS, Nastran) recommend
+      quadratic elements as the primary choice for general structural analysis.
+      Q8 is the default recommendation in Abaqus (CPS8R), ANSYS (PLANE183),
+      and Nastran (CQUAD8).
+    </p>
+    <table>
+      <thead>
+        <tr><th>Property</th><th>Q4 (Bilinear)</th><th>Q8 (Serendipity)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Nodes</td><td>4 (corners only)</td><td>8 (4 corners + 4 midside)</td></tr>
+        <tr><td>Shape functions</td><td>Bilinear: 1, xi, eta, xi*eta</td><td>Biquadratic: +xi^2, eta^2, xi^2*eta, xi*eta^2</td></tr>
+        <tr><td>Integration</td><td>2x2 Gauss (4 pts)</td><td>3x3 Gauss (9 pts)</td></tr>
+        <tr><td>Stiffness matrix</td><td>8x8</td><td>16x16</td></tr>
+        <tr><td>Convergence rate</td><td>O(h^2) energy norm</td><td>O(h^3) energy norm</td></tr>
+        <tr><td>Shear locking</td><td>Yes (full integration)</td><td>No (quadratic displacement field)</td></tr>
+        <tr><td>Curved boundaries</td><td>No (straight edges)</td><td>Yes (midside nodes)</td></tr>
+        <tr><td>Distortion sensitivity</td><td>Low</td><td>Moderate (midside position matters)</td></tr>
+        <tr><td>Best for</td><td>Large deformation, explicit dynamics</td><td>General analysis, stress concentrations</td></tr>
+        <tr><td>Abaqus equivalent</td><td>CPS4, CPS4R</td><td>CPS8, CPS8R</td></tr>
+        <tr><td>ANSYS equivalent</td><td>PLANE182</td><td>PLANE183</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Shear Locking in Q4 Elements</h2>
+    <p class="section-intro">
+      Shear locking is an artificial stiffening that occurs when fully-integrated
+      lower-order elements model bending-dominated problems. In pure bending,
+      the shear strain should be zero, but Q4's bilinear shape functions
+      introduce parasitic shear strains that make the element appear artificially stiff.
+      This is why Q4 tip deflections can be off by 50%+ on coarse meshes,
+      while Q8 converges to the correct solution with far fewer elements.
+    </p>
+
     <h2>Jacobian &amp; B-Matrix</h2>
     <p class="section-intro">
       The Jacobian maps natural to physical coordinates:

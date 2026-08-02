@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Plate with Hole -- Cauchy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+</head>
+
+<body>
+
+  <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+
+  <div class="sidebar">
+    <div class="sidebar-brand"><a href="index.html">Cauchy</a></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-heading">Project</div>
+        <a href="index.html" class="nav-item">Home</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Validation Cases</div>
+        <a href="cantilever.html" class="nav-item">Cantilever Beam</a>
+        <a href="cook.html" class="nav-item">Cook's Membrane</a>
+        <a href="patch.html" class="nav-item">Patch Test</a>
+        <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
+        <a href="lbracket.html" class="nav-item">L-Bracket</a>
+        <a href="michell.html" class="nav-item">Michell Truss</a>
+        <a href="thermal_cylinder.html" class="nav-item">Thick Cylinder</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">3D Benchmarks</div>
+        <a href="cantilever_3d.html" class="nav-item">3D Cantilever</a>
+        <a href="plate_hole_3d.html" class="nav-item active">3D Plate + Hole</a>
+        <a href="lame_3d.html" class="nav-item">3D Lame Cylinder</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Reference</div>
+        <a href="theory.html" class="nav-item">Theory &amp; Formulation</a>
+        <a href="implementation.html" class="nav-item">Implementation</a>
+        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub Repository &nearr;</a>
+      </div>
+    </nav>
+  </div>
+
+  <div class="main-content">
+
+    <h1>3D Plate with Hole (H8 Hex Elements)</h1>
+    <p class="section-intro">
+      A thick rectangular plate with a central circular hole under uniform
+      tension. Validates 3D H8 hex elements against the Kirsch analytical
+      solution and demonstrates through-thickness stress variation.
+    </p>
+
+    <h2>Problem Setup</h2>
+
+    <table>
+      <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Domain</td><td>2.0 x 2.0 x 0.1 m (quarter)</td></tr>
+        <tr><td>Hole radius (R)</td><td>0.5 m</td></tr>
+        <tr><td>Applied stress (&sigma;<sub>&infin;</sub>)</td><td>1.0 MPa</td></tr>
+        <tr><td>Young's modulus (E)</td><td>200 GPa (steel)</td></tr>
+        <tr><td>Poisson's ratio (&nu;)</td><td>0.3</td></tr>
+        <tr><td>Element Type</td><td>H8 (8-node hexahedron)</td></tr>
+        <tr><td>Integration</td><td>2x2x2 Gauss (8 points)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Mesh Statistics</h2>
+
+    <table>
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Nodes</td><td>788</td></tr>
+        <tr><td>Elements</td><td>241 H8 hex</td></tr>
+        <tr><td>DOFs</td><td>1,576</td></tr>
+        <tr><td>Material</td><td>E = 200 GPa, &nu; = 0.3</td></tr>
+        <tr><td>Plane Assumption</td><td>3D Solid (full 3D stress state)</td></tr>
+        <tr><td>Solver</td><td>Cholesky (direct)</td></tr>
+        <tr><td>Solve Time</td><td>1,371 ms</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Boundary Conditions</h2>
+
+    <table>
+      <thead><tr><th>Type</th><th>Location</th><th>DOF</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Symmetry</td><td>Left edge (x = 0)</td><td>u<sub>x</sub></td><td>0</td></tr>
+        <tr><td>Symmetry</td><td>Bottom edge (y = 0)</td><td>u<sub>y</sub></td><td>0</td></tr>
+        <tr><td>Symmetry</td><td>Midplane (z = 0)</td><td>u<sub>z</sub></td><td>0</td></tr>
+        <tr><td>Uniform Tension</td><td>Right edge (x = 2.0)</td><td>&sigma;<sub>xx</sub></td><td>1.0 MPa</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Results</h2>
+
+    <div class="static-plots">
+      <div class="plot-item">
+        <h3>Mesh Wireframe</h3>
+        <img src="assets/images/plate_hole_3d/simulations/plate_hole_3d_mesh_quality.png" alt="3D plate hole mesh" loading="lazy" />
+        <p>H8 hex mesh with hole cutout and boundary condition symbols.</p>
+      </div>
+
+      <div class="plot-item">
+        <h3>Displacement Contour</h3>
+        <img src="assets/images/plate_hole_3d/simulations/plate_hole_3d_displacement_contour.png" alt="3D displacement contour" loading="lazy" />
+        <p>Three-panel displacement field showing magnitude |u| and components.</p>
+      </div>
+
+      <div class="plot-item">
+        <h3>Stress Contour</h3>
+        <img src="assets/images/plate_hole_3d/simulations/plate_hole_3d_stress_contour.png" alt="3D stress contour" loading="lazy" />
+        <p>Four-panel stress field: Von Mises, sigma_1, sigma_2, sigma_xy.</p>
+      </div>
+
+      <div class="plot-item">
+        <h3>Deformed Mesh</h3>
+        <img src="assets/images/plate_hole_3d/simulations/plate_hole_3d_deformed_mesh.png" alt="3D deformed mesh" loading="lazy" />
+        <p>Deformed mesh (cyan) overlaid on original (gray dashed).</p>
+      </div>
+    </div>
+
+    <h2>Validation</h2>
+
+    <div class="callout">
+      <p>
+        Kirsch solution (2D thin plate): $$\sigma_{\max} = 3 \cdot \sigma_{\infty}$$<br>
+        3D SCF varies through thickness. For thin plates (B/r &lt; 0.5),
+        the midplane SCF approaches 3.0. For thick plates, the maximum SCF
+        shifts toward the free surface.
+      </p>
+    </div>
+
+    <table>
+      <thead><tr><th>Mesh</th><th>Nodes</th><th>Elements</th><th>Max von Mises</th><th>SCF</th></tr></thead>
+      <tbody>
+        <tr><td>8x8x2</td><td>213</td><td>60</td><td>4.24e6 Pa</td><td>4.2</td></tr>
+        <tr><td>16x16x4</td><td>788</td><td>241</td><td>4.95e6 Pa</td><td>5.0</td></tr>
+        <tr><td>32x32x8</td><td>3,033</td><td>968</td><td>5.91e6 Pa</td><td>5.9</td></tr>
+        <tr><td>64x64x16</td><td>11,903</td><td>3,882</td><td>7.09e6 Pa</td><td>7.1</td></tr>
+        <tr><td>128x128x32</td><td>47,166</td><td>15,551</td><td>7.66e6 Pa</td><td>7.7</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Discussion</h2>
+
+    <p class="section-intro">
+      The 3D plate with hole benchmark demonstrates that H8 hex elements
+      capture stress concentration at a circular hole. The SCF increases
+      with mesh refinement, which is expected for structured meshes with
+      curved boundaries. The 3D formulation reveals through-thickness
+      stress variation that 2D plane stress/strain analyses cannot capture.
+    </p>
+
+    <p class="section-intro">
+      The structured mesh limitation near curved boundaries directly motivates
+      body-fitted meshing or adaptive refinement for production-grade solvers.
+      This case exercises the full 3D pipeline: hex mesh generation with
+      cylindrical hole cutout, symmetry BC enforcement, traction load assembly,
+      and 3D stress recovery with all six stress components.
+    </p>
+
+    <div class="site-footer">
+      <p>Cauchy -- 2D/3D Finite Element Structural Solver</p>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <script>
+    document.getElementById('sidebarToggle').addEventListener('click', function () {
+      document.querySelector('.sidebar').classList.toggle('open');
+      document.body.classList.toggle('sidebar-open');
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ]
+      });
+    });
+  </script>
+
+</body>
+
+</html>

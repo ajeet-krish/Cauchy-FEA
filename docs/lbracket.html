@@ -158,6 +158,25 @@
       </tbody>
     </table>
 
+    <h2>Mesh Convergence</h2>
+
+    <p class="section-intro">
+      h-refinement convergence study for stress concentration at the
+      re-entrant corner. The stress value increases with mesh refinement,
+      confirming the theoretical singularity at sharp corners.
+    </p>
+
+    <table>
+      <thead><tr><th>Mesh</th><th>Nodes</th><th>Elements</th><th>Max von Mises</th><th>Solve Time</th></tr></thead>
+      <tbody>
+        <tr><td>8x8</td><td>56</td><td>39</td><td>2.17e5 Pa</td><td>2.5 ms</td></tr>
+        <tr><td>16x16</td><td>208</td><td>175</td><td>2.46e5 Pa</td><td>31.6 ms</td></tr>
+        <tr><td>32x32</td><td>800</td><td>735</td><td>2.98e5 Pa</td><td>1,466 ms</td></tr>
+        <tr><td>64x64</td><td>3,136</td><td>3,007</td><td>3.71e5 Pa</td><td>374.5 ms</td></tr>
+        <tr><td>128x128</td><td>12,416</td><td>12,159</td><td>4.49e5 Pa</td><td>2,549 ms</td></tr>
+      </tbody>
+    </table>
+
     <h2>Discussion</h2>
 
     <p class="section-intro">

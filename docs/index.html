@@ -34,6 +34,12 @@
         <a href="thermal_cylinder.html" class="nav-item">Thick Cylinder</a>
       </div>
       <div class="nav-section">
+        <div class="nav-heading">3D Benchmarks</div>
+        <a href="cantilever_3d.html" class="nav-item">3D Cantilever</a>
+        <a href="plate_hole_3d.html" class="nav-item">3D Plate + Hole</a>
+        <a href="lame_3d.html" class="nav-item">3D Lame Cylinder</a>
+      </div>
+      <div class="nav-section">
         <div class="nav-heading">Advanced</div>
         <a href="pinn.html" class="nav-item">PINN Surrogate</a>
       </div>
@@ -81,7 +87,7 @@
 
       <a href="cantilever.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/images/cantilever_deformed.png" 
+          <img src="assets/images/cantilever/simulations/cantilever_deformed.png" 
                alt="Cantilever deformed mesh" 
                loading="lazy" />
         </div>
@@ -94,7 +100,7 @@
 
       <a href="cook.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/images/cook_deformed.png" 
+          <img src="assets/images/cook/simulations/cook_deformed.png" 
                alt="Cook's membrane deformed mesh" 
                loading="lazy" />
         </div>
@@ -107,7 +113,7 @@
 
       <a href="patch.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/images/patch_deformed.png" 
+          <img src="assets/images/patch/simulations/patch_deformed.png" 
                alt="Patch test deformed mesh" 
                loading="lazy" />
         </div>
@@ -120,7 +126,7 @@
 
       <a href="plate_hole.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/images/plate_hole_deformed.png" 
+          <img src="assets/images/plate_hole/simulations/plate_hole_deformed.png" 
                alt="Plate with hole deformed mesh" 
                loading="lazy" />
         </div>
@@ -133,7 +139,7 @@
 
       <a href="lbracket.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/images/lbracket_deformed.png" 
+          <img src="assets/images/lbracket/simulations/lbracket_deformed.png" 
                alt="L-bracket deformed mesh" 
                loading="lazy" />
         </div>
@@ -146,7 +152,7 @@
 
       <a href="michell.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/images/michell_deformed.png" 
+          <img src="assets/images/michell/simulations/michell_deformed.png" 
                alt="Michell truss deformed mesh" 
                loading="lazy" />
         </div>
@@ -157,22 +163,61 @@
         </div>
       </a>
 
-      <a href="thermal_cylinder.html" class="case-card">
-        <div class="case-thumb">
-          <img src="assets/images/thermal_cylinder_deformed.png" 
-               alt="Thermal cylinder deformed mesh" 
-               loading="lazy" />
-        </div>
-        <div class="case-info">
-          <h3>Thick Cylinder (Lame)</h3>
-          <p>Annular cylinder under internal pressure and thermal gradient. Validates plane strain formulation against Lame solution.</p>
-          <span class="case-link">View case &rarr;</span>
-        </div>
-      </a>
+       <a href="thermal_cylinder.html" class="case-card">
+         <div class="case-thumb">
+           <img src="assets/images/thermal_cylinder/simulations/thermal_cylinder_deformed.png" 
+                alt="Thermal cylinder deformed mesh" 
+                loading="lazy" />
+         </div>
+         <div class="case-info">
+           <h3>Thick Cylinder (Lame)</h3>
+           <p>Annular cylinder under internal pressure and thermal gradient. Validates plane strain formulation against Lame solution.</p>
+           <span class="case-link">View case &rarr;</span>
+         </div>
+       </a>
 
-      <a href="pinn.html" class="case-card">
+       <a href="cantilever_3d.html" class="case-card">
+         <div class="case-thumb">
+           <img src="assets/images/cantilever_3d/simulations/cantilever_3d_deformed.png" 
+                alt="3D cantilever deformed mesh" 
+                loading="lazy" />
+         </div>
+         <div class="case-info">
+           <h3>3D Cantilever Beam</h3>
+           <p>3D hexahedral (H8) element validation against Euler-Bernoulli beam theory. Demonstrates 3D solid element formulation.</p>
+           <span class="case-link">View case &rarr;</span>
+         </div>
+       </a>
+
+       <a href="plate_hole_3d.html" class="case-card">
+         <div class="case-thumb">
+           <img src="assets/images/plate_hole_3d/simulations/plate_hole_3d_deformed.png" 
+                alt="3D plate hole deformed mesh" 
+                loading="lazy" />
+         </div>
+         <div class="case-info">
+           <h3>3D Plate with Hole</h3>
+           <p>3D stress concentration around a circular hole in a thick plate. SCF varies through thickness.</p>
+           <span class="case-link">View case &rarr;</span>
+         </div>
+       </a>
+
+       <a href="lame_3d.html" class="case-card">
+         <div class="case-thumb">
+           <img src="assets/images/lame_3d/simulations/lame_3d_deformed.png" 
+                alt="3D Lame deformed mesh" 
+                loading="lazy" />
+         </div>
+         <div class="case-info">
+           <h3>3D Thick Cylinder (Lame)</h3>
+           <p>3D Lame solution validation for thick-walled cylinder under internal pressure. All 6 stress components.</p>
+           <span class="case-link">View case &rarr;</span>
+         </div>
+       </a>
+
+       <a href="pinn.html" class="case-card">
         <div class="case-thumb">
-          <img src="assets/images/pinn_cantilever_pinn_uy.png" 
+          <img src="assets/images/cantilever/pinn/pinn_cantilever_pinn_uy.png" 
                alt="PINN prediction" 
                loading="lazy" />
         </div>

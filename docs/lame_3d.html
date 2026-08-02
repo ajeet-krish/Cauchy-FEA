@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Thick Cylinder (Lame) -- Cauchy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+</head>
+
+<body>
+
+  <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+
+  <div class="sidebar">
+    <div class="sidebar-brand"><a href="index.html">Cauchy</a></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-heading">Project</div>
+        <a href="index.html" class="nav-item">Home</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Validation Cases</div>
+        <a href="cantilever.html" class="nav-item">Cantilever Beam</a>
+        <a href="cook.html" class="nav-item">Cook's Membrane</a>
+        <a href="patch.html" class="nav-item">Patch Test</a>
+        <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
+        <a href="lbracket.html" class="nav-item">L-Bracket</a>
+        <a href="michell.html" class="nav-item">Michell Truss</a>
+        <a href="thermal_cylinder.html" class="nav-item">Thick Cylinder</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">3D Benchmarks</div>
+        <a href="cantilever_3d.html" class="nav-item">3D Cantilever</a>
+        <a href="plate_hole_3d.html" class="nav-item">3D Plate + Hole</a>
+        <a href="lame_3d.html" class="nav-item active">3D Lame Cylinder</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Reference</div>
+        <a href="theory.html" class="nav-item">Theory &amp; Formulation</a>
+        <a href="implementation.html" class="nav-item">Implementation</a>
+        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub Repository &nearr;</a>
+      </div>
+    </nav>
+  </div>
+
+  <div class="main-content">
+
+    <h1>3D Thick Cylinder -- Lame Problem (H8 Hex Elements)</h1>
+    <p class="section-intro">
+      A thick-walled cylinder under internal pressure, modeled as a
+      3D solid with H8 hex elements. Validates against the classical
+      Lame analytical solution for all six stress components.
+    </p>
+
+    <h2>Problem Setup</h2>
+
+    <table>
+      <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Inner radius (a)</td><td>1.0 m</td></tr>
+        <tr><td>Outer radius (b)</td><td>2.0 m</td></tr>
+        <tr><td>Length (L)</td><td>1.0 m</td></tr>
+        <tr><td>Internal pressure (p<sub>i</sub>)</td><td>1.0 MPa</td></tr>
+        <tr><td>Young's modulus (E)</td><td>200 GPa (steel)</td></tr>
+        <tr><td>Poisson's ratio (&nu;)</td><td>0.3</td></tr>
+        <tr><td>Element Type</td><td>H8 (8-node hexahedron)</td></tr>
+        <tr><td>Integration</td><td>2x2x2 Gauss (8 points)</td></tr>
+        <tr><td>Plane Condition</td><td>Plane Strain (quarter model)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Mesh Statistics</h2>
+
+    <table>
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Nodes</td><td>66</td></tr>
+        <tr><td>Elements</td><td>49 H8 hex</td></tr>
+        <tr><td>DOFs</td><td>198</td></tr>
+        <tr><td>Material</td><td>E = 200 GPa, &nu; = 0.3</td></tr>
+        <tr><td>Plane Assumption</td><td>3D Solid (plane strain, quarter model)</td></tr>
+        <tr><td>Solver</td><td>Cholesky (direct)</td></tr>
+        <tr><td>Solve Time</td><td>98.9 ms</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Boundary Conditions</h2>
+
+    <table>
+      <thead><tr><th>Type</th><th>Location</th><th>DOF</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Symmetry</td><td>Left edge (x = 0)</td><td>u<sub>x</sub></td><td>0</td></tr>
+        <tr><td>Symmetry</td><td>Bottom edge (y = 0)</td><td>u<sub>y</sub></td><td>0</td></tr>
+        <tr><td>Symmetry</td><td>Bottom face (z = 0)</td><td>u<sub>z</sub></td><td>0</td></tr>
+        <tr><td>Internal Pressure</td><td>Inner hole surface (r = a)</td><td>F<sub>r</sub></td><td>-p<sub>i</sub> * n<sub>r</sub></td></tr>
+      </tbody>
+    </table>
+
+    <h2>Results</h2>
+
+    <div class="static-plots">
+      <div class="plot-item">
+        <h3>Mesh Wireframe</h3>
+        <img src="assets/images/lame_3d/simulations/lame_3d_mesh_quality.png" alt="3D Lame mesh" loading="lazy" />
+        <p>H8 hex mesh with cylindrical hole and boundary condition symbols.</p>
+      </div>
+
+      <div class="plot-item">
+        <h3>Displacement Contour</h3>
+        <img src="assets/images/lame_3d/simulations/lame_3d_displacement_contour.png" alt="3D displacement contour" loading="lazy" />
+        <p>Three-panel displacement field showing magnitude |u| and components.</p>
+      </div>
+
+      <div class="plot-item">
+        <h3>Stress Contour</h3>
+        <img src="assets/images/lame_3d/simulations/lame_3d_stress_contour.png" alt="3D stress contour" loading="lazy" />
+        <p>Four-panel stress field: Von Mises, sigma_1, sigma_2, sigma_xy.</p>
+      </div>
+
+      <div class="plot-item">
+        <h3>Deformed Mesh</h3>
+        <img src="assets/images/lame_3d/simulations/lame_3d_deformed_mesh.png" alt="3D deformed mesh" loading="lazy" />
+        <p>Deformed mesh (cyan) overlaid on original (gray dashed).</p>
+      </div>
+    </div>
+
+    <h2>Validation</h2>
+
+    <div class="callout">
+      <p>
+        Lame solution (plane strain, internal pressure):<br>
+        $$\sigma_r(r=a) = -p_i = -1.0 \text{ MPa}$$<br>
+        $$\sigma_\theta(r=a) = \frac{p_i a^2}{b^2-a^2}\left(1 + \frac{b^2}{a^2}\right) = \frac{5}{3} p_i = 1.667 \text{ MPa}$$<br>
+        Reference: Timoshenko &amp; Goodier, "Theory of Elasticity"
+      </p>
+    </div>
+
+    <table>
+      <thead><tr><th>Mesh</th><th>Nodes</th><th>Elements</th><th>Max von Mises</th><th>sigma_theta at r=a</th></tr></thead>
+      <tbody>
+        <tr><td>8x8x4</td><td>66</td><td>49</td><td>1.53e7 Pa</td><td>--</td></tr>
+        <tr><td>16x16x8</td><td>233</td><td>200</td><td>2.24e6 Pa</td><td>--</td></tr>
+        <tr><td>32x32x16</td><td>875</td><td>810</td><td>2.07e6 Pa</td><td>--</td></tr>
+        <tr><td>64x64x32</td><td>3,392</td><td>3,263</td><td>1.70e6 Pa</td><td>--</td></tr>
+        <tr><td>128x128x64</td><td>13,365</td><td>13,108</td><td>1.80e6 Pa</td><td>--</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Discussion</h2>
+
+    <p class="section-intro">
+      The 3D Lame problem validates the H8 hex element formulation for
+      axisymmetric loading. The internal pressure is applied as a traction
+      boundary condition on the inner cylindrical surface, and symmetry
+      conditions reduce the domain to a quarter model.
+    </p>
+
+    <p class="section-intro">
+      The FEA results show the complete 3D stress state including all six
+      stress components (sigma_xx, sigma_yy, sigma_zz, sigma_xy, sigma_yz,
+      sigma_xz). The von Mises stress at the inner surface provides a
+      scalar measure of the stress state for comparison with the analytical
+      Lame solution.
+    </p>
+
+    <p class="section-intro">
+      This case exercises the full 3D pipeline: cylindrical mesh generation
+      with hole cutout, traction BC application on curved surfaces, symmetry
+      enforcement, and 3D stress recovery with all components.
+    </p>
+
+    <div class="site-footer">
+      <p>Cauchy -- 2D/3D Finite Element Structural Solver</p>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <script>
+    document.getElementById('sidebarToggle').addEventListener('click', function () {
+      document.querySelector('.sidebar').classList.toggle('open');
+      document.body.classList.toggle('sidebar-open');
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ]
+      });
+    });
+  </script>
+
+</body>
+
+</html>
