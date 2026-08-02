@@ -90,58 +90,107 @@
           <td>Tip load (P)</td>
           <td>-1000 N (downward)</td>
         </tr>
+      </tbody>
+    </table>
+
+    <h2>Mesh Statistics</h2>
+
+    <table>
+      <thead>
         <tr>
-          <td>Mesh</td>
-          <td>32 x 8 Q4 elements</td>
+          <th>Property</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Nodes</td>
+          <td>849</td>
+        </tr>
+        <tr>
+          <td>Elements</td>
+          <td>256</td>
+        </tr>
+        <tr>
+          <td>Element Type</td>
+          <td>Q8 (8-node serendipity quadrilateral)</td>
+        </tr>
+        <tr>
+          <td>DOFs</td>
+          <td>1,698</td>
+        </tr>
+        <tr>
+          <td>Material</td>
+          <td>E = 200 GPa, &nu; = 0.3</td>
+        </tr>
+        <tr>
+          <td>Plane Assumption</td>
+          <td>Plane Stress (t = 0.01 m)</td>
         </tr>
         <tr>
           <td>Solver</td>
-          <td>Cholesky (594 DOFs)</td>
+          <td>Cholesky (direct)</td>
+        </tr>
+        <tr>
+          <td>Solve Time</td>
+          <td>337.5 ms</td>
         </tr>
       </tbody>
     </table>
 
     <h2>Boundary Conditions</h2>
 
-    <p class="section-intro">
-      The left edge (x=0) is fully clamped: u<sub>x</sub>=0, u<sub>y</sub>=0 for all nodes.
-      A single point load P=-1000 N is applied at the bottom-right corner
-      node in the y-direction.
-    </p>
-
-    <div class="callout">
-      <p>
-        Clamped: u<sub>x</sub> = u<sub>y</sub> = 0 at x = 0<br>
-        Loaded: F<sub>y</sub> = -1000 N at tip node
-      </p>
-    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Location</th>
+          <th>DOF</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Fixed</td>
+          <td>Left edge (x = 0, all nodes)</td>
+          <td>u<sub>x</sub>, u<sub>y</sub></td>
+          <td>0</td>
+        </tr>
+        <tr>
+          <td>Point Load</td>
+          <td>Bottom-right corner (x = 1.0, y = 0)</td>
+          <td>F<sub>y</sub></td>
+          <td>-1000 N</td>
+        </tr>
+      </tbody>
+    </table>
 
     <h2>Results</h2>
 
     <div class="static-plots">
       <div class="plot-item">
         <h3>Mesh Quality</h3>
-        <img src="assets/images/cantilever_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
-        <p>Mesh geometry and element quality statistics.</p>
+        <img src="assets/images/cantilever/simulations/cantilever_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
+        <p>Mesh wireframe with boundary condition symbols (triangles=fixed, arrows=forces).</p>
       </div>
 
       <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="assets/images/cantilever_displacement_contour.png" alt="Displacement contour (|u|, ux, uy)"
+        <img src="assets/images/cantilever/simulations/cantilever_displacement_contour.png" alt="Displacement contour (|u|, ux, uy)"
           loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
       </div>
 
       <div class="plot-item">
         <h3>Stress Contour</h3>
-        <img src="assets/images/cantilever_stress_contour.png" alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)"
+        <img src="assets/images/cantilever/simulations/cantilever_stress_contour.png" alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)"
           loading="lazy" />
         <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
       </div>
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="assets/images/cantilever_deformed_mesh.png" alt="Deformed mesh overlay with displacement vectors"
+        <img src="assets/images/cantilever/simulations/cantilever_deformed_mesh.png" alt="Deformed mesh overlay with displacement vectors"
           loading="lazy" />
         <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors and max displacement
           annotation.</p>
@@ -149,7 +198,7 @@
 
       <div class="plot-item">
         <h3>Principal Stress Directions</h3>
-        <img src="assets/images/cantilever_principal_stress.png" alt="Principal stress arrow plot" loading="lazy" />
+        <img src="assets/images/cantilever/simulations/cantilever_principal_stress.png" alt="Principal stress arrow plot" loading="lazy" />
         <p>Arrow plot showing sigma_1 (red=tension, blue=compression) and sigma_2 directions at element centroids.</p>
       </div>
     </div>

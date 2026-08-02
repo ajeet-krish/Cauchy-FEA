@@ -67,32 +67,47 @@
         <tr><td>Young's modulus (E)</td><td>1.0 MPa (normalized)</td></tr>
         <tr><td>Poisson's ratio (&nu;)</td><td>1/3</td></tr>
         <tr><td>Total shear load</td><td>1.0 N (distributed on right edge)</td></tr>
-        <tr><td>Mesh</td><td>32 x 32 Q4 elements</td></tr>
-        <tr><td>Solver</td><td>Conjugate Gradient (2178 DOFs)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Mesh Statistics</h2>
+
+    <table>
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Nodes</td><td>3,201</td></tr>
+        <tr><td>Elements</td><td>1,024</td></tr>
+        <tr><td>Element Type</td><td>Q8 (8-node serendipity quadrilateral)</td></tr>
+        <tr><td>DOFs</td><td>6,402</td></tr>
+        <tr><td>Material</td><td>E = 1.0 MPa, &nu; = 1/3</td></tr>
+        <tr><td>Plane Assumption</td><td>Plane Stress (t = 1.0 mm)</td></tr>
+        <tr><td>Solver</td><td>Conjugate Gradient</td></tr>
+        <tr><td>Solve Time</td><td>59.1 ms</td></tr>
       </tbody>
     </table>
 
     <h2>Boundary Conditions</h2>
 
-    <div class="callout">
-      <p>
-        Clamped: u<sub>x</sub> = u<sub>y</sub> = 0 on left edge (x = 0)<br>
-        Loaded: Distributed shear F<sub>y</sub> = 1.0 N / (ny+1) per node on right edge
-      </p>
-    </div>
+    <table>
+      <thead><tr><th>Type</th><th>Location</th><th>DOF</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Fixed</td><td>Left edge (x = 0, all nodes)</td><td>u<sub>x</sub>, u<sub>y</sub></td><td>0</td></tr>
+        <tr><td>Distributed Load</td><td>Right edge (x = 48 mm, all nodes)</td><td>F<sub>y</sub></td><td>1.0 N / (n_nodes) per node</td></tr>
+      </tbody>
+    </table>
 
     <h2>Results</h2>
 
     <div class="static-plots">
       <div class="plot-item">
         <h3>Mesh Quality</h3>
-        <img src="assets/images/cook_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
-        <p>Mesh geometry and element quality statistics.</p>
+        <img src="assets/images/cook/simulations/cook_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
+        <p>Mesh wireframe with boundary condition symbols (triangles=fixed, arrows=forces).</p>
       </div>
 
       <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="assets/images/cook_displacement_contour.png"
+        <img src="assets/images/cook/simulations/cook_displacement_contour.png"
              alt="Displacement contour (|u|, ux, uy)"
              loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
@@ -100,7 +115,7 @@
 
       <div class="plot-item">
         <h3>Stress Contour</h3>
-        <img src="assets/images/cook_stress_contour.png"
+        <img src="assets/images/cook/simulations/cook_stress_contour.png"
              alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)"
              loading="lazy" />
         <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
@@ -108,7 +123,7 @@
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="assets/images/cook_deformed_mesh.png"
+        <img src="assets/images/cook/simulations/cook_deformed_mesh.png"
              alt="Deformed mesh overlay with displacement vectors"
              loading="lazy" />
         <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors and max displacement annotation.</p>
@@ -116,7 +131,7 @@
 
       <div class="plot-item">
         <h3>Principal Stress Directions</h3>
-        <img src="assets/images/cook_principal_stress.png"
+        <img src="assets/images/cook/simulations/cook_principal_stress.png"
              alt="Principal stress arrow plot"
              loading="lazy" />
         <p>Arrow plot showing sigma_1 (red=tension, blue=compression) and sigma_2 directions at element centroids.</p>

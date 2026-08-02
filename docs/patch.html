@@ -63,32 +63,47 @@
         <tr><td>Young's modulus (E)</td><td>200 GPa (steel)</td></tr>
         <tr><td>Poisson's ratio (&nu;)</td><td>0.3</td></tr>
         <tr><td>Prescribed displacement</td><td>u<sub>x</sub> = 0.001 m (right edge)</td></tr>
-        <tr><td>Mesh</td><td>4 x 4 Q4 elements</td></tr>
-        <tr><td>Solver</td><td>Cholesky (50 DOFs)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Mesh Statistics</h2>
+
+    <table>
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Nodes</td><td>25</td></tr>
+        <tr><td>Elements</td><td>16</td></tr>
+        <tr><td>Element Type</td><td>Q4 (4-node bilinear quadrilateral)</td></tr>
+        <tr><td>DOFs</td><td>50</td></tr>
+        <tr><td>Material</td><td>E = 200 GPa, &nu; = 0.3</td></tr>
+        <tr><td>Plane Assumption</td><td>Plane Stress (t = 0.01 m)</td></tr>
+        <tr><td>Solver</td><td>Cholesky (direct)</td></tr>
+        <tr><td>Solve Time</td><td>1.2 ms</td></tr>
       </tbody>
     </table>
 
     <h2>Boundary Conditions</h2>
 
-    <div class="callout">
-      <p>
-        Left edge: u<sub>x</sub> = u<sub>y</sub> = 0 (fully clamped)<br>
-        Right edge: u<sub>x</sub> = 0.001 m, u<sub>y</sub> = 0 (prescribed displacement)
-      </p>
-    </div>
+    <table>
+      <thead><tr><th>Type</th><th>Location</th><th>DOF</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Fixed</td><td>Left edge (x = 0, all nodes)</td><td>u<sub>x</sub>, u<sub>y</sub></td><td>0</td></tr>
+        <tr><td>Prescribed</td><td>Right edge (x = 1.0, all nodes)</td><td>u<sub>x</sub></td><td>0.001 m</td></tr>
+      </tbody>
+    </table>
 
     <h2>Results</h2>
 
     <div class="static-plots">
       <div class="plot-item">
         <h3>Mesh Quality</h3>
-        <img src="assets/images/patch_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
-        <p>Mesh geometry and element quality statistics.</p>
+        <img src="assets/images/patch/simulations/patch_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
+        <p>Mesh wireframe with boundary condition symbols (triangles=fixed, arrows=forces).</p>
       </div>
 
       <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="assets/images/patch_displacement_contour.png" 
+        <img src="assets/images/patch/simulations/patch_displacement_contour.png" 
              alt="Displacement contour (|u|, ux, uy)" 
              loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
@@ -96,7 +111,7 @@
 
       <div class="plot-item">
         <h3>Stress Contour</h3>
-        <img src="assets/images/patch_stress_contour.png" 
+        <img src="assets/images/patch/simulations/patch_stress_contour.png" 
              alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)" 
              loading="lazy" />
         <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
@@ -104,7 +119,7 @@
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="assets/images/patch_deformed_mesh.png" 
+        <img src="assets/images/patch/simulations/patch_deformed_mesh.png" 
              alt="Deformed mesh overlay with displacement vectors" 
              loading="lazy" />
         <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors. Constant strain indicates patch test pass.</p>
@@ -112,7 +127,7 @@
 
       <div class="plot-item">
         <h3>Principal Stress Directions</h3>
-        <img src="assets/images/patch_principal_stress.png" 
+        <img src="assets/images/patch/simulations/patch_principal_stress.png" 
              alt="Principal stress arrow plot" 
              loading="lazy" />
         <p>Arrow plot showing sigma_1 and sigma_2 directions. Uniform orientation indicates constant stress state.</p>

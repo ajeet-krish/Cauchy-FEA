@@ -65,34 +65,48 @@
         <tr><td>Applied stress (&sigma;<sub>&infin;</sub>)</td><td>1.0 MPa</td></tr>
         <tr><td>Young's modulus (E)</td><td>200 GPa (steel)</td></tr>
         <tr><td>Poisson's ratio (&nu;)</td><td>0.3</td></tr>
-        <tr><td>Mesh</td><td>16 x 16 Q4 elements (241 active)</td></tr>
-        <tr><td>Solver</td><td>Cholesky (548 DOFs)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Mesh Statistics</h2>
+
+    <table>
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Nodes</td><td>788</td></tr>
+        <tr><td>Elements</td><td>241</td></tr>
+        <tr><td>Element Type</td><td>Q8 (8-node serendipity quadrilateral)</td></tr>
+        <tr><td>DOFs</td><td>1,576</td></tr>
+        <tr><td>Material</td><td>E = 200 GPa, &nu; = 0.3</td></tr>
+        <tr><td>Plane Assumption</td><td>Plane Stress (t = 0.01 m)</td></tr>
+        <tr><td>Solver</td><td>Cholesky (direct)</td></tr>
+        <tr><td>Solve Time</td><td>273.3 ms</td></tr>
       </tbody>
     </table>
 
     <h2>Boundary Conditions</h2>
 
-    <div class="callout">
-      <p>
-        Left edge (x=0): u<sub>x</sub> = 0 (symmetry)<br>
-        Bottom edge (y=0): u<sub>y</sub> = 0 (symmetry)<br>
-        Right edge (x=2): &sigma;<sub>xx</sub> = 1.0 MPa (uniform tension)<br>
-        Top edge (y=2): free
-      </p>
-    </div>
+    <table>
+      <thead><tr><th>Type</th><th>Location</th><th>DOF</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Symmetry</td><td>Left edge (x = 0)</td><td>u<sub>x</sub></td><td>0</td></tr>
+        <tr><td>Symmetry</td><td>Bottom edge (y = 0)</td><td>u<sub>y</sub></td><td>0</td></tr>
+        <tr><td>Uniform Tension</td><td>Right edge (x = 2.0)</td><td>&sigma;<sub>xx</sub></td><td>1.0 MPa</td></tr>
+      </tbody>
+    </table>
 
     <h2>Results</h2>
 
     <div class="static-plots">
       <div class="plot-item">
         <h3>Mesh Quality</h3>
-        <img src="assets/images/plate_hole_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
-        <p>Mesh geometry and element quality statistics.</p>
+        <img src="assets/images/plate_hole/simulations/plate_hole_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
+        <p>Mesh wireframe with boundary condition symbols (triangles=fixed, arrows=forces).</p>
       </div>
 
       <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="assets/images/plate_hole_displacement_contour.png" 
+        <img src="assets/images/plate_hole/simulations/plate_hole_displacement_contour.png" 
              alt="Displacement contour (|u|, ux, uy)" 
              loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
@@ -100,7 +114,7 @@
 
       <div class="plot-item">
         <h3>Stress Contour</h3>
-        <img src="assets/images/plate_hole_stress_contour.png" 
+        <img src="assets/images/plate_hole/simulations/plate_hole_stress_contour.png" 
              alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)" 
              loading="lazy" />
         <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
@@ -108,7 +122,7 @@
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="assets/images/plate_hole_deformed_mesh.png" 
+        <img src="assets/images/plate_hole/simulations/plate_hole_deformed_mesh.png" 
              alt="Deformed mesh overlay with displacement vectors" 
              loading="lazy" />
         <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors. Stress concentration visible at hole edge.</p>
@@ -116,7 +130,7 @@
 
       <div class="plot-item">
         <h3>Principal Stress Directions</h3>
-        <img src="assets/images/plate_hole_principal_stress.png" 
+        <img src="assets/images/plate_hole/simulations/plate_hole_principal_stress.png" 
              alt="Principal stress arrow plot" 
              loading="lazy" />
         <p>Arrow plot showing sigma_1 (red) and sigma_2 (blue) directions. Stress concentration at hole edge clearly visible.</p>

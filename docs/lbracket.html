@@ -66,33 +66,48 @@
         <tr><td>Poisson's ratio (&nu;)</td><td>0.3</td></tr>
         <tr><td>Thickness</td><td>0.01 m</td></tr>
         <tr><td>Load</td><td>P = -1000 N (distributed on left edge below corner)</td></tr>
-        <tr><td>Mesh</td><td>32 x 32 Q4 elements (735 active)</td></tr>
-        <tr><td>Solver</td><td>Cholesky (1600 DOFs)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Mesh Statistics</h2>
+
+    <table>
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Nodes</td><td>800</td></tr>
+        <tr><td>Elements</td><td>735</td></tr>
+        <tr><td>Element Type</td><td>Q4 (4-node bilinear quadrilateral)</td></tr>
+        <tr><td>DOFs</td><td>1,600</td></tr>
+        <tr><td>Material</td><td>E = 200 GPa, &nu; = 0.3</td></tr>
+        <tr><td>Plane Assumption</td><td>Plane Stress (t = 0.01 m)</td></tr>
+        <tr><td>Solver</td><td>Cholesky (direct)</td></tr>
+        <tr><td>Solve Time</td><td>31.6 ms</td></tr>
       </tbody>
     </table>
 
     <h2>Boundary Conditions</h2>
 
-    <div class="callout">
-      <p>
-        Top edge (y=2): u<sub>y</sub> = 0<br>
-        Left edge (x=0): u<sub>x</sub> = 0<br>
-        Left edge below corner (x=0, y&lt;1): Distributed load F<sub>y</sub> = -1000 N / n_nodes
-      </p>
-    </div>
+    <table>
+      <thead><tr><th>Type</th><th>Location</th><th>DOF</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Fixed</td><td>Top edge (y = 2.0)</td><td>u<sub>y</sub></td><td>0</td></tr>
+        <tr><td>Fixed</td><td>Left edge (x = 0)</td><td>u<sub>x</sub></td><td>0</td></tr>
+        <tr><td>Distributed Load</td><td>Left edge below corner (x = 0, y &lt; 1)</td><td>F<sub>y</sub></td><td>-1000 N / n_nodes per node</td></tr>
+      </tbody>
+    </table>
 
     <h2>Results</h2>
 
     <div class="static-plots">
       <div class="plot-item">
         <h3>Mesh Quality</h3>
-        <img src="assets/images/lbracket_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
-        <p>Mesh geometry and element quality statistics.</p>
+        <img src="assets/images/lbracket/simulations/lbracket_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
+        <p>Mesh wireframe with boundary condition symbols (triangles=fixed, arrows=forces).</p>
       </div>
 
       <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="assets/images/lbracket_displacement_contour.png" 
+        <img src="assets/images/lbracket/simulations/lbracket_displacement_contour.png" 
              alt="Displacement contour (|u|, ux, uy)" 
              loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
@@ -100,7 +115,7 @@
 
       <div class="plot-item">
         <h3>Stress Contour</h3>
-        <img src="assets/images/lbracket_stress_contour.png" 
+        <img src="assets/images/lbracket/simulations/lbracket_stress_contour.png" 
              alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)" 
              loading="lazy" />
         <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
@@ -108,7 +123,7 @@
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="assets/images/lbracket_deformed_mesh.png" 
+        <img src="assets/images/lbracket/simulations/lbracket_deformed_mesh.png" 
              alt="Deformed mesh overlay with displacement vectors" 
              loading="lazy" />
         <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors. Stress concentration at re-entrant corner.</p>
@@ -116,7 +131,7 @@
 
       <div class="plot-item">
         <h3>Principal Stress Directions</h3>
-        <img src="assets/images/lbracket_principal_stress.png" 
+        <img src="assets/images/lbracket/simulations/lbracket_principal_stress.png" 
              alt="Principal stress arrow plot" 
              loading="lazy" />
         <p>Arrow plot showing sigma_1 (red) and sigma_2 (blue) directions. High stress concentration at re-entrant corner.</p>

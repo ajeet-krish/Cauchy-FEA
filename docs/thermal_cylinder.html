@@ -68,55 +68,67 @@
         <tr><td>Young's modulus (E)</td><td>200 GPa (steel)</td></tr>
         <tr><td>Poisson's ratio (&nu;)</td><td>0.3</td></tr>
         <tr><td>Thermal expansion (&alpha;)</td><td>12e-6 /K</td></tr>
-        <tr><td>Thickness (t)</td><td>0.01 m</td></tr>
-        <tr><td>Plane condition</td><td>Plane Strain</td></tr>
-        <tr><td>Mesh</td><td>32 x 32 Q4 elements (875 nodes)</td></tr>
-        <tr><td>Solver</td><td>Cholesky</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Mesh Statistics</h2>
+
+    <table>
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Nodes</td><td>875</td></tr>
+        <tr><td>Elements</td><td>810</td></tr>
+        <tr><td>Element Type</td><td>Q4 (4-node bilinear quadrilateral)</td></tr>
+        <tr><td>DOFs</td><td>1,750</td></tr>
+        <tr><td>Material</td><td>E = 200 GPa, &nu; = 0.3, &alpha; = 12e-6 /K</td></tr>
+        <tr><td>Plane Assumption</td><td>Plane Strain (t = 0.01 m)</td></tr>
+        <tr><td>Solver</td><td>Cholesky (direct)</td></tr>
+        <tr><td>Solve Time</td><td>1,930 ms</td></tr>
       </tbody>
     </table>
 
     <h2>Boundary Conditions</h2>
 
-    <div class="callout">
-      <p>
-        Left edge (x=0, symmetry): u<sub>x</sub> = 0<br>
-        Bottom edge (y=0, symmetry): u<sub>y</sub> = 0<br>
-        Inner hole (r=a): Internal pressure p<sub>i</sub> = 1.0 MPa<br>
-        Outer boundary (r=b): Free<br>
-        Thermal: T(r) = T<sub>inner</sub> + (T<sub>outer</sub> - T<sub>inner</sub>) &middot; ln(r/a) / ln(b/a)
-      </p>
-    </div>
+    <table>
+      <thead><tr><th>Type</th><th>Location</th><th>DOF</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Symmetry</td><td>Left edge (x = 0)</td><td>u<sub>x</sub></td><td>0</td></tr>
+        <tr><td>Symmetry</td><td>Bottom edge (y = 0)</td><td>u<sub>y</sub></td><td>0</td></tr>
+        <tr><td>Pressure</td><td>Inner hole (r = a)</td><td>&sigma;<sub>rr</sub></td><td>-1.0 MPa</td></tr>
+        <tr><td>Thermal</td><td>Through-thickness</td><td>T(r)</td><td>T<sub>inner</sub> + (T<sub>outer</sub> - T<sub>inner</sub>) ln(r/a) / ln(b/a)</td></tr>
+      </tbody>
+    </table>
 
     <h2>Results</h2>
 
     <div class="static-plots">
       <div class="plot-item">
         <h3>Mesh Quality</h3>
-        <img src="assets/images/thermal_cylinder_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
-        <p>Mesh geometry and element quality statistics.</p>
+        <img src="assets/images/thermal_cylinder/simulations/thermal_cylinder_mesh_quality.png" alt="Mesh quality metrics" loading="lazy" />
+        <p>Mesh wireframe with boundary condition symbols (triangles=fixed, arrows=forces).</p>
       </div>
 
       <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="assets/images/thermal_cylinder_displacement_contour.png" alt="Displacement contour (|u|, ux, uy)" loading="lazy" />
+        <img src="assets/images/thermal_cylinder/simulations/thermal_cylinder_displacement_contour.png" alt="Displacement contour (|u|, ux, uy)" loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
       </div>
 
       <div class="plot-item">
         <h3>Stress Contour</h3>
-        <img src="assets/images/thermal_cylinder_stress_contour.png" alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)" loading="lazy" />
+        <img src="assets/images/thermal_cylinder/simulations/thermal_cylinder_stress_contour.png" alt="Stress contour (Von Mises, sigma_1, sigma_2, sigma_xy)" loading="lazy" />
         <p>Four-panel stress field: Von Mises, sigma_1 (max principal), sigma_2 (min principal), sigma_xy (shear).</p>
       </div>
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="assets/images/thermal_cylinder_deformed_mesh.png" alt="Deformed mesh overlay with displacement vectors" loading="lazy" />
+        <img src="assets/images/thermal_cylinder/simulations/thermal_cylinder_deformed_mesh.png" alt="Deformed mesh overlay with displacement vectors" loading="lazy" />
         <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors and thermal expansion.</p>
       </div>
 
       <div class="plot-item">
         <h3>Principal Stress Directions</h3>
-        <img src="assets/images/thermal_cylinder_principal_stress.png" alt="Principal stress arrow plot" loading="lazy" />
+        <img src="assets/images/thermal_cylinder/simulations/thermal_cylinder_principal_stress.png" alt="Principal stress arrow plot" loading="lazy" />
         <p>Arrow plot showing sigma_1 (red=tension, blue=compression) and sigma_2 directions at element centroids.</p>
       </div>
     </div>

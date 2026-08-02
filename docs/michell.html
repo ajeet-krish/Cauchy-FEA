@@ -66,26 +66,42 @@
         <tr><td>Bar area</td><td>0.001 m^2 each</td></tr>
         <tr><td>Young's modulus (E)</td><td>200 GPa (steel)</td></tr>
         <tr><td>Load</td><td>F<sub>y</sub> = -1000 N at node 2</td></tr>
-        <tr><td>Solver</td><td>Cholesky (6 DOFs)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Mesh Statistics</h2>
+
+    <table>
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Nodes</td><td>3</td></tr>
+        <tr><td>Elements</td><td>3</td></tr>
+        <tr><td>Element Type</td><td>Bar (2-node truss)</td></tr>
+        <tr><td>DOFs</td><td>6</td></tr>
+        <tr><td>Material</td><td>E = 200 GPa, &nu; = 0.3</td></tr>
+        <tr><td>Plane Assumption</td><td>N/A (1D truss)</td></tr>
+        <tr><td>Solver</td><td>Cholesky (direct)</td></tr>
+        <tr><td>Solve Time</td><td>0.8 ms</td></tr>
       </tbody>
     </table>
 
     <h2>Boundary Conditions</h2>
 
-    <div class="callout">
-      <p>
-        Node 0: u<sub>x</sub> = u<sub>y</sub> = 0 (pinned)<br>
-        Node 1: u<sub>x</sub> = u<sub>y</sub> = 0 (pinned)<br>
-        Node 2: F<sub>y</sub> = -1000 N (downward load)
-      </p>
-    </div>
+    <table>
+      <thead><tr><th>Type</th><th>Location</th><th>DOF</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Fixed</td><td>Node 0 (0, 0)</td><td>u<sub>x</sub>, u<sub>y</sub></td><td>0</td></tr>
+        <tr><td>Fixed</td><td>Node 1 (0, 0.5)</td><td>u<sub>x</sub>, u<sub>y</sub></td><td>0</td></tr>
+        <tr><td>Point Load</td><td>Node 2 (1.0, 0.25)</td><td>F<sub>y</sub></td><td>-1000 N</td></tr>
+      </tbody>
+    </table>
 
     <h2>Results</h2>
 
     <div class="static-plots">
       <div class="plot-item">
         <h3>Displacement Contour</h3>
-        <img src="assets/images/michell_displacement_contour.png" 
+        <img src="assets/images/michell/simulations/michell_displacement_contour.png" 
              alt="Displacement contour (|u|, ux, uy)" 
              loading="lazy" />
         <p>Three-panel displacement field showing magnitude |u| and components ux, uy.</p>
@@ -93,7 +109,7 @@
 
       <div class="plot-item">
         <h3>Deformed Mesh</h3>
-        <img src="assets/images/michell_deformed_mesh.png" 
+        <img src="assets/images/michell/simulations/michell_deformed_mesh.png" 
              alt="Deformed mesh overlay with displacement vectors" 
              loading="lazy" />
         <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors showing truss deflection under load.</p>

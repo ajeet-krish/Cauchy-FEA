@@ -19,6 +19,25 @@ from matplotlib.tri import Triangulation
 import argparse
 
 
+def extract_case_name(outdir):
+    """Extract case name from output directory path.
+    
+    Supports both old structure (output/cantilever_32/) and 
+    new structure (output/cantilever/simulations/32/).
+    """
+    parts = outdir.rstrip('/').split(os.sep)
+    # Find 'simulations' in path -> case name is two levels up
+    if 'simulations' in parts:
+        sim_idx = parts.index('simulations')
+        if sim_idx >= 2:
+            return parts[sim_idx - 1]
+    # Fallback: use basename and strip mesh size suffixes
+    name = os.path.basename(outdir)
+    for suffix in ['_32', '_64', '_16', '_8', '_4', '_q8']:
+        name = name.replace(suffix, '')
+    return name
+
+
 def load_meta(outdir):
     with open(os.path.join(outdir, 'meta.json')) as f:
         return json.load(f)
@@ -116,7 +135,7 @@ def nodal_average(element_values, mesh):
 
 def plot_displacement_contour(outdir, meta, image_dir):
     # Extract case name from outdir (e.g., 'output/cantilever_32' -> 'cantilever')
-    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
+    case_name = extract_case_name(outdir)
     data = load_displacement(outdir)
     nodes = data['nodes']
 
@@ -163,7 +182,7 @@ def plot_displacement_contour(outdir, meta, image_dir):
 
 def plot_stress_contour(outdir, meta, image_dir):
     # Extract case name from outdir
-    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
+    case_name = extract_case_name(outdir)
     stress_file = os.path.join(outdir, 'stress.json')
     if not os.path.exists(stress_file):
         print(f'  No stress.json found in {outdir}, skipping stress contour')
@@ -171,6 +190,11 @@ def plot_stress_contour(outdir, meta, image_dir):
     
     stress_data = load_stress(outdir)
     elements = stress_data['elements']
+    
+    if not elements:
+        print(f'  No stress elements found, skipping stress contour')
+        return
+    
     mesh = load_mesh(outdir)
 
     von_mises = np.array([e['von_mises'] for e in elements])
@@ -236,7 +260,7 @@ def plot_stress_contour(outdir, meta, image_dir):
 
 def plot_deformed_mesh(outdir, meta, image_dir, scale=None):
     # Extract case name from outdir
-    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
+    case_name = extract_case_name(outdir)
     disp_data = load_displacement(outdir)
     mesh = load_mesh(outdir)
 
@@ -362,7 +386,7 @@ def plot_deformed_mesh(outdir, meta, image_dir, scale=None):
 
 def plot_principal_stress_arrows(outdir, meta, image_dir):
     # Extract case name from outdir
-    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
+    case_name = extract_case_name(outdir)
     stress_file = os.path.join(outdir, 'stress.json')
     if not os.path.exists(stress_file):
         print(f'  No stress.json found in {outdir}, skipping principal stress arrows')
@@ -375,6 +399,10 @@ def plot_principal_stress_arrows(outdir, meta, image_dir):
 
     stress_data = load_stress(outdir)
     elements = stress_data['elements']
+    
+    if not elements:
+        print(f'  No stress elements found, skipping principal stress arrows')
+        return
     
     sigma_1 = np.array([e['sigma_1'] for e in elements])
     sigma_2 = np.array([e['sigma_2'] for e in elements])
@@ -466,7 +494,7 @@ def plot_principal_stress_arrows(outdir, meta, image_dir):
 
 def plot_convergence(outdir, image_dir):
     # Extract case name from outdir
-    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
+    case_name = extract_case_name(outdir)
     conv_file = os.path.join(outdir, 'convergence.json')
     if not os.path.exists(conv_file):
         print(f'  No convergence.json found in {outdir}')
@@ -519,7 +547,7 @@ def print_summary(outdir):
 def plot_stress_contour_thumbnail(outdir, meta, image_dir, figsize=(4, 3)):
     """Generate a small thumbnail for the landing page."""
     # Extract case name from outdir
-    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
+    case_name = extract_case_name(outdir)
     stress_file = os.path.join(outdir, 'stress.json')
     if not os.path.exists(stress_file):
         print(f'  No stress.json found in {outdir}, skipping thumbnail')
@@ -561,7 +589,7 @@ def plot_stress_contour_thumbnail(outdir, meta, image_dir, figsize=(4, 3)):
 def plot_deformed_mesh_thumbnail(outdir, meta, image_dir, figsize=(4, 3)):
     """Generate a small deformed mesh thumbnail for the landing page."""
     # Extract case name from outdir
-    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
+    case_name = extract_case_name(outdir)
     disp_data = load_displacement(outdir)
     mesh = load_mesh(outdir)
 
@@ -631,16 +659,15 @@ def plot_deformed_mesh_thumbnail(outdir, meta, image_dir, figsize=(4, 3)):
 
 def plot_mesh_quality(outdir, meta, image_dir):
     """Mesh wireframe with boundary condition symbols.
-    
+
     Single-panel figure showing:
     1. Element edges as black wireframe lines
     2. Yellow triangles at fully fixed nodes (ux=0 AND uy=0)
     3. Yellow circles at roller nodes (single-DOF constraint)
     4. Green/red arrows at force application points
-    5. Statistics text box (node count, element count, material)
     """
     # Extract case name from outdir
-    case_name = os.path.basename(outdir).replace('_32', '').replace('_64', '')
+    case_name = extract_case_name(outdir)
     mesh = load_mesh(outdir)
     if not mesh:
         print(f'  No mesh.json found, skipping mesh quality')
@@ -730,27 +757,6 @@ def plot_mesh_quality(outdir, meta, image_dir):
     ax.set_ylabel('y (m)')
     ax.set_title(f'Mesh: {len(nodes)} nodes, {len(quad_elems) + len(tri_elems)} elements')
 
-    # 7. Statistics text box
-    stats_text = (
-        f"Mesh Statistics\n"
-        f"{'='*28}\n"
-        f"Nodes:      {len(nodes)}\n"
-        f"Elements:   {len(quad_elems) + len(tri_elems)}\n"
-        f"  Q4:       {len(quad_elems)}\n"
-        f"  T3:       {len(tri_elems)}\n"
-        f"DOFs:       {len(nodes) * 2}\n"
-        f"\n"
-        f"Boundary Conditions\n"
-        f"{'='*28}\n"
-        f"Fixed (tri):    {len(fixed_nodes)}\n"
-        f"Roller (circ):  {len(roller_x_only | roller_y_only)}\n"
-        f"Forces (arrow): {len(neumann)}\n"
-    )
-    ax.text(0.98, 0.98, stats_text, transform=ax.transAxes, fontsize=9,
-            verticalalignment='top', horizontalalignment='right',
-            fontfamily='monospace',
-            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-
     # Legend
     from matplotlib.patches import Patch
     from matplotlib.lines import Line2D
@@ -773,34 +779,64 @@ def plot_mesh_quality(outdir, meta, image_dir):
 
 def plot_all_cases(outdir_base, image_dir):
     """Generate PNGs for all cases."""
-    os.makedirs(image_dir, exist_ok=True)
-    cases = ['cantilever_32', 'cook_32', 'lbracket', 'michell', 'patch', 'plate_hole', 'thermal_cylinder']
-    for case in cases:
-        outdir = os.path.join(outdir_base, case)
-        if os.path.exists(outdir) and os.path.exists(os.path.join(outdir, 'meta.json')):
-            print(f'\nProcessing {case}:')
-            meta = load_meta(outdir)
-            plot_mesh_quality(outdir, meta, image_dir)
-            plot_displacement_contour(outdir, meta, image_dir)
-            plot_stress_contour(outdir, meta, image_dir)
-            plot_deformed_mesh(outdir, meta, image_dir)
-            plot_principal_stress_arrows(outdir, meta, image_dir)
+    cases = {
+        'cantilever': '32',
+        'cook': '32',
+        'lbracket': '',
+        'michell': '',
+        'patch': '',
+        'plate_hole': '',
+        'thermal_cylinder': '',
+    }
+    for case_name, mesh_size in cases.items():
+        # New structure: output/{case}/simulations/{mesh_size}/
+        if mesh_size:
+            outdir = os.path.join(outdir_base, case_name, 'simulations', mesh_size)
         else:
-            print(f'\nSkipping {case}: output not found')
+            outdir = os.path.join(outdir_base, case_name, 'simulations')
+        
+        # Per-case image directory: docs/assets/images/{case}/simulations/
+        case_image_dir = os.path.join(image_dir, case_name, 'simulations')
+        os.makedirs(case_image_dir, exist_ok=True)
+        
+        if os.path.exists(outdir) and os.path.exists(os.path.join(outdir, 'meta.json')):
+            print(f'\nProcessing {case_name}:')
+            meta = load_meta(outdir)
+            plot_mesh_quality(outdir, meta, case_image_dir)
+            plot_displacement_contour(outdir, meta, case_image_dir)
+            plot_stress_contour(outdir, meta, case_image_dir)
+            plot_deformed_mesh(outdir, meta, case_image_dir)
+            plot_principal_stress_arrows(outdir, meta, case_image_dir)
+        else:
+            print(f'\nSkipping {case_name}: output not found at {outdir}')
 
 
 def generate_thumbnails(outdir_base, image_dir):
     """Generate small thumbnails for landing page."""
-    os.makedirs(image_dir, exist_ok=True)
-    cases = ['cantilever_32', 'cook_32', 'lbracket', 'michell', 'patch', 'plate_hole']
-    for case in cases:
-        outdir = os.path.join(outdir_base, case)
-        if os.path.exists(outdir) and os.path.exists(os.path.join(outdir, 'meta.json')):
-            print(f'\nGenerating thumbnail for {case}:')
-            meta = load_meta(outdir)
-            plot_deformed_mesh_thumbnail(outdir, meta, image_dir)
+    cases = {
+        'cantilever': '32',
+        'cook': '32',
+        'lbracket': '',
+        'michell': '',
+        'patch': '',
+        'plate_hole': '',
+    }
+    for case_name, mesh_size in cases.items():
+        if mesh_size:
+            outdir = os.path.join(outdir_base, case_name, 'simulations', mesh_size)
         else:
-            print(f'\nSkipping {case}: output not found')
+            outdir = os.path.join(outdir_base, case_name, 'simulations')
+        
+        # Thumbnails go to docs/assets/images/{case}/simulations/
+        case_image_dir = os.path.join(image_dir, case_name, 'simulations')
+        os.makedirs(case_image_dir, exist_ok=True)
+        
+        if os.path.exists(outdir) and os.path.exists(os.path.join(outdir, 'meta.json')):
+            print(f'\nGenerating thumbnail for {case_name}:')
+            meta = load_meta(outdir)
+            plot_deformed_mesh_thumbnail(outdir, meta, case_image_dir)
+        else:
+            print(f'\nSkipping {case_name}: output not found at {outdir}')
 
 
 def main():
