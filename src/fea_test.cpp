@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "fea_types.hpp"
 #include "elements.hpp"
+#include "elements_3d.hpp"
 #include "sparse.hpp"
 #include "solver.hpp"
 #include "mesh.hpp"
@@ -484,6 +485,8 @@ TEST(Q8ElementTest, CantileverComparison) {
         int corner = j * (nx + 1);
         m8.dirichlet.push_back({corner, 0, 0.0});
         m8.dirichlet.push_back({corner, 1, 0.0});
+    }
+    for (int j = 0; j < ny; ++j) {
         int vmid = num_corners + num_hmid + j * (nx + 1);
         m8.dirichlet.push_back({vmid, 0, 0.0});
         m8.dirichlet.push_back({vmid, 1, 0.0});
@@ -525,6 +528,226 @@ TEST(Q4ElementTest, NegativeJacobianDetection) {
 
     EXPECT_THROW(elements::Q4Element::stiffness(bad_nodes, mat, PlaneType::STRESS),
                  std::runtime_error);
+}
+
+// ==========================================================================
+// 3D ELEMENT TESTS
+// ==========================================================================
+
+// H8 shape functions sum to 1
+TEST(H8ElementTest, ShapeFunctionsPartitionOfUnity) {
+    double test_pts[][3] = {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5},
+                            {-0.5, -0.5, -0.5}, {0.3, -0.7, 0.2}};
+
+    for (auto& pt : test_pts) {
+        double sum = 0.0;
+        for (int i = 0; i < 8; ++i) {
+            sum += elements::H8Element::shape_func(i, pt[0], pt[1], pt[2]);
+        }
+        EXPECT_NEAR(sum, 1.0, 1e-12);
+    }
+}
+
+// H8 Jacobian for unit cube
+TEST(H8ElementTest, JacobianUnitCube) {
+    // Unit cube: [0,1] x [0,1] x [0,1]
+    std::array<Node, 8> nodes = {{
+        {0,0,0}, {1,0,0}, {1,1,0}, {0,1,0},
+        {0,0,1}, {1,0,1}, {1,1,1}, {0,1,1}
+    }};
+
+    double detJ = elements::H8Element::jacobian_det(nodes, 0.0, 0.0, 0.0);
+    EXPECT_NEAR(detJ, 1.0/8.0, 1e-12);  // For unit cube, det(J) = 1/8
+
+    // Should be constant for trilinear hex on cube
+    detJ = elements::H8Element::jacobian_det(nodes, 0.5, 0.5, 0.5);
+    EXPECT_NEAR(detJ, 1.0/8.0, 1e-12);
+}
+
+// H8 stiffness matrix symmetry
+TEST(H8ElementTest, StiffnessSymmetry) {
+    Material mat = Material::steel();
+    std::array<Node, 8> nodes = {{
+        {0,0,0}, {1,0,0}, {1,1,0}, {0,1,0},
+        {0,0,1}, {1,0,1}, {1,1,1}, {0,1,1}
+    }};
+
+    auto K = elements::H8Element::stiffness(nodes, mat);
+
+    for (int i = 0; i < 24; ++i) {
+        for (int j = 0; j < 24; ++j) {
+            EXPECT_NEAR(K[i][j], K[j][i], 1e-8 * (std::abs(K[i][j]) + 1.0));
+        }
+    }
+}
+
+// H8 stiffness produces zero for rigid body mode
+TEST(H8ElementTest, StiffnessSingularRigidBody) {
+    Material mat = Material::steel();
+    std::array<Node, 8> nodes = {{
+        {0,0,0}, {1,0,0}, {1,1,0}, {0,1,0},
+        {0,0,1}, {1,0,1}, {1,1,1}, {0,1,1}
+    }};
+
+    auto K = elements::H8Element::stiffness(nodes, mat);
+
+    // Rigid body translation in x
+    std::array<double, 24> u_rb{};
+    for (int i = 0; i < 8; ++i) u_rb[3*i] = 1.0;  // all ux = 1
+
+    std::array<double, 24> Ku{};
+    for (int i = 0; i < 24; ++i)
+        for (int j = 0; j < 24; ++j)
+            Ku[i] += K[i][j] * u_rb[j];
+
+    // Tolerance: floating point accumulation across 8 Gauss points
+    // produces residuals ~1e-5 for stiffness ~1e10 (relative error ~1e-15)
+    double K_max = 0.0;
+    for (int i = 0; i < 24; ++i)
+        K_max = std::max(K_max, std::abs(K[i][i]));
+    for (int i = 0; i < 24; ++i) {
+        EXPECT_NEAR(Ku[i], 0.0, 1e-6 * K_max);
+    }
+}
+
+// T4 shape functions sum to 1
+TEST(T4ElementTest, ShapeFunctionsPartitionOfUnity) {
+    double test_pts[][3] = {{0.25, 0.25, 0.25}, {0.5, 0.2, 0.1},
+                            {0.1, 0.6, 0.1}, {0.0, 0.0, 0.0}};
+
+    for (auto& pt : test_pts) {
+        double sum = 0.0;
+        for (int i = 0; i < 4; ++i) {
+            sum += elements::T4Element::shape_func(i, pt[0], pt[1], pt[2]);
+        }
+        EXPECT_NEAR(sum, 1.0, 1e-12);
+    }
+}
+
+// T4 element volume for unit tet
+TEST(T4ElementTest, Volume) {
+    // Unit tet: (0,0,0), (1,0,0), (0,1,0), (0,0,1)
+    std::array<Node, 4> nodes = {{
+        {0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}
+    }};
+
+    double vol = elements::T4Element::volume(nodes);
+    EXPECT_NEAR(vol, 1.0/6.0, 1e-12);
+}
+
+// T4 stiffness matrix symmetry
+TEST(T4ElementTest, StiffnessSymmetry) {
+    Material mat = Material::steel();
+    std::array<Node, 4> nodes = {{
+        {0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}
+    }};
+
+    auto K = elements::T4Element::stiffness(nodes, mat);
+
+    for (int i = 0; i < 12; ++i) {
+        for (int j = 0; j < 12; ++j) {
+            EXPECT_NEAR(K[i][j], K[j][i], 1e-8 * (std::abs(K[i][j]) + 1.0));
+        }
+    }
+}
+
+// 3D hex mesh generation
+TEST(HexMeshTest, Generation) {
+    set_dimension(3);
+    auto m = mesh::generate_structured_hex(1.0, 1.0, 1.0, 2, 2, 2);
+
+    EXPECT_EQ(m.num_nodes(), 27);   // (2+1)^3
+    EXPECT_EQ(m.num_hexes(), 8);    // 2^3
+    EXPECT_TRUE(m.is_3d());
+
+    // Check node coordinates are within [0,1]
+    for (const auto& n : m.nodes) {
+        EXPECT_GE(n.x, -1e-12);
+        EXPECT_LE(n.x, 1.0 + 1e-12);
+        EXPECT_GE(n.y, -1e-12);
+        EXPECT_LE(n.y, 1.0 + 1e-12);
+        EXPECT_GE(n.z, -1e-12);
+        EXPECT_LE(n.z, 1.0 + 1e-12);
+    }
+}
+
+// 3D tet mesh generation from hex
+TEST(TetMeshTest, GenerationFromHex) {
+    set_dimension(3);
+    auto m = mesh::generate_structured_tet(1.0, 1.0, 1.0, 2, 2, 2);
+
+    EXPECT_EQ(m.num_nodes(), 27);
+    EXPECT_EQ(m.num_tets(), 48);   // 8 hexes * 6 tets each
+    EXPECT_EQ(m.num_hexes(), 0);   // hexes removed after conversion
+    EXPECT_TRUE(m.is_3d());
+}
+
+// 3D cantilever beam validation (H8 elements)
+TEST(H8CantileverTest, TipDeflection) {
+    // Cantilever beam: L=1.0, h=0.1, t=0.1
+    // Point load P at free end
+    // Exact tip deflection: PL^3/(3EI) for Euler-Bernoulli
+    set_dimension(3);
+
+    double L = 1.0, h = 0.1, t = 0.1;
+    double P = -1000.0;  // downward load
+    double E = 200e9;
+    double nu = 0.3;
+
+    int nx = 16, ny = 4, nz = 2;
+    auto m = mesh::generate_structured_hex(L, h, t, nx, ny, nz);
+
+    m.mat.E = E;
+    m.mat.nu = nu;
+    m.mat.rho = 7800.0;
+    m.mat.t = 1.0;  // not used for 3D
+
+    // Fix left end (x=0): all DOFs = 0
+    for (int i = 0; i < m.num_nodes(); ++i) {
+        if (std::abs(m.nodes[i].x) < 1e-10) {
+            m.dirichlet.push_back({i, 0, 0.0});
+            m.dirichlet.push_back({i, 1, 0.0});
+            m.dirichlet.push_back({i, 2, 0.0});
+        }
+    }
+
+    // Apply load at free end (x=L): bottom edge center
+    double load_y = h / 2.0;
+    double load_z = t / 2.0;
+    for (int i = 0; i < m.num_nodes(); ++i) {
+        if (std::abs(m.nodes[i].x - L) < 1e-10 &&
+            std::abs(m.nodes[i].y - load_y) < 1e-10 &&
+            std::abs(m.nodes[i].z - load_z) < 1e-10) {
+            m.neumann.push_back({i, 1, P});
+        }
+    }
+
+    auto result = fea::solve(m, true);
+
+    // Find max displacement at tip
+    double max_uy = 0.0;
+    for (int i = 0; i < m.num_nodes(); ++i) {
+        if (std::abs(m.nodes[i].x - L) < 1e-10) {
+            double uy = result.displacement[dof_index(i, 1)];
+            if (uy < max_uy) max_uy = uy;
+        }
+    }
+
+    // Exact: delta = PL^3/(3EI), I = t*h^3/12
+    double I = t * h * h * h / 12.0;
+    double delta_exact = std::abs(P * L * L * L / (3.0 * E * I));
+
+    double tip_disp = std::abs(max_uy);
+    double error = std::abs(tip_disp - delta_exact) / delta_exact;
+
+    std::cout << "H8 cantilever tip: " << tip_disp
+              << ", exact: " << delta_exact
+              << ", error: " << error * 100.0 << "%" << std::endl;
+
+    // H8 with full integration locks in bending, so allow up to 30% error
+    // (mesh refinement would improve this)
+    EXPECT_LT(error, 0.30);
+    EXPECT_GT(tip_disp, 0.0);  // must deflect downward
 }
 
 // ==========================================================================

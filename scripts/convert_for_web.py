@@ -147,8 +147,9 @@ def convert_single(outdir, outfile):
 
     nodes = mesh['nodes']
 
-    # Handle new format (quad_elements + tri_elements) or legacy format (elements)
-    quad_elems = mesh.get('quad_elements', mesh.get('elements', []))
+    # Handle Q4, Q8, and T3 element formats
+    quad_elems = mesh.get('quad_elements', [])
+    quad8_elems = mesh.get('quad8_elements', [])
     tri_elems = mesh.get('tri_elements', [])
 
     # Build node array for Three.js
@@ -156,9 +157,11 @@ def convert_single(outdir, outfile):
     for n in nodes:
         node_array.append({'x': n['x'], 'y': n['y'], 'z': 0.0})
 
-    # Build element array for Three.js (quads only, split into triangles for Three.js)
+    # Build element array for Three.js (use corner nodes for Q8)
     elem_array = []
     for e in quad_elems:
+        elem_array.append({'n0': e['n0'], 'n1': e['n1'], 'n2': e['n2'], 'n3': e['n3']})
+    for e in quad8_elems:
         elem_array.append({'n0': e['n0'], 'n1': e['n1'], 'n2': e['n2'], 'n3': e['n3']})
     for e in tri_elems:
         # Convert T3 to T4 (degenerate quad) for Three.js compatibility
@@ -199,8 +202,8 @@ def convert_single(outdir, outfile):
         stress_data['theta1'] = theta1
         stress_data['theta2'] = theta2
 
-    # Compute nodally-averaged stresses for smooth contours
-    all_elems = quad_elems + tri_elems
+    # Compute nodally-averaged stresses for smooth contours (Q4 + Q8 + T3)
+    all_elems = quad_elems + quad8_elems + tri_elems
     node_stress_avg = compute_nodal_averaged_stresses(nodes, all_elems, stress['elements'] if stress else [])
     
     nodal_stress = {
@@ -270,7 +273,23 @@ def main():
 
         converted = 0
         for case_name, web_name in CASE_MAP.items():
-            indir = os.path.join(base_dir, case_name)
+            # New structure: output/{case}/simulations/{mesh_size}/
+            # Try common mesh sizes for each case
+            sim_dir = os.path.join(base_dir, case_name, 'simulations')
+            if os.path.exists(sim_dir):
+                # Find subdirectories (mesh sizes) and pick the largest
+                subdirs = [d for d in os.listdir(sim_dir) 
+                          if os.path.isdir(os.path.join(sim_dir, d)) and not d.startswith('adapt')]
+                if subdirs:
+                    # Sort numerically to get the largest mesh
+                    subdirs.sort(key=lambda x: int(x.replace('_q8', '').replace('q8', '') or '0'))
+                    indir = os.path.join(sim_dir, subdirs[-1])
+                else:
+                    indir = sim_dir
+            else:
+                # Fallback to old structure
+                indir = os.path.join(base_dir, case_name)
+            
             if os.path.exists(os.path.join(indir, 'mesh.json')):
                 outfile = os.path.join(out_dir, f'{web_name}.json')
                 if convert_single(indir, outfile):

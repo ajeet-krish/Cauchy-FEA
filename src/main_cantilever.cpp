@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
             std::cout << "  Extrapolated: " << gci.extrapolated_value << std::endl;
             std::cout << "  GCI fine: " << gci.gci_fine << std::endl;
 
-            std::filesystem::create_directories("output/cantilever");
+            std::filesystem::create_directories("output/cantilever/simulations");
             convergence::write_json("output/cantilever/convergence.json",
                 "cantilever", "tip_displacement", delta_exact, samples, gci);
         }
@@ -139,7 +139,7 @@ int main(int argc, char* argv[]) {
     if (use_q8) {
         int num_corners = (nx + 1) * (ny + 1);
         int num_hmid = nx * (ny + 1);
-        for (int j = 0; j <= ny; ++j) {
+        for (int j = 0; j < ny; ++j) {
             int vmid = num_corners + num_hmid + j * (nx + 1);
             m.dirichlet.push_back({vmid, 0, 0.0});
             m.dirichlet.push_back({vmid, 1, 0.0});
@@ -175,7 +175,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Energy balance: U=" << U << ", W=" << W
               << ", error=" << std::abs(U - W) / (std::abs(W) + 1e-30) * 100.0 << "%" << std::endl;
 
-    std::string outdir = "output/cantilever_" + std::to_string(nx) + (use_q8 ? "_q8" : "");
+    std::string outdir = "output/cantilever/simulations/" + std::to_string(nx) + (use_q8 ? "_q8" : "");
     std::filesystem::create_directories(outdir);
     postprocess::write_meta_json(outdir + "/meta.json", m, result.displacement, result.stresses,
                                  result.cg_iterations, result.solve_time_ms);

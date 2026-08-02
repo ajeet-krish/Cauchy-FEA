@@ -70,12 +70,13 @@ def load_triangulation(outdir):
     
     nodes = mesh['nodes']
     
-    # Handle new format (quad_elements + tri_elements) or legacy format (elements)
-    quad_elems = mesh.get('quad_elements', mesh.get('elements', []))
+    # Handle Q4, Q8, and T3 element formats
+    quad_elems = mesh.get('quad_elements', [])
+    quad8_elems = mesh.get('quad8_elements', [])
     tri_elems = mesh.get('tri_elements', [])
     
     # Skip if no elements (e.g., bar elements only like michell)
-    if not quad_elems and not tri_elems:
+    if not quad_elems and not quad8_elems and not tri_elems:
         return None, None, None
     
     x = np.array([n['x'] for n in nodes])
@@ -83,8 +84,14 @@ def load_triangulation(outdir):
     
     triangles = []
     
-    # Split each quad into 2 triangles: (n0,n1,n2) and (n0,n2,n3)
+    # Split each Q4 into 2 triangles: (n0,n1,n2) and (n0,n2,n3)
     for elem in quad_elems:
+        n0, n1, n2, n3 = elem['n0'], elem['n1'], elem['n2'], elem['n3']
+        triangles.append([n0, n1, n2])
+        triangles.append([n0, n2, n3])
+    
+    # Split each Q8 into 2 triangles using corner nodes only
+    for elem in quad8_elems:
         n0, n1, n2, n3 = elem['n0'], elem['n1'], elem['n2'], elem['n3']
         triangles.append([n0, n1, n2])
         triangles.append([n0, n2, n3])
@@ -106,8 +113,9 @@ def nodal_average(element_values, mesh):
     """Convert element-centered values to nodal values via averaging."""
     num_nodes = mesh['num_nodes']
     
-    # Handle new format (quad_elements + tri_elements) or legacy format (elements)
-    quad_elems = mesh.get('quad_elements', mesh.get('elements', []))
+    # Handle Q4, Q8, and T3 element formats
+    quad_elems = mesh.get('quad_elements', [])
+    quad8_elems = mesh.get('quad8_elements', [])
     tri_elems = mesh.get('tri_elements', [])
     
     nodal_sum = np.zeros(num_nodes)
@@ -120,8 +128,16 @@ def nodal_average(element_values, mesh):
             nodal_sum[node_idx] += val
             nodal_count[node_idx] += 1
     
-    # Average T3 element values
+    # Average Q8 element values (use corner nodes only for averaging)
     offset = len(quad_elems)
+    for i, elem in enumerate(quad8_elems):
+        val = element_values[offset + i]
+        for node_idx in [elem['n0'], elem['n1'], elem['n2'], elem['n3']]:
+            nodal_sum[node_idx] += val
+            nodal_count[node_idx] += 1
+    
+    # Average T3 element values
+    offset = len(quad_elems) + len(quad8_elems)
     for i, elem in enumerate(tri_elems):
         val = element_values[offset + i]
         for node_idx in [elem['n0'], elem['n1'], elem['n2']]:
@@ -269,7 +285,8 @@ def plot_deformed_mesh(outdir, meta, image_dir, scale=None):
         return
 
     nodes_orig = mesh['nodes']
-    quad_elems = mesh.get('quad_elements', mesh.get('elements', []))
+    quad_elems = mesh.get('quad_elements', [])
+    quad8_elems = mesh.get('quad8_elements', [])
     tri_elems = mesh.get('tri_elements', [])
     nodes_disp = disp_data['nodes']
 
@@ -305,6 +322,13 @@ def plot_deformed_mesh(outdir, meta, image_dir, scale=None):
         ys = list(y_orig[n]) + [y_orig[n[0]]]
         ax.plot(xs, ys, color='#cccccc', linestyle='--', linewidth=0.4, alpha=0.5, zorder=1)
 
+    # Draw undeformed mesh - Q8 elements (use corner nodes only)
+    for elem in quad8_elems:
+        n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
+        xs = list(x_orig[n]) + [x_orig[n[0]]]
+        ys = list(y_orig[n]) + [y_orig[n[0]]]
+        ax.plot(xs, ys, color='#cccccc', linestyle='--', linewidth=0.4, alpha=0.5, zorder=1)
+
     # Draw undeformed mesh - T3 elements
     for elem in tri_elems:
         n = [elem['n0'], elem['n1'], elem['n2']]
@@ -316,6 +340,17 @@ def plot_deformed_mesh(outdir, meta, image_dir, scale=None):
     for elem in quad_elems:
         n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
         # Close the quad
+        n_closed = n + [n[0]]
+        for i in range(4):
+            i0, i1 = n_closed[i], n_closed[i + 1]
+            avg_disp = (disp_mag[i0] + disp_mag[i1]) / 2.0
+            color = cmap(norm(avg_disp))
+            ax.plot([x_def[i0], x_def[i1]], [y_def[i0], y_def[i1]],
+                    color=color, linewidth=0.9, solid_capstyle='round', zorder=2)
+
+    # Draw deformed mesh with colormap edges - Q8 elements (use corner nodes only)
+    for elem in quad8_elems:
+        n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
         n_closed = n + [n[0]]
         for i in range(4):
             i0, i1 = n_closed[i], n_closed[i + 1]
@@ -423,18 +458,36 @@ def plot_principal_stress_arrows(outdir, meta, image_dir):
 
     # Compute element centroids
     nodes = mesh['nodes']
-    # Handle new format (quad_elements + tri_elements) or legacy format (elements)
-    quads = mesh.get('quad_elements', mesh.get('elements', []))
+    # Handle Q8 (quad8_elements) and Q4 (quad_elements) formats
+    quads = mesh.get('quad_elements', [])
+    quad8s = mesh.get('quad8_elements', [])
     tri_elems = mesh.get('tri_elements', [])
-    cx = np.array([(nodes[e['n0']]['x'] + nodes[e['n1']]['x'] +
-                    nodes[e['n2']]['x'] + nodes[e['n3']]['x']) / 4.0 for e in quads])
-    cy = np.array([(nodes[e['n0']]['y'] + nodes[e['n1']]['y'] +
-                    nodes[e['n2']]['y'] + nodes[e['n3']]['y']) / 4.0 for e in quads])
+    
+    # For Q8 elements, use corner nodes (n0-n3) for centroid
+    cx_list = []
+    cy_list = []
+    for e in quads:
+        cx_list.append((nodes[e['n0']]['x'] + nodes[e['n1']]['x'] +
+                        nodes[e['n2']]['x'] + nodes[e['n3']]['x']) / 4.0)
+        cy_list.append((nodes[e['n0']]['y'] + nodes[e['n1']]['y'] +
+                        nodes[e['n2']]['y'] + nodes[e['n3']]['y']) / 4.0)
+    for e in quad8s:
+        cx_list.append((nodes[e['n0']]['x'] + nodes[e['n1']]['x'] +
+                        nodes[e['n2']]['x'] + nodes[e['n3']]['x']) / 4.0)
+        cy_list.append((nodes[e['n0']]['y'] + nodes[e['n1']]['y'] +
+                        nodes[e['n2']]['y'] + nodes[e['n3']]['y']) / 4.0)
+    cx = np.array(cx_list)
+    cy = np.array(cy_list)
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Draw mesh wireframe for reference
     for elem in quads:
+        n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
+        xs = list(np.array([nodes[i]['x'] for i in n])) + [nodes[n[0]]['x']]
+        ys = list(np.array([nodes[i]['y'] for i in n])) + [nodes[n[0]]['y']]
+        ax.plot(xs, ys, color='#dddddd', linewidth=0.3, alpha=0.5)
+    for elem in quad8s:
         n = [elem['n0'], elem['n1'], elem['n2'], elem['n3']]
         xs = list(np.array([nodes[i]['x'] for i in n])) + [nodes[n[0]]['x']]
         ys = list(np.array([nodes[i]['y'] for i in n])) + [nodes[n[0]]['y']]
@@ -675,11 +728,12 @@ def plot_mesh_quality(outdir, meta, image_dir):
 
     nodes = mesh['nodes']
     quad_elems = mesh.get('quad_elements', [])
+    quad8_elems = mesh.get('quad8_elements', [])
     tri_elems = mesh.get('tri_elements', [])
     dirichlet = mesh.get('dirichlet', [])
     neumann = mesh.get('neumann', [])
 
-    if not quad_elems and not tri_elems:
+    if not quad_elems and not quad8_elems and not tri_elems:
         print(f'  No elements found, skipping mesh quality')
         return
 
@@ -688,8 +742,11 @@ def plot_mesh_quality(outdir, meta, image_dir):
 
     fig, ax = plt.subplots(figsize=(10, 8))
 
-    # 1. Draw wireframe (element edges)
+    # 1. Draw wireframe (element edges) - use corner nodes for Q8
     for elem in quad_elems:
+        n = [elem['n0'], elem['n1'], elem['n2'], elem['n3'], elem['n0']]
+        ax.plot([x[i] for i in n], [y[i] for i in n], 'k-', linewidth=0.5)
+    for elem in quad8_elems:
         n = [elem['n0'], elem['n1'], elem['n2'], elem['n3'], elem['n0']]
         ax.plot([x[i] for i in n], [y[i] for i in n], 'k-', linewidth=0.5)
     for elem in tri_elems:
@@ -755,7 +812,7 @@ def plot_mesh_quality(outdir, meta, image_dir):
     ax.set_aspect('equal')
     ax.set_xlabel('x (m)')
     ax.set_ylabel('y (m)')
-    ax.set_title(f'Mesh: {len(nodes)} nodes, {len(quad_elems) + len(tri_elems)} elements')
+    ax.set_title(f'Mesh: {len(nodes)} nodes, {len(quad_elems) + len(quad8_elems) + len(tri_elems)} elements')
 
     # Legend
     from matplotlib.patches import Patch
