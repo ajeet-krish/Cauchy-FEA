@@ -81,6 +81,115 @@
       </div>
     </section>
 
+    <h2>Simulation Overview</h2>
+    <p style="color: var(--fg-dim); font-size: 0.88em; margin-bottom: 1rem;">
+      All 7 validation cases solved with the same C++20 solver core. Each case targets a specific aspect of structural mechanics
+      and validates against analytical or reference solutions. Mesh convergence studies are run at 5 resolutions (8x8 through 128x128).
+    </p>
+
+    <table class="overview-table">
+      <thead>
+        <tr>
+          <th>Case</th>
+          <th>Elements</th>
+          <th>Mesh</th>
+          <th>DOFs</th>
+          <th>Material</th>
+          <th>Plane</th>
+          <th>Max Disp.</th>
+          <th>Max Stress</th>
+          <th>Validates</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="case-name"><a href="cantilever.html">Cantilever Beam</a></td>
+          <td><span class="tag tag-q8">Q8</span> 256</td>
+          <td>32x8</td>
+          <td>1,698</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>0.139 mm</td>
+          <td>8.20 MPa</td>
+          <td>PL^3/(3EI) deflection, My/I stress</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="cook.html">Cook's Membrane</a></td>
+          <td><span class="tag tag-q8">Q8</span> 1,024</td>
+          <td>32x32</td>
+          <td>6,402</td>
+          <td>Aluminum (E=1 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>9.50 mm</td>
+          <td>0.21 MPa</td>
+          <td>Shear-bending coupling, ~13.68 mm reference</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="patch.html">Patch Test</a></td>
+          <td><span class="tag tag-q4">Q4</span> 16</td>
+          <td>4x4</td>
+          <td>50</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>1.00 mm</td>
+          <td>208 MPa</td>
+          <td>Constant stress recovery (element pass/fail)</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="plate_hole.html">Plate with Hole</a></td>
+          <td><span class="tag tag-q8">Q8</span> 15,551</td>
+          <td>128x128</td>
+          <td>94,332</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>0.028 mm</td>
+          <td>7.66 MPa</td>
+          <td>Kirsch SCF~3.0 at circular hole edge</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="lbracket.html">L-Bracket</a></td>
+          <td><span class="tag tag-q4">Q4</span> 12,159</td>
+          <td>128x128</td>
+          <td>24,832</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>0.001 mm</td>
+          <td>0.45 MPa</td>
+          <td>Re-entrant corner singularity, mesh refinement</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="michell.html">Michell Truss</a></td>
+          <td><span class="tag tag-bar">Bar</span> 3</td>
+          <td>3 bars</td>
+          <td>6</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>0.044 mm</td>
+          <td>--</td>
+          <td>Bar element assembly, hand calculation check</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="thermal_cylinder.html">Thick Cylinder</a></td>
+          <td><span class="tag tag-q4">Q4</span> 13,108</td>
+          <td>128x128</td>
+          <td>26,730</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-strain">Strain</span></td>
+          <td>0.007 mm</td>
+          <td>1.80 MPa</td>
+          <td>Lame solution, internal pressure + thermal</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="color: var(--fg-muted); font-size: 0.78em; margin-top: 0.5rem;">
+      <strong>Element types:</strong>
+      <span class="tag tag-bar">Bar</span> 2-node truss,
+      <span class="tag tag-q4">Q4</span> 4-node bilinear quad (2x2 Gauss),
+      <span class="tag tag-q8">Q8</span> 8-node serendipity (3x3 Gauss).
+      All cases use steel (E=200 GPa, nu=0.3) unless noted. Convergence studies run at 8, 16, 32, 64, 128 resolution.
+    </p>
+
     <h2>Validation Cases</h2>
 
     <div class="case-grid">
@@ -241,7 +350,7 @@
 
       <div class="feature-item">
         <h4>Dual Solvers</h4>
-        <p>Cholesky direct solver for small/medium systems. Conjugate Gradient with Jacobi preconditioner for large sparse systems.</p>
+        <p>Cholesky direct solver for small/medium systems. Conjugate Gradient with auto-selected preconditioner (IC(0), SSOR, Block Jacobi) for large sparse systems.</p>
       </div>
 
       <div class="feature-item">
@@ -274,6 +383,26 @@
         <p>Element assembly and stress recovery loops parallelized with OpenMP.</p>
       </div>
 
+      <div class="feature-item">
+        <h4>Shear Locking Fix</h4>
+        <p>Selective Reduced Integration (SRI) and B-Bar methods eliminate Q4 shear locking in bending-dominated problems.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Contact Mechanics</h4>
+        <p>Node-to-surface frictionless contact with penalty constraint enforcement. Master-slave formulation with gap function detection.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Geometric Nonlinearity</h4>
+        <p>Total Lagrangian Newton-Raphson with Green-Lagrange strain, consistent tangent stiffness, and load stepping.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Dynamic Analysis</h4>
+        <p>Newmark-beta time integration, consistent mass matrices, Rayleigh damping, and subspace iteration modal analysis.</p>
+      </div>
+
     </div>
 
     <h2>Architecture</h2>
@@ -304,7 +433,7 @@
         <code>./build/FEA_Cook 32</code> &mdash; Cook's membrane (32x32 mesh)<br>
         <code>./build/FEA_PlateHole 16 --q8</code> &mdash; plate with hole (Q8 elements)<br>
         <code>./build/FEA_AdaptHole 8 --iters 4</code> &mdash; adaptive refinement<br>
-        <code>./build/FEA_Tests</code> &mdash; run 22 Google Test cases
+        <code>./build/FEA_Tests</code> &mdash; run 57 Google Test cases
       </p>
     </div>
 

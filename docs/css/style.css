@@ -327,6 +327,47 @@ tr:hover td { background: rgba(255, 179, 71, 0.03); }
   color: var(--fg-dim);
 }
 
+/* --- Case Overview Table --- */
+.overview-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.78em;
+}
+.overview-table th {
+  background: var(--bg-card);
+  color: var(--amber);
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 2px solid var(--border-light);
+  white-space: nowrap;
+}
+.overview-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-dim);
+}
+.overview-table tr:hover td {
+  background: rgba(255, 179, 71, 0.04);
+}
+.overview-table .case-name {
+  color: var(--amber);
+  font-weight: 500;
+}
+.overview-table .tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  margin-right: 4px;
+}
+.overview-table .tag-q4 { background: rgba(0, 212, 255, 0.15); color: var(--cyan); }
+.overview-table .tag-q8 { background: rgba(255, 179, 71, 0.15); color: var(--amber); }
+.overview-table .tag-bar { background: rgba(57, 211, 83, 0.15); color: var(--green); }
+.overview-table .tag-stress { background: rgba(255, 107, 53, 0.12); color: var(--orange); }
+.overview-table .tag-strain { background: rgba(255, 71, 87, 0.12); color: var(--red); }
+.overview-table .tag-thermal { background: rgba(255, 200, 112, 0.15); color: var(--amber-bright); }
+
 /* --- FEA Viewer --- */
 .viewer-container {
   position: relative;
