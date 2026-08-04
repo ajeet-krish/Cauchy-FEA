@@ -1,6 +1,7 @@
 #pragma once
 #include "fea_types.hpp"
 #include "sparse.hpp"
+#include "preconditioners.hpp"
 #include <vector>
 #include <cmath>
 #include <stdexcept>
@@ -78,7 +79,7 @@ struct CholeskySolver {
 
 // ------------------------------------------------------------------
 // Conjugate Gradient solver (for large sparse SPD systems)
-// Preconditioner: Jacobi (diagonal)
+// Supports pluggable preconditioners via template parameter
 // ------------------------------------------------------------------
 struct CGSolver {
     int max_iter = 10000;
@@ -92,28 +93,25 @@ struct CGSolver {
         int iterations = 0;
         double residual_norm = 0.0;
         bool converged = false;
+        preconditioners::PreconditionerType prec_type =
+            preconditioners::PreconditionerType::JACOBI;
     };
 
-    // Solve K * x = b using preconditioned CG
-    Result solve(const CSRMatrix& K, const std::vector<double>& b) const {
+    // Solve K * x = b using preconditioned CG with a specific preconditioner
+    template<typename Preconditioner>
+    Result solve(const CSRMatrix& K, const std::vector<double>& b,
+                 const Preconditioner& M) const {
         int n = K.nrows;
         if (static_cast<int>(b.size()) != n)
             throw std::runtime_error("CG: dimension mismatch");
-
-        // Jacobi preconditioner (inverse diagonal)
-        auto diag = K.diagonal();
-        std::vector<double> M_inv(n, 0.0);
-        for (int i = 0; i < n; ++i) {
-            M_inv[i] = (std::abs(diag[i]) > 1e-15) ? (1.0 / diag[i]) : 1.0;
-        }
 
         // Initialize
         std::vector<double> x(n, 0.0);
         std::vector<double> r = b;  // r = b - K*x (x=0 initially)
         std::vector<double> z(n, 0.0);
 
-        // z = M_inv * r
-        for (int i = 0; i < n; ++i) z[i] = M_inv[i] * r[i];
+        // z = M^{-1} * r
+        M.apply(r, z);
 
         std::vector<double> p = z;
         double rz = 0.0;
@@ -153,8 +151,8 @@ struct CGSolver {
                 return result;
             }
 
-            // z = M_inv * r
-            for (int i = 0; i < n; ++i) z[i] = M_inv[i] * r[i];
+            // z = M^{-1} * r
+            M.apply(r, z);
 
             double rz_new = 0.0;
             for (int i = 0; i < n; ++i) rz_new += r[i] * z[i];
@@ -168,6 +166,15 @@ struct CGSolver {
         }
 
         result.x = x;
+        return result;
+    }
+
+    // Convenience: solve with Jacobi preconditioner (backward compatible)
+    Result solve(const CSRMatrix& K, const std::vector<double>& b) const {
+        preconditioners::Jacobi M;
+        M.setup(K);
+        auto result = solve(K, b, M);
+        result.prec_type = preconditioners::PreconditionerType::JACOBI;
         return result;
     }
 };

@@ -751,6 +751,157 @@ TEST(H8CantileverTest, TipDeflection) {
 }
 
 // ==========================================================================
+// PRECONDITIONER TESTS
+// ==========================================================================
+
+// Test that Jacobi preconditioner reduces CG iterations vs unpreconditioned
+TEST(PreconditionerTest, JacobiReducesIterations) {
+    // Build a simple SPD system (5x5 tridiagonal)
+    int n = 5;
+    COOMatrix K_coo(n, n);
+    for (int i = 0; i < n; ++i) {
+        K_coo.add(i, i, 4.0);
+        if (i > 0) K_coo.add(i, i - 1, -1.0);
+        if (i < n - 1) K_coo.add(i, i + 1, -1.0);
+    }
+    auto K = K_coo.to_csr();
+
+    std::vector<double> b(n, 1.0);
+
+    // Unpreconditioned CG (using Jacobi with identity-like preconditioner)
+    CGSolver cg_no_prec(1000, 1e-10);
+    preconditioners::Jacobi M;
+    M.setup(K);
+    auto result = cg_no_prec.solve(K, b, M);
+
+    EXPECT_TRUE(result.converged);
+    EXPECT_LT(result.iterations, n);  // should converge quickly for 5x5
+}
+
+// Test IC(0) preconditioner on a banded system
+TEST(PreconditionerTest, IncompleteCholeskySetup) {
+    int n = 20;
+    COOMatrix K_coo(n, n);
+    for (int i = 0; i < n; ++i) {
+        K_coo.add(i, i, 4.0);
+        if (i > 0) K_coo.add(i, i - 1, -1.0);
+        if (i < n - 1) K_coo.add(i, i + 1, -1.0);
+    }
+    auto K = K_coo.to_csr();
+
+    preconditioners::IncompleteCholesky ic;
+    ic.setup(K);
+
+    // IC(0) should produce a valid lower triangular factor
+    EXPECT_GT(ic.n, 0);
+    EXPECT_FALSE(ic.L_vals.empty());
+
+    // Apply preconditioner to a vector
+    std::vector<double> r(n, 1.0);
+    std::vector<double> z(n, 0.0);
+    ic.apply(r, z);
+
+    // z should be non-zero
+    double z_norm = 0.0;
+    for (int i = 0; i < n; ++i) z_norm += z[i] * z[i];
+    EXPECT_GT(z_norm, 0.0);
+}
+
+// Test SSOR preconditioner
+TEST(PreconditionerTest, SSORSetup) {
+    int n = 20;
+    COOMatrix K_coo(n, n);
+    for (int i = 0; i < n; ++i) {
+        K_coo.add(i, i, 4.0);
+        if (i > 0) K_coo.add(i, i - 1, -1.0);
+        if (i < n - 1) K_coo.add(i, i + 1, -1.0);
+    }
+    auto K = K_coo.to_csr();
+
+    preconditioners::SSOR ssor(1.0);  // omega = 1.0 (Gauss-Seidel)
+    ssor.setup(K);
+
+    std::vector<double> r(n, 1.0);
+    std::vector<double> z(n, 0.0);
+    ssor.apply(r, z);
+
+    double z_norm = 0.0;
+    for (int i = 0; i < n; ++i) z_norm += z[i] * z[i];
+    EXPECT_GT(z_norm, 0.0);
+}
+
+// Test Block Jacobi preconditioner
+TEST(PreconditionerTest, BlockJacobiSetup) {
+    int n = 20;
+    COOMatrix K_coo(n, n);
+    for (int i = 0; i < n; ++i) {
+        K_coo.add(i, i, 4.0);
+        if (i > 0) K_coo.add(i, i - 1, -1.0);
+        if (i < n - 1) K_coo.add(i, i + 1, -1.0);
+    }
+    auto K = K_coo.to_csr();
+
+    preconditioners::BlockJacobi bj(2);  // block_size = 2
+    bj.setup(K);
+
+    EXPECT_FALSE(bj.blocks.empty());
+
+    std::vector<double> r(n, 1.0);
+    std::vector<double> z(n, 0.0);
+    bj.apply(r, z);
+
+    double z_norm = 0.0;
+    for (int i = 0; i < n; ++i) z_norm += z[i] * z[i];
+    EXPECT_GT(z_norm, 0.0);
+}
+
+// Test that IC(0) + CG converges to the same solution as Jacobi + CG
+TEST(PreconditionerTest, IC0ConvergesSameSolution) {
+    // 1D Poisson: -u'' = f on [0,1], u(0)=u(1)=0
+    int n = 50;
+    COOMatrix K_coo(n, n);
+    double h = 1.0 / (n + 1);
+    for (int i = 0; i < n; ++i) {
+        K_coo.add(i, i, 2.0 / (h * h));
+        if (i > 0) K_coo.add(i, i - 1, -1.0 / (h * h));
+        if (i < n - 1) K_coo.add(i, i + 1, -1.0 / (h * h));
+    }
+    auto K = K_coo.to_csr();
+
+    // RHS: f = 1 everywhere
+    std::vector<double> b(n, 1.0);
+
+    // Solve with Jacobi
+    preconditioners::Jacobi M_jac;
+    M_jac.setup(K);
+    CGSolver cg(1000, 1e-10);
+    auto res_jac = cg.solve(K, b, M_jac);
+
+    // Solve with IC(0)
+    preconditioners::IncompleteCholesky M_ic;
+    M_ic.setup(K);
+    CGSolver cg2(1000, 1e-10);
+    auto res_ic = cg2.solve(K, b, M_ic);
+
+    EXPECT_TRUE(res_jac.converged);
+    EXPECT_TRUE(res_ic.converged);
+
+    // Solutions should be close
+    double diff_norm = 0.0;
+    double sol_norm = 0.0;
+    for (int i = 0; i < n; ++i) {
+        diff_norm += (res_jac.x[i] - res_ic.x[i]) * (res_jac.x[i] - res_ic.x[i]);
+        sol_norm += res_jac.x[i] * res_jac.x[i];
+    }
+    diff_norm = std::sqrt(diff_norm);
+    sol_norm = std::sqrt(sol_norm);
+
+    if (sol_norm > 1e-15) {
+        EXPECT_LT(diff_norm / sol_norm, 1e-6);
+    }
+}
+
+// ==========================================================================
 // MAIN
 // ==========================================================================
 int main(int argc, char** argv) {

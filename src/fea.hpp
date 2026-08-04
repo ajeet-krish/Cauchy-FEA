@@ -240,9 +240,34 @@ struct SolveResult {
     int cg_iterations = 0;
     double solve_time_ms = 0.0;
     bool cg_converged = false;
+    preconditioners::PreconditionerType prec_used =
+        preconditioners::PreconditionerType::JACOBI;
 };
 
-inline SolveResult solve(Mesh& m, bool use_cg = false) {
+// Auto-select preconditioner based on matrix properties
+inline preconditioners::PreconditionerType auto_select_preconditioner(
+    const CSRMatrix& K) {
+
+    int n = K.nrows;
+    double nnz_per_row = static_cast<double>(K.values.size()) / n;
+
+    // For very small systems, Jacobi is fine
+    if (n < 500) return preconditioners::PreconditionerType::JACOBI;
+
+    // For moderate systems with moderate fill, use SSOR
+    if (n < 5000 && nnz_per_row < 20) return preconditioners::PreconditionerType::SSOR;
+
+    // For large systems, use IC(0) if fill is manageable
+    if (nnz_per_row < 30) return preconditioners::PreconditionerType::IC0;
+
+    // For very large or very sparse systems, block Jacobi
+    return preconditioners::PreconditionerType::BLOCK_JACOBI;
+}
+
+inline SolveResult solve(Mesh& m, bool use_cg = false,
+    preconditioners::PreconditionerType prec_type =
+        preconditioners::PreconditionerType::JACOBI) {
+
     auto t_start = std::chrono::high_resolution_clock::now();
 
     // Auto-switch to CG for large systems (Cholesky is O(n^3) with dense matrix)
@@ -274,19 +299,75 @@ inline SolveResult solve(Mesh& m, bool use_cg = false) {
     std::vector<double> u;
     int cg_iters = 0;
     bool cg_conv = false;
+    auto final_prec = prec_type;
 
     if (use_cg) {
-        std::cout << "Solving with Conjugate Gradient..." << std::endl;
-        CGSolver cg(10000, 1e-10);
-        auto result = cg.solve(K_csr, f);
-        u = result.x;
-        cg_iters = result.iterations;
-        cg_conv = result.converged;
-        std::cout << "  CG iterations: " << cg_iters
-                  << ", residual: " << std::scientific << std::setprecision(2)
-                  << result.residual_norm
-                  << (cg_conv ? " (converged)" : " (DID NOT converge)")
-                  << std::endl;
+        // Auto-select preconditioner if using default Jacobi on large systems
+        if (prec_type == preconditioners::PreconditionerType::JACOBI && m.num_dofs() > 5000) {
+            prec_type = auto_select_preconditioner(K_csr);
+            std::cout << "  Auto-selected preconditioner: "
+                      << preconditioners::preconditioner_name(prec_type) << std::endl;
+        }
+
+        std::string prec_label = preconditioners::preconditioner_name(prec_type);
+
+        if (prec_type == preconditioners::PreconditionerType::IC0) {
+            preconditioners::IncompleteCholesky M;
+            M.setup(K_csr);
+            CGSolver cg(10000, 1e-10);
+            auto result = cg.solve(K_csr, f, M);
+            u = result.x;
+            cg_iters = result.iterations;
+            cg_conv = result.converged;
+            final_prec = result.prec_type;
+            std::cout << "  CG iterations: " << cg_iters
+                      << ", residual: " << std::scientific << std::setprecision(2)
+                      << result.residual_norm
+                      << (cg_conv ? " (converged)" : " (DID NOT converge)")
+                      << std::endl;
+        } else if (prec_type == preconditioners::PreconditionerType::SSOR) {
+            preconditioners::SSOR M(1.0);
+            M.setup(K_csr);
+            CGSolver cg(10000, 1e-10);
+            auto result = cg.solve(K_csr, f, M);
+            u = result.x;
+            cg_iters = result.iterations;
+            cg_conv = result.converged;
+            std::cout << "  CG iterations: " << cg_iters
+                      << ", residual: " << std::scientific << std::setprecision(2)
+                      << result.residual_norm
+                      << (cg_conv ? " (converged)" : " (DID NOT converge)")
+                      << std::endl;
+        } else if (prec_type == preconditioners::PreconditionerType::BLOCK_JACOBI) {
+            preconditioners::BlockJacobi M(2);  // block_size = DOF_PER_NODE
+            M.setup(K_csr);
+            CGSolver cg(10000, 1e-10);
+            auto result = cg.solve(K_csr, f, M);
+            u = result.x;
+            cg_iters = result.iterations;
+            cg_conv = result.converged;
+            std::cout << "  CG iterations: " << cg_iters
+                      << ", residual: " << std::scientific << std::setprecision(2)
+                      << result.residual_norm
+                      << (cg_conv ? " (converged)" : " (DID NOT converge)")
+                      << std::endl;
+        } else {
+            // Jacobi (default)
+            preconditioners::Jacobi M;
+            M.setup(K_csr);
+            CGSolver cg(10000, 1e-10);
+            auto result = cg.solve(K_csr, f, M);
+            u = result.x;
+            cg_iters = result.iterations;
+            cg_conv = result.converged;
+            std::cout << "  CG iterations: " << cg_iters
+                      << ", residual: " << std::scientific << std::setprecision(2)
+                      << result.residual_norm
+                      << (cg_conv ? " (converged)" : " (DID NOT converge)")
+                      << std::endl;
+        }
+
+        std::cout << "  Preconditioner: " << preconditioners::preconditioner_name(final_prec) << std::endl;
     } else {
         std::cout << "Solving with Cholesky..." << std::endl;
         auto K_dense = DenseMatrix::from_csr(K_csr);
@@ -323,7 +404,7 @@ inline SolveResult solve(Mesh& m, bool use_cg = false) {
     std::cout << "  Solve time: " << std::fixed << std::setprecision(1)
               << solve_time << " ms" << std::endl;
 
-    return { u, stresses, K_csr, f, cg_iters, solve_time, cg_conv };
+    return { u, stresses, K_csr, f, cg_iters, solve_time, cg_conv, final_prec };
 }
 
 // ------------------------------------------------------------------
