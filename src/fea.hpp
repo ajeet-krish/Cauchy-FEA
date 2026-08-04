@@ -3,6 +3,7 @@
 #include "elements.hpp"
 #include "elements_3d.hpp"
 #include "locking_mitigation.hpp"
+#include "contact.hpp"
 #include "sparse.hpp"
 #include "solver.hpp"
 #include "mesh.hpp"
@@ -414,6 +415,181 @@ inline SolveResult solve(Mesh& m, bool use_cg = false,
               << solve_time << " ms" << std::endl;
 
     return { u, stresses, K_csr, f, cg_iters, solve_time, cg_conv, final_prec };
+}
+
+// ------------------------------------------------------------------
+// Solve with contact: assembles contact forces into RHS
+// Uses penalty method for contact constraint enforcement
+// ------------------------------------------------------------------
+struct ContactSolveResult {
+    SolveResult base_result;
+    int contact_iterations;
+    double max_penetration;
+};
+
+inline ContactSolveResult solve_with_contact(
+    Mesh& m,
+    const std::vector<int>& slave_nodes,
+    const contact::ContactSurface& master,
+    double contact_penalty = 1e6,
+    bool use_cg = false,
+    preconditioners::PreconditionerType prec_type =
+        preconditioners::PreconditionerType::JACOBI) {
+
+    auto t_start = std::chrono::high_resolution_clock::now();
+
+    // Auto-switch to CG for large systems
+    if (!use_cg && m.num_dofs() > 2000) {
+        std::cout << "Auto-switching to CG (DOFs=" << m.num_dofs() << " > 2000)" << std::endl;
+        use_cg = true;
+    }
+
+    // 1. Assemble
+    std::cout << "Assembling global stiffness matrix..." << std::endl;
+    auto K_coo = assemble(m);
+    std::cout << "  COO entries: " << K_coo.val.size() << std::endl;
+
+    // 2. Compute penalty BEFORE modifying matrix
+    double penalty = compute_penalty(K_coo);
+
+    // 3. Apply Dirichlet BCs (penalty method)
+    apply_dirichlet_penalty(K_coo, m, penalty);
+
+    // 4. Convert to CSR
+    auto K_csr = K_coo.to_csr();
+    std::cout << "  CSR non-zeros: " << K_csr.values.size() << std::endl;
+
+    // 5. Build RHS
+    auto f = build_rhs(m);
+
+    // 6. Detect contact and assemble contact forces
+    std::cout << "Detecting contact..." << std::endl;
+    auto contact_result = contact::assemble_contact_forces(
+        m.nodes, slave_nodes, master, m.num_dofs(), contact_penalty);
+
+    // Add contact forces to RHS
+    for (int i = 0; i < m.num_dofs(); ++i) {
+        f[i] += contact_result.f_contact[i];
+    }
+
+    // Add contact diagonal stiffness to K
+    // (This is needed for the penalty method to work correctly)
+    for (const auto& [dof, val] : contact_result.K_diag_additions) {
+        // We need to add to the CSR diagonal
+        // Find the diagonal entry and add to it
+        for (int k = K_csr.row_ptr[dof]; k < K_csr.row_ptr[dof + 1]; ++k) {
+            if (K_csr.col_ind[k] == dof) {
+                K_csr.values[k] += val;
+                break;
+            }
+        }
+    }
+
+    modify_rhs_dirichlet(f, m, penalty);
+
+    // 7. Solve
+    std::vector<double> u;
+    int cg_iters = 0;
+    bool cg_conv = false;
+    auto final_prec = prec_type;
+
+    if (use_cg) {
+        if (prec_type == preconditioners::PreconditionerType::JACOBI && m.num_dofs() > 5000) {
+            prec_type = auto_select_preconditioner(K_csr);
+        }
+
+        if (prec_type == preconditioners::PreconditionerType::IC0) {
+            preconditioners::IncompleteCholesky M;
+            M.setup(K_csr);
+            CGSolver cg(10000, 1e-10);
+            auto result = cg.solve(K_csr, f, M);
+            u = result.x;
+            cg_iters = result.iterations;
+            cg_conv = result.converged;
+            final_prec = result.prec_type;
+        } else if (prec_type == preconditioners::PreconditionerType::SSOR) {
+            preconditioners::SSOR M(1.0);
+            M.setup(K_csr);
+            CGSolver cg(10000, 1e-10);
+            auto result = cg.solve(K_csr, f, M);
+            u = result.x;
+            cg_iters = result.iterations;
+            cg_conv = result.converged;
+        } else if (prec_type == preconditioners::PreconditionerType::BLOCK_JACOBI) {
+            preconditioners::BlockJacobi M(2);
+            M.setup(K_csr);
+            CGSolver cg(10000, 1e-10);
+            auto result = cg.solve(K_csr, f, M);
+            u = result.x;
+            cg_iters = result.iterations;
+            cg_conv = result.converged;
+        } else {
+            preconditioners::Jacobi M;
+            M.setup(K_csr);
+            CGSolver cg(10000, 1e-10);
+            auto result = cg.solve(K_csr, f, M);
+            u = result.x;
+            cg_iters = result.iterations;
+            cg_conv = result.converged;
+        }
+
+        std::cout << "  CG iterations: " << cg_iters << std::endl;
+    } else {
+        std::cout << "Solving with Cholesky..." << std::endl;
+        auto K_dense = DenseMatrix::from_csr(K_csr);
+        CholeskySolver chol;
+        chol.factor(K_dense);
+        u = chol.solve(f);
+    }
+
+    // 8. Compute penetration
+    double max_penetration = 0.0;
+    for (int sn : slave_nodes) {
+        double gap, nx, ny, xi;
+        contact::find_nearest_segment(sn, m.nodes, master, gap, nx, ny, xi);
+        // Apply displacement to get deformed position
+        double deformed_x = m.nodes[sn].x + u[dof_index(sn, 0)];
+        double deformed_y = m.nodes[sn].y + u[dof_index(sn, 1)];
+        // Recompute gap with deformed configuration
+        // (simplified: just check original gap + displacement in normal direction)
+        double disp_normal = u[dof_index(sn, 0)] * nx + u[dof_index(sn, 1)] * ny;
+        double final_gap = gap + disp_normal;
+        if (final_gap < max_penetration) {
+            max_penetration = final_gap;
+        }
+    }
+
+    // 9. Post-process
+    std::cout << "Computing stresses..." << std::endl;
+    auto stresses = postprocess::compute_all_stresses(m, u);
+
+    auto t_end = std::chrono::high_resolution_clock::now();
+    double solve_time = std::chrono::duration<double, std::milli>(t_end - t_start).count();
+
+    // Report
+    double max_disp = 0.0;
+    for (int i = 0; i < m.num_nodes(); ++i) {
+        double ux = u[dof_index(i, 0)];
+        double uy = u[dof_index(i, 1)];
+        double uz = (g_dim == 3) ? u[dof_index(i, 2)] : 0.0;
+        double d = std::sqrt(ux * ux + uy * uy + uz * uz);
+        if (d > max_disp) max_disp = d;
+    }
+
+    double max_stress = 0.0;
+    for (const auto& s : stresses) {
+        if (s.von_mises > max_stress) max_stress = s.von_mises;
+    }
+
+    std::cout << "  Max displacement: " << std::scientific << std::setprecision(4)
+              << max_disp << " m" << std::endl;
+    std::cout << "  Max von Mises stress: " << max_stress << " Pa" << std::endl;
+    std::cout << "  Max penetration: " << max_penetration << " m" << std::endl;
+    std::cout << "  Solve time: " << std::fixed << std::setprecision(1)
+              << solve_time << " ms" << std::endl;
+
+    SolveResult base{ u, stresses, K_csr, f, cg_iters, solve_time, cg_conv, final_prec };
+    return { base, 1, max_penetration };
 }
 
 // ------------------------------------------------------------------

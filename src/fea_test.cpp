@@ -3,6 +3,7 @@
 #include "elements.hpp"
 #include "elements_3d.hpp"
 #include "locking_mitigation.hpp"
+#include "contact.hpp"
 #include "sparse.hpp"
 #include "solver.hpp"
 #include "mesh.hpp"
@@ -1096,6 +1097,128 @@ TEST(ShearingLockingTest, SRIPatchTest) {
     // (SRI is designed for bending, not pure tension)
     double rel_error = std::abs(avg_sxx - expected_stress) / expected_stress;
     EXPECT_LT(rel_error, 0.30);
+}
+
+// ==========================================================================
+// CONTACT MECHANICS TESTS
+// ==========================================================================
+
+// Test gap function computation
+TEST(ContactTest, GapFunction) {
+    // Master segment from (0,0) to (1,0) -- CCW ordered
+    double nx, ny, xi;
+
+    // Slave at (0.5, 0.1) -- above segment, should have positive gap (separated)
+    double gap = contact::compute_gap(0.5, 0.1, 0.0, 0.0, 1.0, 0.0, nx, ny, xi);
+    EXPECT_NEAR(gap, 0.1, 1e-10);
+    EXPECT_NEAR(ny, 1.0, 1e-10);  // normal points up (outward for CCW segment)
+
+    // Slave at (0.5, -0.1) -- below segment, should have negative gap (penetrating)
+    gap = contact::compute_gap(0.5, -0.1, 0.0, 0.0, 1.0, 0.0, nx, ny, xi);
+    EXPECT_NEAR(gap, -0.1, 1e-10);
+    EXPECT_NEAR(ny, 1.0, 1e-10);  // normal still points up (outward)
+
+    // Slave at (0.5, 0.0) -- on segment, gap = 0
+    gap = contact::compute_gap(0.5, 0.0, 0.0, 0.0, 1.0, 0.0, nx, ny, xi);
+    EXPECT_NEAR(gap, 0.0, 1e-10);
+}
+
+// Test contact surface creation
+TEST(ContactTest, BoundarySurfaceCreation) {
+    std::vector<int> boundary = {0, 1, 2, 3};
+    auto surface = contact::create_boundary_surface(boundary);
+
+    EXPECT_EQ(surface.num_segments(), 4);
+    EXPECT_EQ(surface.segments[0].node0, 0);
+    EXPECT_EQ(surface.segments[0].node1, 1);
+    EXPECT_EQ(surface.segments[3].node0, 3);
+    EXPECT_EQ(surface.segments[3].node1, 0);  // wraps around
+}
+
+// Test contact detection
+TEST(ContactTest, ContactDetection) {
+    set_dimension(2);
+    // Simple 2-node system
+    std::vector<Node> nodes = {
+        {0.0, 0.0}, {1.0, 0.0},  // master segment
+        {0.5, 0.05}               // slave (above, no contact)
+    };
+
+    contact::ContactSurface master;
+    master.add_segment(0, 1);
+
+    std::vector<int> slaves = {2};
+
+    auto pairs = contact::detect_contact(nodes, slaves, master);
+    EXPECT_EQ(pairs.size(), 0);  // no penetration, no contact
+}
+
+// Test contact detection with penetration
+TEST(ContactTest, ContactDetectionWithPenetration) {
+    set_dimension(2);
+    std::vector<Node> nodes = {
+        {0.0, 0.0}, {1.0, 0.0},  // master segment
+        {0.5, -0.05}              // slave (below, penetrating)
+    };
+
+    contact::ContactSurface master;
+    master.add_segment(0, 1);
+
+    std::vector<int> slaves = {2};
+
+    auto pairs = contact::detect_contact(nodes, slaves, master);
+    EXPECT_EQ(pairs.size(), 1);  // one penetration detected
+    EXPECT_LT(pairs[0].gap, 0.0);  // gap should be negative
+}
+
+// Test contact force assembly
+TEST(ContactTest, ForceAssembly) {
+    // Ensure 2D mode (3D tests may have set dimension=3)
+    set_dimension(2);
+
+    std::vector<Node> nodes = {
+        {0.0, 0.0}, {1.0, 0.0},  // master segment
+        {0.5, -0.05}              // slave (penetrating)
+    };
+
+    contact::ContactSurface master;
+    master.add_segment(0, 1);
+
+    std::vector<int> slaves = {2};
+
+    auto result = contact::assemble_contact_forces(nodes, slaves, master, 6, 1e6);
+
+    // Contact force should push slave upward (positive y)
+    EXPECT_GT(result.f_contact[5], 0.0);  // dof 5 = node 2, y-component
+    EXPECT_NEAR(result.f_contact[4], 0.0, 1e-10);  // no x-force for vertical gap
+}
+
+// Test Hertz contact setup (simplified version without mesh generation)
+TEST(ContactTest, HertzSetup) {
+    // Create a simple contact scenario manually
+    std::vector<Node> nodes = {
+        {0.0, 0.0}, {1.0, 0.0}, {2.0, 0.0},  // bottom plate top edge
+        {0.0, 0.5}, {1.0, 0.5}, {2.0, 0.5},  // top plate bottom edge
+    };
+
+    contact::ContactSurface master;
+    master.add_segment(0, 1);
+    master.add_segment(1, 2);
+
+    std::vector<int> slaves = {3, 4, 5};
+
+    // No penetration initially
+    auto pairs = contact::detect_contact(nodes, slaves, master);
+    EXPECT_EQ(pairs.size(), 0);
+
+    // Move top plate down to create penetration
+    std::vector<Node> deformed = nodes;
+    deformed[3].y = -0.05;  // penetrate
+    deformed[4].y = -0.05;
+    deformed[5].y = -0.05;
+
+    auto pairs2 = contact::detect_contact(deformed, slaves, master);
+    EXPECT_EQ(pairs2.size(), 3);  // all 3 nodes penetrating
 }
 
 // ==========================================================================
