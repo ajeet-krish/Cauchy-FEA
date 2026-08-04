@@ -4,6 +4,7 @@
 #include "elements_3d.hpp"
 #include "locking_mitigation.hpp"
 #include "contact.hpp"
+#include "nonlinear.hpp"
 #include "sparse.hpp"
 #include "solver.hpp"
 #include "mesh.hpp"
@@ -1219,6 +1220,126 @@ TEST(ContactTest, HertzSetup) {
 
     auto pairs2 = contact::detect_contact(deformed, slaves, master);
     EXPECT_EQ(pairs2.size(), 3);  // all 3 nodes penetrating
+}
+
+// ==========================================================================
+// NONLINEAR SOLVER TESTS
+// ==========================================================================
+
+// Test deformation gradient computation
+TEST(NonlinearTest, DeformationGradient) {
+    set_dimension(2);
+    // Unit square Q4 element
+    std::array<Node, 4> nodes = {
+        Node{0.0, 0.0}, Node{1.0, 0.0},
+        Node{1.0, 1.0}, Node{0.0, 1.0}
+    };
+
+    // Zero displacement -> F = I
+    std::array<double, 8> u_zero{};
+    auto F0 = nonlinear::DeformationGradient::compute(nodes, u_zero, 0.0, 0.0);
+    EXPECT_NEAR(F0.F11, 1.0, 1e-10);
+    EXPECT_NEAR(F0.F12, 0.0, 1e-10);
+    EXPECT_NEAR(F0.F21, 0.0, 1e-10);
+    EXPECT_NEAR(F0.F22, 1.0, 1e-10);
+
+    // Uniform extension in x: u = (0.1*x, 0)
+    std::array<double, 8> u_ext = {0.0, 0.0, 0.1, 0.0, 0.1, 0.0, 0.0, 0.0};
+    auto F1 = nonlinear::DeformationGradient::compute(nodes, u_ext, 0.0, 0.0);
+    EXPECT_NEAR(F1.F11, 1.1, 1e-10);
+    EXPECT_NEAR(F1.F22, 1.0, 1e-10);
+}
+
+// Test Green-Lagrange strain
+TEST(NonlinearTest, GreenLagrangeStrain) {
+    set_dimension(2);
+    std::array<Node, 4> nodes = {
+        Node{0.0, 0.0}, Node{1.0, 0.0},
+        Node{1.0, 1.0}, Node{0.0, 1.0}
+    };
+
+    // Zero displacement -> E = 0
+    std::array<double, 8> u_zero{};
+    auto F = nonlinear::DeformationGradient::compute(nodes, u_zero, 0.0, 0.0);
+    double E11, E22, E12;
+    F.green_lagrange_strain(E11, E22, E12);
+    EXPECT_NEAR(E11, 0.0, 1e-10);
+    EXPECT_NEAR(E22, 0.0, 1e-10);
+    EXPECT_NEAR(E12, 0.0, 1e-10);
+}
+
+// Test internal force computation
+TEST(NonlinearTest, InternalForces) {
+    set_dimension(2);
+    auto m = mesh::generate_structured_quad(1.0, 1.0, 2, 2);
+    m.mat = Material::steel();
+    m.mat.t = 0.01;
+    m.plane = PlaneType::STRESS;
+
+    // Zero displacement -> internal forces should be zero
+    std::vector<double> u_zero(m.num_dofs(), 0.0);
+    auto result = nonlinear::compute_internal_forces(m, u_zero);
+
+    double f_norm = 0.0;
+    for (int i = 0; i < m.num_dofs(); ++i) {
+        f_norm += result.f_int[i] * result.f_int[i];
+    }
+    f_norm = std::sqrt(f_norm);
+
+    EXPECT_NEAR(f_norm, 0.0, 1e-10);
+    EXPECT_NEAR(result.strain_energy, 0.0, 1e-10);
+}
+
+// Test Newton-Raphson on a simple linear problem
+// Verify that tangent stiffness matches linear stiffness at u=0
+TEST(NonlinearTest, NewtonRaphsonLinear) {
+    set_dimension(2);
+    auto m = mesh::generate_structured_quad(1.0, 1.0, 2, 2);
+    m.mat = Material::steel();
+    m.mat.t = 0.01;
+    m.plane = PlaneType::STRESS;
+
+    // Fix left edge
+    for (int i = 0; i < m.num_nodes(); ++i) {
+        if (std::abs(m.nodes[i].x) < 1e-10) {
+            m.dirichlet.push_back({i, 0, 0.0});
+            m.dirichlet.push_back({i, 1, 0.0});
+        }
+    }
+
+    // At zero displacement, tangent stiffness should match linear stiffness
+    std::vector<double> u_zero(m.num_dofs(), 0.0);
+
+    // Compute tangent at u=0
+    auto K_tangent = nonlinear::compute_tangent_stiffness(m, u_zero);
+
+    // Compute linear stiffness (without penalty, for fair comparison)
+    auto K_coo = fea::assemble(m);
+    auto K_linear = K_coo.to_csr();
+
+    // Compare diagonal entries (should match for linear elasticity at u=0)
+    double max_diff = 0.0;
+    for (int i = 0; i < m.num_dofs(); ++i) {
+        double d_tangent = K_tangent.diagonal(i);
+        double d_linear = K_linear.diagonal(i);
+        if (d_linear > 1e-10) {
+            double diff = std::abs(d_tangent - d_linear) / d_linear;
+            max_diff = std::max(max_diff, diff);
+        }
+    }
+
+    std::cout << "Tangent vs linear stiffness max relative diff: " << max_diff << std::endl;
+
+    // They should be very close (within 1% for linear elasticity at u=0)
+    EXPECT_LT(max_diff, 0.01);
+
+    // Verify internal force is zero at zero displacement
+    auto f_int = nonlinear::compute_internal_forces(m, u_zero);
+    double f_norm = 0.0;
+    for (int i = 0; i < m.num_dofs(); ++i) {
+        f_norm += f_int.f_int[i] * f_int.f_int[i];
+    }
+    EXPECT_NEAR(std::sqrt(f_norm), 0.0, 1e-10);
 }
 
 // ==========================================================================
