@@ -98,33 +98,17 @@
       </tbody>
     </table>
 
-    <h2>Results</h2>
+    <h2>Results -- Interactive 3D Viewer</h2>
+    <p class="section-intro">
+      Rotate: left-click drag. Zoom: scroll. Pan: right-click drag.
+      Use the toolbar to switch contour types, toggle wireframe, and animate deformation.
+    </p>
 
-    <div class="static-plots">
-      <div class="plot-item">
-        <h3>Mesh Wireframe</h3>
-        <img src="assets/images/cantilever_3d/simulations/cantilever_3d_mesh_quality.png" alt="3D cantilever mesh" loading="lazy" />
-        <p>H8 hex mesh with boundary condition symbols.</p>
-      </div>
-
-      <div class="plot-item">
-        <h3>Displacement Contour</h3>
-        <img src="assets/images/cantilever_3d/simulations/cantilever_3d_displacement_contour.png" alt="3D displacement contour" loading="lazy" />
-        <p>Three-panel displacement field showing magnitude |u| and components.</p>
-      </div>
-
-      <div class="plot-item">
-        <h3>Stress Contour</h3>
-        <img src="assets/images/cantilever_3d/simulations/cantilever_3d_stress_contour.png" alt="3D stress contour" loading="lazy" />
-        <p>Four-panel stress field: Von Mises, sigma_1, sigma_2, sigma_xy.</p>
-      </div>
-
-      <div class="plot-item">
-        <h3>Deformed Mesh</h3>
-        <img src="assets/images/cantilever_3d/simulations/cantilever_3d_deformed_mesh.png" alt="3D deformed mesh" loading="lazy" />
-        <p>Deformed mesh (cyan) overlaid on original (gray dashed) with displacement vectors.</p>
-      </div>
+    <div class="viewer-container" id="fea-viewer-3d" style="width: 100%; aspect-ratio: 16/10; position: relative;">
     </div>
+
+    <div id="fea-controls-3d" style="margin: 0.5rem 0;"></div>
+    <div id="fea-colorbar-container-3d" style="position: relative;"></div>
 
     <h2>Validation</h2>
 
@@ -190,6 +174,42 @@
           { left: "$", right: "$", display: false }
         ]
       });
+    });
+  </script>
+
+  <!-- Three.js for 3D WebGL viewer -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+
+  <!-- FEA 3D Viewer -->
+  <script src="assets/js/colormaps.js"></script>
+  <script src="assets/js/fea-colorbar.js"></script>
+  <script src="assets/js/fea-viewer-3d.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const container = document.getElementById('fea-viewer-3d');
+      if (container) {
+        const viewer = new FEAViewer3D(container);
+
+        // Set up colorbar
+        const colorbarContainer = document.getElementById('fea-colorbar-container-3d');
+        if (colorbarContainer) {
+          const colorbar = new FEAColorbar(colorbarContainer);
+          colorbar.create();
+          viewer.setColorbar(colorbar);
+        }
+
+        // Set up controls
+        const controlsContainer = document.getElementById('fea-controls-3d');
+        if (controlsContainer) {
+          const controls = new FEAControls3D(viewer);
+          controls.createToolbar(controlsContainer);
+        }
+
+        // Load data
+        viewer.loadData('assets/data/cantilever_3d.json');
+      }
     });
   </script>
 
