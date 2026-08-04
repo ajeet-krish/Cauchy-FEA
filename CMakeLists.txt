@@ -85,7 +85,13 @@ set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-add_executable(FEA_Tests src/fea_test.cpp ${FEA_HEADERS})
+add_executable(FEA_Tests
+  src/fea_test.cpp
+  tests/test_c_api.cpp
+  src/fea_solver_c_api.cpp
+  src/fea_solver_c_api.h
+  ${FEA_HEADERS}
+)
 target_include_directories(FEA_Tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(FEA_Tests PRIVATE GTest::gtest_main OpenMP::OpenMP_CXX)
 

@@ -31,3 +31,12 @@ pinn/models/
 *.swp
 *.swo
 *~
+
+# Node.js / Desktop app
+node_modules/
+dist/
+package-lock.json
+*.tgz
+
+# Rust / Tauri build
+src-tauri/target/
