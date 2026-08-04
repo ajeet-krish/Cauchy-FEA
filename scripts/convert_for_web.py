@@ -434,10 +434,12 @@ def convert_single(outdir, outfile):
     camera = compute_camera_preset(mesh)
 
     # Build output
+    # Use 'hex_elements' key for 3D, 'elements' for 2D
+    elem_key = 'hex_elements' if is_3d else 'elements'
     output = {
         'meta': meta or {},
         'nodes': node_array,
-        'elements': elem_array,
+        elem_key: elem_array,
         'displacement': disp_array,
         'stress': stress_data,
         'nodalStress': nodal_stress,

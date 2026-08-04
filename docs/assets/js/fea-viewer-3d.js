@@ -183,7 +183,9 @@ class FEAViewer3D {
 
     _parseData() {
         this.numNodes = this.data.nodes.length;
-        this.numElements = this.data.hex_elements.length;
+        // Support both 'hex_elements' and 'elements' keys
+        this.hexElements = this.data.hex_elements || this.data.elements || [];
+        this.numElements = this.hexElements.length;
 
         // Compute bounds from nodes
         let xmin = Infinity, xmax = -Infinity;
@@ -322,7 +324,7 @@ class FEAViewer3D {
      * Each hex has 6 faces, each face is 2 triangles = 12 triangles = 36 indices per hex.
      */
     _buildHexGeometry(nodes, displacement, scale) {
-        const hexElements = this.data.hex_elements;
+        const hexElements = this.hexElements;
 
         // Each hex: 6 faces * 2 tris * 3 verts = 36 vertices (non-indexed for flat shading
         // and per-vertex coloring). We duplicate vertices so each triangle gets its own
@@ -404,7 +406,7 @@ class FEAViewer3D {
             [0, 4], [1, 5], [2, 6], [3, 7]
         ];
 
-        for (const elem of this.data.hex_elements) {
+        for (const elem of this.hexElements) {
             const nodeIndices = [elem.n0, elem.n1, elem.n2, elem.n3,
                                  elem.n4, elem.n5, elem.n6, elem.n7];
 
@@ -430,7 +432,7 @@ class FEAViewer3D {
         const scale = 0.1;
 
         for (let i = 0; i < this.numElements; i++) {
-            const elem = this.data.hex_elements[i];
+            const elem = this.hexElements[i];
             const nodeIndices = [elem.n0, elem.n1, elem.n2, elem.n3,
                                  elem.n4, elem.n5, elem.n6, elem.n7];
 
@@ -592,7 +594,7 @@ class FEAViewer3D {
             // original node each vertex corresponds to. We rebuild the mapping.
             const colors = new Float32Array(positions.count * 3);
 
-            const hexElements = this.data.hex_elements;
+            const hexElements = this.hexElements;
 
             const faceNodeIndices = [
                 [0, 1, 2, 3],   // Bottom
