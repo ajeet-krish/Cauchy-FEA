@@ -40,6 +40,9 @@ enum class CaseType { CANTILEVER, MICHELL, COOK, LBRACKET, PATCH, PLATE_HOLE, TH
 // Plane stress vs plane strain
 enum class PlaneType { STRESS, STRAIN };
 
+// Q4 integration type (for shear locking mitigation)
+enum class IntegrationType { FULL, SRI, BBAR };
+
 // Convert CaseType to string for JSON output
 inline const char* case_name(CaseType c) {
     switch (c) {
@@ -61,6 +64,17 @@ inline const char* case_name(CaseType c) {
 inline CaseType g_case = CaseType::CANTILEVER;
 inline AnalysisType g_analysis = AnalysisType::STATIC;
 inline PlaneType g_plane = PlaneType::STRESS;
+inline IntegrationType g_integration = IntegrationType::FULL;
+
+// Convert IntegrationType to string
+inline const char* integration_name(IntegrationType t) {
+    switch (t) {
+        case IntegrationType::FULL: return "Full (2x2)";
+        case IntegrationType::SRI:  return "SRI";
+        case IntegrationType::BBAR: return "B-Bar";
+    }
+    return "Unknown";
+}
 
 // ------------------------------------------------------------------
 // Material properties

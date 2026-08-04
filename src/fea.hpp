@@ -2,6 +2,7 @@
 #include "fea_types.hpp"
 #include "elements.hpp"
 #include "elements_3d.hpp"
+#include "locking_mitigation.hpp"
 #include "sparse.hpp"
 #include "solver.hpp"
 #include "mesh.hpp"
@@ -37,7 +38,15 @@ inline COOMatrix assemble(const Mesh& m) {
                 elem_nodes[i] = m.nodes[elem[i]];
             }
 
-            auto Ke = elements::Q4Element::stiffness(elem_nodes, m.mat, m.plane);
+            // Select Q4 element formulation based on integration type
+            std::array<std::array<double, 8>, 8> Ke;
+            if (g_integration == IntegrationType::SRI) {
+                Ke = locking::Q4SRIElement::stiffness(elem_nodes, m.mat, m.plane);
+            } else if (g_integration == IntegrationType::BBAR) {
+                Ke = locking::Q4BBarElement::stiffness(elem_nodes, m.mat, m.plane);
+            } else {
+                Ke = elements::Q4Element::stiffness(elem_nodes, m.mat, m.plane);
+            }
             auto dof_idx = elements::Q4Element::dof_indices(elem);
 
             for (int i = 0; i < 8; ++i) {
