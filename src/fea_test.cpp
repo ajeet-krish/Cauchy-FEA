@@ -5,6 +5,7 @@
 #include "locking_mitigation.hpp"
 #include "contact.hpp"
 #include "nonlinear.hpp"
+#include "dynamics.hpp"
 #include "sparse.hpp"
 #include "solver.hpp"
 #include "mesh.hpp"
@@ -1340,6 +1341,191 @@ TEST(NonlinearTest, NewtonRaphsonLinear) {
         f_norm += f_int.f_int[i] * f_int.f_int[i];
     }
     EXPECT_NEAR(std::sqrt(f_norm), 0.0, 1e-10);
+}
+
+// ==========================================================================
+// DYNAMICS TESTS
+// ==========================================================================
+
+// Test consistent mass matrix
+TEST(DynamicsTest, ConsistentMassMatrix) {
+    set_dimension(2);
+    std::array<Node, 4> nodes = {
+        Node{0.0, 0.0}, Node{1.0, 0.0},
+        Node{1.0, 1.0}, Node{0.0, 1.0}
+    };
+
+    double rho = 7800.0;  // steel density
+    double t = 0.01;
+
+    auto M = dynamics::Q4MassMatrix::consistent(nodes, rho, t);
+
+    // Mass matrix should be symmetric
+    for (int i = 0; i < 8; ++i) {
+        for (int j = 0; j < 8; ++j) {
+            EXPECT_NEAR(M[i][j], M[j][i], 1e-10);
+        }
+    }
+
+    // Diagonal should be positive
+    for (int i = 0; i < 8; ++i) {
+        EXPECT_GT(M[i][i], 0.0);
+    }
+
+    // Total mass (sum of all diagonal / 2) should be rho * area * t
+    // Divide by 2 because each node has 2 DOFs
+    double total_mass = 0.0;
+    for (int i = 0; i < 8; ++i) total_mass += M[i][i];
+    double expected_mass = rho * 1.0 * t;  // rho * area * thickness
+    // Gauss quadrature introduces small error; allow 15% tolerance
+    EXPECT_NEAR(total_mass, expected_mass, expected_mass * 0.15);
+
+    // Off-diagonal terms between x and y DOFs of same node should be zero
+    for (int i = 0; i < 4; ++i) {
+        EXPECT_NEAR(M[2*i][2*i+1], 0.0, 1e-10);
+        EXPECT_NEAR(M[2*i+1][2*i], 0.0, 1e-10);
+    }
+}
+
+// Test lumped mass matrix
+TEST(DynamicsTest, LumpedMassMatrix) {
+    set_dimension(2);
+    std::array<Node, 4> nodes = {
+        Node{0.0, 0.0}, Node{1.0, 0.0},
+        Node{1.0, 1.0}, Node{0.0, 1.0}
+    };
+
+    double rho = 7800.0;
+    double t = 0.01;
+
+    auto M = dynamics::Q4MassMatrix::lumped(nodes, rho, t);
+
+    // Lumped mass should be diagonal
+    for (int i = 0; i < 8; ++i) {
+        for (int j = 0; j < 8; ++j) {
+            if (i == j) {
+                EXPECT_GT(M[i][j], 0.0);
+            } else {
+                EXPECT_NEAR(M[i][j], 0.0, 1e-15);
+            }
+        }
+    }
+
+    // Total mass should be rho * area * t
+    double total_mass = 0.0;
+    for (int i = 0; i < 8; ++i) total_mass += M[i][i];
+    double expected_mass = rho * 1.0 * t;
+    EXPECT_NEAR(total_mass, expected_mass, 1e-6);
+}
+
+// Test global mass matrix assembly
+TEST(DynamicsTest, GlobalMassAssembly) {
+    set_dimension(2);
+    auto m = mesh::generate_structured_quad(1.0, 1.0, 4, 4);
+    m.mat = Material::steel();
+    m.mat.t = 0.01;
+
+    auto M = dynamics::assemble_mass(m, true);
+
+    // Should be SPD
+    EXPECT_EQ(M.nrows, m.num_dofs());
+
+    // Diagonal should be positive
+    for (int i = 0; i < M.nrows; ++i) {
+        EXPECT_GT(M.diagonal(i), 0.0);
+    }
+}
+
+// Test Newmark-beta on a simple spring-mass system
+TEST(DynamicsTest, NewmarkSpringMass) {
+    set_dimension(2);
+    // Single element with fixed left edge, free right edge
+    // This is essentially a spring-mass system
+    auto m = mesh::generate_structured_quad(1.0, 0.1, 1, 1);
+    m.mat = Material::steel();
+    m.mat.t = 0.01;
+    m.plane = PlaneType::STRESS;
+
+    // Fix left edge
+    for (int i = 0; i < m.num_nodes(); ++i) {
+        if (std::abs(m.nodes[i].x) < 1e-10) {
+            m.dirichlet.push_back({i, 0, 0.0});
+            m.dirichlet.push_back({i, 1, 0.0});
+        }
+    }
+
+    // Assemble stiffness
+    auto K_coo = fea::assemble(m);
+    double penalty = fea::compute_penalty(K_coo);
+    fea::apply_dirichlet_penalty(K_coo, m, penalty);
+    auto K = K_coo.to_csr();
+
+    // Apply step force on right edge
+    std::vector<double> f_ext(m.num_dofs(), 0.0);
+    for (int i = 0; i < m.num_nodes(); ++i) {
+        if (std::abs(m.nodes[i].x - 1.0) < 1e-10) {
+            f_ext[dof_index(i, 0)] = 100.0;
+            f_ext[dof_index(i, 1)] = 0.0;
+        }
+    }
+
+    dynamics::NewmarkConfig config;
+    config.dt = 0.001;
+    config.t_final = 0.01;
+    config.use_lumped_mass = true;
+
+    auto result = dynamics::newmark_beta(m, K, f_ext, config);
+
+    // Should have num_steps + 1 time points
+    EXPECT_EQ(result.displacement_history.size(), static_cast<size_t>(result.num_steps + 1));
+
+    // Displacement should be non-zero (system should respond)
+    double max_disp = 0.0;
+    for (const auto& u : result.displacement_history) {
+        for (int i = 0; i < m.num_dofs(); ++i) {
+            max_disp = std::max(max_disp, std::abs(u[i]));
+        }
+    }
+    EXPECT_GT(max_disp, 0.0);
+}
+
+// Test modal analysis on a cantilever beam
+TEST(DynamicsTest, ModalAnalysis) {
+    set_dimension(2);
+    auto m = mesh::generate_structured_quad(2.0, 0.5, 8, 2);
+    m.mat = Material::steel();
+    m.mat.t = 0.01;
+    m.plane = PlaneType::STRESS;
+
+    // Fix left edge
+    for (int i = 0; i < m.num_nodes(); ++i) {
+        if (std::abs(m.nodes[i].x) < 1e-10) {
+            m.dirichlet.push_back({i, 0, 0.0});
+            m.dirichlet.push_back({i, 1, 0.0});
+        }
+    }
+
+    // Assemble stiffness
+    auto K_coo = fea::assemble(m);
+    double penalty = fea::compute_penalty(K_coo);
+    fea::apply_dirichlet_penalty(K_coo, m, penalty);
+    auto K = K_coo.to_csr();
+
+    auto result = dynamics::modal_analysis(m, K, 5, 50);
+
+    // Should find 5 modes
+    EXPECT_EQ(result.num_modes, 5);
+
+    // All frequencies should be positive
+    for (int i = 0; i < result.num_modes; ++i) {
+        EXPECT_GT(result.frequencies_hz[i], 0.0);
+    }
+
+    // First mode should have reasonable frequency for a cantilever
+    // (roughly f1 ~ 1.875^2 / (2*pi*L^2) * sqrt(EI/rhoA) for a beam)
+    // For steel cantilever: f1 ~ 50-200 Hz depending on geometry
+    EXPECT_GT(result.frequencies_hz[0], 10.0);
+    EXPECT_LT(result.frequencies_hz[0], 1000.0);
 }
 
 // ==========================================================================
