@@ -977,6 +977,96 @@ input[type="range"]::-webkit-slider-thumb:hover {
   border: none;
 }
 
+/* Boundary Condition Editor */
+.bc-tool-bar {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+
+.bc-tool-btn {
+  flex: 1;
+  padding: 5px 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.bc-tool-btn:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+
+.bc-tool-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0d1117;
+  font-weight: 600;
+}
+
+.bc-tool-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.bc-force-controls {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.bc-presets {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.bc-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.bc-load-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.force-input {
+  width: 80px;
+}
+
+.force-input-inline {
+  width: 60px;
+  padding: 2px 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  text-align: right;
+}
+
+.force-input-inline:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   * {

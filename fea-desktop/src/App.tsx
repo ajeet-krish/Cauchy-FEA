@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { ProjectState, Shape, Material, DirichletBC, NeumannBC } from './types';
+import type { ProjectState, Shape, Material, DirichletBC, NeumannBC, BCTool } from './types';
 import GeometryEditor from './components/GeometryEditor';
 import BCLoadEditor from './components/BCLoadEditor';
 import MeshCanvas from './components/MeshCanvas';
@@ -32,6 +32,7 @@ function App() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [meshGenerating, setMeshGenerating] = useState(false);
   const [shapesDirty, setShapesDirty] = useState(false);
+  const [activeBCTool, setActiveBCTool] = useState<BCTool>(null);
 
   const togglePanel = (name: string) => {
     setCollapsed((prev) => ({ ...prev, [name]: !prev[name] }));
@@ -43,15 +44,21 @@ function App() {
   };
 
   const handleMaterialChange = (material: Material) => {
+    if (!Number.isFinite(material.E) || material.E <= 0) return;
+    if (!Number.isFinite(material.nu) || material.nu <= 0 || material.nu >= 0.5) return;
+    if (!Number.isFinite(material.rho) || material.rho <= 0) return;
+    if (!Number.isFinite(material.t) || material.t <= 0) return;
     setProject((prev) => ({ ...prev, material }));
   };
 
   const handleNxChange = (nx: number) => {
-    setProject((prev) => ({ ...prev, nx }));
+    const clamped = Math.max(2, Math.min(200, Math.floor(nx) || 2));
+    setProject((prev) => ({ ...prev, nx: clamped }));
   };
 
   const handleNyChange = (ny: number) => {
-    setProject((prev) => ({ ...prev, ny }));
+    const clamped = Math.max(2, Math.min(200, Math.floor(ny) || 2));
+    setProject((prev) => ({ ...prev, ny: clamped }));
   };
 
   const handleElemTypeChange = (elemType: number) => {
@@ -68,6 +75,117 @@ function App() {
 
   const handleNeumannChange = (neumann: NeumannBC[]) => {
     setProject((prev) => ({ ...prev, neumann }));
+  };
+
+  const handleBCToolChange = (tool: BCTool) => {
+    setActiveBCTool(tool);
+  };
+
+  const handleNodeClick = (nodeIndex: number) => {
+    if (!activeBCTool) return;
+
+    setProject((prev) => {
+      if (!prev.mesh) return prev;
+      if (nodeIndex < 0 || nodeIndex >= prev.mesh.nodes.length) return prev;
+
+      // Fixed UX+UY
+      if (activeBCTool === 'fixed_ux_uy') {
+        const existing = prev.dirichlet.filter((bc) => bc.node === nodeIndex);
+        if (existing.length > 0) return prev;
+        return {
+          ...prev,
+          dirichlet: [
+            ...prev.dirichlet,
+            { node: nodeIndex, dof: 0, value: 0 },
+            { node: nodeIndex, dof: 1, value: 0 },
+          ],
+        };
+      }
+
+      // Fixed UX only
+      if (activeBCTool === 'fixed_ux') {
+        const existing = prev.dirichlet.filter(
+          (bc) => bc.node === nodeIndex && bc.dof === 0,
+        );
+        if (existing.length > 0) return prev;
+        return {
+          ...prev,
+          dirichlet: [
+            ...prev.dirichlet,
+            { node: nodeIndex, dof: 0, value: 0 },
+          ],
+        };
+      }
+
+      // Fixed UY only
+      if (activeBCTool === 'fixed_uy') {
+        const existing = prev.dirichlet.filter(
+          (bc) => bc.node === nodeIndex && bc.dof === 1,
+        );
+        if (existing.length > 0) return prev;
+        return {
+          ...prev,
+          dirichlet: [
+            ...prev.dirichlet,
+            { node: nodeIndex, dof: 1, value: 0 },
+          ],
+        };
+      }
+
+      // Roller X: constrained in Y
+      if (activeBCTool === 'roller_x') {
+        const existing = prev.dirichlet.filter(
+          (bc) => bc.node === nodeIndex && bc.dof === 1,
+        );
+        if (existing.length > 0) return prev;
+        return {
+          ...prev,
+          dirichlet: [
+            ...prev.dirichlet,
+            { node: nodeIndex, dof: 1, value: 0 },
+          ],
+        };
+      }
+
+      // Roller Y: constrained in X
+      if (activeBCTool === 'roller_y') {
+        const existing = prev.dirichlet.filter(
+          (bc) => bc.node === nodeIndex && bc.dof === 0,
+        );
+        if (existing.length > 0) return prev;
+        return {
+          ...prev,
+          dirichlet: [
+            ...prev.dirichlet,
+            { node: nodeIndex, dof: 0, value: 0 },
+          ],
+        };
+      }
+
+      // Force X
+      if (activeBCTool === 'force_x') {
+        return {
+          ...prev,
+          neumann: [
+            ...prev.neumann,
+            { node: nodeIndex, dof: 0, value: -1000 },
+          ],
+        };
+      }
+
+      // Force Y
+      if (activeBCTool === 'force_y') {
+        return {
+          ...prev,
+          neumann: [
+            ...prev.neumann,
+            { node: nodeIndex, dof: 1, value: -1000 },
+          ],
+        };
+      }
+
+      return prev;
+    });
   };
 
   const handleGenerateMesh = async () => {
@@ -92,12 +210,12 @@ function App() {
   const handleSolve = async () => {
     if (!project.mesh) return;
     try {
-      const result = await invoke('solve', {
-        meshJson: JSON.stringify(project.mesh),
-        materialJson: JSON.stringify(project.material),
-        dirichletJson: JSON.stringify(project.dirichlet),
-        neumannJson: JSON.stringify(project.neumann),
+      const configJson = JSON.stringify({
         planeType: project.planeType,
+      });
+      const result = await invoke('run_fea_solve', {
+        meshJson: JSON.stringify(project.mesh),
+        configJson,
       });
       setProject((prev) => ({ ...prev, result: result as ProjectState['result'] }));
     } catch (err) {
@@ -328,8 +446,11 @@ function App() {
             </div>
             <div className={`panel-body ${collapsed['bc'] ? 'collapsed' : ''}`}>
               <BCLoadEditor
+                mesh={project.mesh}
                 dirichlet={project.dirichlet}
                 neumann={project.neumann}
+                activeBCTool={activeBCTool}
+                onBCToolChange={handleBCToolChange}
                 onDirichletChange={handleDirichletChange}
                 onNeumannChange={handleNeumannChange}
               />
@@ -408,7 +529,16 @@ function App() {
               </div>
             ) : project.mesh ? (
               <div className="canvas-container">
-                <MeshCanvas mesh={project.mesh} showGrid showNodes />
+                <MeshCanvas
+                  mesh={project.mesh}
+                  showGrid
+                  showNodes
+                  bcTool={activeBCTool}
+                  dirichlet={project.dirichlet}
+                  neumann={project.neumann}
+                  selectedNode={null}
+                  onNodeClick={handleNodeClick}
+                />
               </div>
             ) : (
               <div className="canvas-placeholder">

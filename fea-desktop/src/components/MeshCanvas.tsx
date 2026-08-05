@@ -1,10 +1,16 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import type { MeshData, Point } from '../types';
+import type { MeshData, Point, DirichletBC, NeumannBC, BCTool } from '../types';
+import { renderBCs, drawSelectedNode, drawHoverNode } from '../utils/bc-renderer';
 
 interface MeshCanvasProps {
   mesh: MeshData | null;
   showGrid?: boolean;
   showNodes?: boolean;
+  bcTool?: BCTool | null;
+  dirichlet?: DirichletBC[];
+  neumann?: NeumannBC[];
+  selectedNode?: number | null;
+  onNodeClick?: (nodeIndex: number) => void;
 }
 
 // Element color palette (cycling)
@@ -40,12 +46,46 @@ function getBBox(nodes: Point[]): { x0: number; y0: number; x1: number; y1: numb
   return { x0: x0 - pad, y0: y0 - pad, x1: x1 + pad, y1: y1 + pad };
 }
 
-export default function MeshCanvas({ mesh, showGrid = true, showNodes = true }: MeshCanvasProps) {
+/**
+ * Find the nearest node to a screen position within a threshold.
+ * Returns the node index or -1 if no node is close enough.
+ */
+function findNearestNode(
+  sx: number,
+  sy: number,
+  nodes: Point[],
+  toScreen: (pt: Point) => { sx: number; sy: number },
+  thresholdPx: number = 20,
+): number {
+  let bestIdx = -1;
+  let bestDist = thresholdPx;
+  for (let i = 0; i < nodes.length; i++) {
+    const { sx: nsx, sy: nsy } = toScreen(nodes[i]);
+    const dist = Math.hypot(nsx - sx, nsy - sy);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
+}
+
+export default function MeshCanvas({
+  mesh,
+  showGrid = true,
+  showNodes = true,
+  bcTool = null,
+  dirichlet = [],
+  neumann = [],
+  selectedNode = null,
+  onNodeClick,
+}: MeshCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewOffset, setViewOffset] = useState({ x: 0, y: 0 });
   const [viewScale, setViewScale] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState<{ px: number; py: number; ox: number; oy: number } | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<number | null>(null);
 
   // Compute transform to fit mesh in canvas
   const computeTransform = useCallback((canvasW: number, canvasH: number) => {
@@ -69,6 +109,20 @@ export default function MeshCanvas({ mesh, showGrid = true, showNodes = true }: 
     const offsetY = canvasH / 2 - centerY * scale + viewOffset.y;
     return { offsetX, offsetY, scale };
   }, [mesh, viewScale, viewOffset]);
+
+  // Convert world coordinates to screen coordinates
+  const worldToScreen = useCallback(
+    (pt: Point) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return { sx: 0, sy: 0 };
+      const { offsetX, offsetY, scale } = computeTransform(canvas.width, canvas.height);
+      return {
+        sx: offsetX + pt.x * scale,
+        sy: offsetY + pt.y * scale,
+      };
+    },
+    [computeTransform],
+  );
 
   // Draw
   const draw = useCallback(() => {
@@ -109,19 +163,19 @@ export default function MeshCanvas({ mesh, showGrid = true, showNodes = true }: 
       const startGx = Math.floor(bbox.x0 / gridStep) * gridStep;
       const endGx = Math.ceil(bbox.x1 / gridStep) * gridStep;
       for (let gx = startGx; gx <= endGx; gx += gridStep) {
-        const { sx } = toScreen({ x: gx, y: 0 });
+        const { sx: gsx } = toScreen({ x: gx, y: 0 });
         ctx.beginPath();
-        ctx.moveTo(sx, 0);
-        ctx.lineTo(sx, h);
+        ctx.moveTo(gsx, 0);
+        ctx.lineTo(gsx, h);
         ctx.stroke();
       }
       const startGy = Math.floor(bbox.y0 / gridStep) * gridStep;
       const endGy = Math.ceil(bbox.y1 / gridStep) * gridStep;
       for (let gy = startGy; gy <= endGy; gy += gridStep) {
-        const { sy } = toScreen({ x: 0, y: gy });
+        const { sy: gsy } = toScreen({ x: 0, y: gy });
         ctx.beginPath();
-        ctx.moveTo(0, sy);
-        ctx.lineTo(w, sy);
+        ctx.moveTo(0, gsy);
+        ctx.lineTo(w, gsy);
         ctx.stroke();
       }
     }
@@ -163,16 +217,33 @@ export default function MeshCanvas({ mesh, showGrid = true, showNodes = true }: 
       ctx.stroke();
     }
 
+    // Draw BC symbols
+    if ((dirichlet.length > 0 || neumann.length > 0) && mesh.nodes.length > 0) {
+      renderBCs(ctx, dirichlet, neumann, mesh.nodes, toScreen, 16);
+    }
+
     // Draw nodes
     if (showNodes) {
       const nodeRadius = Math.max(1.5, Math.min(3, 2000 / mesh.nodes.length));
       for (const node of mesh.nodes) {
-        const { sx, sy } = toScreen(node);
+        const { sx: nsx, sy: nsy } = toScreen(node);
         ctx.fillStyle = NODE_COLOR;
         ctx.beginPath();
-        ctx.arc(sx, sy, nodeRadius, 0, Math.PI * 2);
+        ctx.arc(nsx, nsy, nodeRadius, 0, Math.PI * 2);
         ctx.fill();
       }
+    }
+
+    // Draw selected node highlight
+    if (selectedNode !== null && selectedNode >= 0 && selectedNode < mesh.nodes.length) {
+      const { sx: selSx, sy: selSy } = toScreen(mesh.nodes[selectedNode]);
+      drawSelectedNode(ctx, selSx, selSy, 8);
+    }
+
+    // Draw hover node highlight (when a BC tool is active)
+    if (hoveredNode !== null && hoveredNode >= 0 && hoveredNode < mesh.nodes.length) {
+      const { sx: hovSx, sy: hovSy } = toScreen(mesh.nodes[hoveredNode]);
+      drawHoverNode(ctx, hovSx, hovSy, 6);
     }
 
     // Coordinate axes at bottom-left
@@ -229,7 +300,7 @@ export default function MeshCanvas({ mesh, showGrid = true, showNodes = true }: 
     ctx.fillText(`Nodes: ${mesh.num_nodes}`, w - 152, 14);
     ctx.fillText(`Elements: ${mesh.num_elements}`, w - 152, 28);
     ctx.fillText(`DOFs: ${mesh.num_dofs}`, w - 152, 42);
-  }, [mesh, showGrid, showNodes, computeTransform]);
+  }, [mesh, showGrid, showNodes, computeTransform, dirichlet, neumann, selectedNode, hoveredNode]);
 
   useEffect(() => {
     draw();
@@ -265,11 +336,35 @@ export default function MeshCanvas({ mesh, showGrid = true, showNodes = true }: 
     setViewScale((prev) => Math.max(0.1, Math.min(10, prev * delta)));
   };
 
+  // Get mouse position in screen coordinates
+  const getMouseScreen = (e: React.MouseEvent<HTMLCanvasElement>): { sx: number; sy: number } => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { sx: 0, sy: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      sx: e.clientX - rect.left,
+      sy: e.clientY - rect.top,
+    };
+  };
+
   // Pan start
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button !== 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    const { sx, sy } = getMouseScreen(e);
+
+    // If a BC tool is active, check for node click first
+    if (bcTool && onNodeClick && mesh && mesh.nodes.length > 0) {
+      const nodeIdx = findNearestNode(sx, sy, mesh.nodes, worldToScreen);
+      if (nodeIdx >= 0) {
+        onNodeClick(nodeIdx);
+        return;
+      }
+    }
+
+    // Otherwise, start panning
     const rect = canvas.getBoundingClientRect();
     setIsPanning(true);
     setPanStart({
@@ -282,6 +377,16 @@ export default function MeshCanvas({ mesh, showGrid = true, showNodes = true }: 
 
   // Pan move
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { sx, sy } = getMouseScreen(e);
+
+    // Update hover node when a BC tool is active
+    if (bcTool && mesh && mesh.nodes.length > 0) {
+      const nodeIdx = findNearestNode(sx, sy, mesh.nodes, worldToScreen);
+      setHoveredNode(nodeIdx >= 0 ? nodeIdx : null);
+    } else {
+      setHoveredNode(null);
+    }
+
     if (!isPanning || !panStart) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -300,7 +405,11 @@ export default function MeshCanvas({ mesh, showGrid = true, showNodes = true }: 
     setPanStart(null);
   };
 
-  const cursorStyle = isPanning ? 'grabbing' : 'grab';
+  const cursorStyle = (() => {
+    if (isPanning) return 'grabbing';
+    if (bcTool) return 'crosshair';
+    return 'grab';
+  })();
 
   return (
     <div className="mesh-canvas-container">

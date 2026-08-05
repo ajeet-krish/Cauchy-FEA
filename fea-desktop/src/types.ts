@@ -29,6 +29,16 @@ export interface NeumannBC {
   value: number;
 }
 
+export type BCTool =
+  | 'fixed_ux_uy'
+  | 'fixed_ux'
+  | 'fixed_uy'
+  | 'roller_x'
+  | 'roller_y'
+  | 'force_x'
+  | 'force_y'
+  | null;
+
 export interface Material {
   E: number;
   nu: number;
