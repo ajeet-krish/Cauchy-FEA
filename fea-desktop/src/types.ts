@@ -91,3 +91,37 @@ export interface ProjectState {
   ny: number;
   elemType: number; // 0=Q4, 1=Q8, 2=T3
 }
+
+export type SweepType = 'mesh_convergence' | 'material_study' | 'load_study';
+
+export interface SweepConfig {
+  sweepType: SweepType;
+  meshStartN: number;
+  meshEndN: number;
+  meshSteps: number;
+  materialProperty: 'E' | 'nu' | 'rho';
+  materialStart: number;
+  materialEnd: number;
+  materialSteps: number;
+  loadStart: number;
+  loadEnd: number;
+  loadSteps: number;
+}
+
+export interface SweepResult {
+  nx: number;
+  ny: number;
+  maxDisplacement: number;
+  maxStress: number;
+  solveTimeMs: number;
+  cgIterations: number;
+}
+
+export interface MaterialPreset {
+  name: string;
+  E: number;
+  nu: number;
+  rho: number;
+  alpha: number;
+  chipColor: string;
+}

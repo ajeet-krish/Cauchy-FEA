@@ -398,6 +398,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   flex-direction: column;
   background: var(--bg-canvas);
   min-width: 0;
+  position: relative;
 }
 
 .canvas-area {
@@ -1192,6 +1193,174 @@ input[type="range"]::-webkit-slider-thumb:hover {
   flex-shrink: 0;
   font-size: 12px;
   margin-top: 1px;
+}
+
+/* ==========================================================================
+   Phase 5: Material Library, Parameter Sweep, Convergence Chart
+   ========================================================================== */
+
+/* Material info card */
+.material-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.material-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.material-chip {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.material-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.material-card-props {
+  display: flex;
+  gap: 12px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Parameter sweep panel */
+.sweep-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sweep-config {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+/* Sweep progress bar */
+.sweep-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sweep-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.sweep-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.2s ease-out;
+}
+
+.sweep-progress-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+
+/* Sweep results table */
+.sweep-results {
+  margin-top: 8px;
+}
+
+.sweep-results h3 {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.sweep-results table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.sweep-results th {
+  text-align: left;
+  padding: 4px 6px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.sweep-results td {
+  padding: 4px 6px;
+  color: var(--text-primary);
+  border-bottom: 1px solid rgba(33, 38, 45, 0.5);
+  white-space: nowrap;
+}
+
+.sweep-results tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sweep-results tr:last-child td {
+  border-bottom: none;
+}
+
+/* Convergence chart */
+.convergence-chart {
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.convergence-chart canvas {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Sweep chart in content area overlay */
+.sweep-chart-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 260px;
+  z-index: 10;
+  border-top: 1px solid var(--border);
+}
+
+/* Sweep config sub-labels */
+.sweep-config .form-group label {
+  color: var(--accent);
 }
 
 /* Reduced motion */

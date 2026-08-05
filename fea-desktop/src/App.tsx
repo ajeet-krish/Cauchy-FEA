@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { ProjectState, SolveResult, Shape, Material, DirichletBC, NeumannBC, BCTool } from './types';
+import type { ProjectState, SolveResult, Shape, Material, DirichletBC, NeumannBC, BCTool, SweepResult } from './types';
 import GeometryEditor from './components/GeometryEditor';
 import BCLoadEditor from './components/BCLoadEditor';
 import MeshCanvas from './components/MeshCanvas';
 import ResultsCanvas from './components/ResultsCanvas';
 import SolverPanel from './components/SolverPanel';
 import ToolBar from './components/ToolBar';
+import MaterialLibrary from './components/MaterialLibrary';
+import ParameterSweep from './components/ParameterSweep';
+import ConvergenceChart from './components/ConvergenceChart';
 
 const DEFAULT_MATERIAL: Material = {
   E: 200e9,
@@ -37,6 +40,7 @@ function App() {
   const [solveError, setSolveError] = useState<string | null>(null);
   const [shapesDirty, setShapesDirty] = useState(false);
   const [activeBCTool, setActiveBCTool] = useState<BCTool>(null);
+  const [sweepResults, setSweepResults] = useState<SweepResult[]>([]);
 
   const togglePanel = (name: string) => {
     setCollapsed((prev) => ({ ...prev, [name]: !prev[name] }));
@@ -261,6 +265,7 @@ function App() {
       elemType: 0,
     });
     setShapesDirty(false);
+    setSweepResults([]);
   };
 
   const handleOpen = () => {
@@ -323,74 +328,10 @@ function App() {
               </span>
             </div>
             <div className={`panel-body ${collapsed['material'] ? 'collapsed' : ''}`}>
-              <div className="form-group">
-                <label>Preset</label>
-                <select
-                  value={`${project.material.E}-${project.material.nu}`}
-                  onChange={(e) => {
-                    const presets: Record<string, Material> = {
-                      '200e9-0.3': { E: 200e9, nu: 0.3, rho: 7850, t: 0.01 },
-                      '70e9-0.33': { E: 70e9, nu: 0.33, rho: 2700, t: 0.01 },
-                      '110e9-0.34': { E: 110e9, nu: 0.34, rho: 4500, t: 0.01 },
-                    };
-                    const mat = presets[e.target.value];
-                    if (mat) handleMaterialChange(mat);
-                  }}
-                >
-                  <option value="200e9-0.3">Steel (E=200 GPa)</option>
-                  <option value="70e9-0.33">Aluminum (E=70 GPa)</option>
-                  <option value="110e9-0.34">Titanium (E=110 GPa)</option>
-                  <option value="custom">Custom</option>
-                </select>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>E (Pa)</label>
-                  <input
-                    type="number"
-                    value={project.material.E}
-                    onChange={(e) =>
-                      handleMaterialChange({ ...project.material, E: +e.target.value })
-                    }
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Poisson</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={project.material.nu}
-                    onChange={(e) =>
-                      handleMaterialChange({ ...project.material, nu: +e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Density (kg/m3)</label>
-                  <input
-                    type="number"
-                    value={project.material.rho}
-                    onChange={(e) =>
-                      handleMaterialChange({ ...project.material, rho: +e.target.value })
-                    }
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Thickness (m)</label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    value={project.material.t}
-                    onChange={(e) =>
-                      handleMaterialChange({ ...project.material, t: +e.target.value })
-                    }
-                  />
-                </div>
-              </div>
+              <MaterialLibrary
+                material={project.material}
+                onChange={handleMaterialChange}
+              />
             </div>
           </div>
 
@@ -551,6 +492,30 @@ function App() {
               )}
             </div>
           </div>
+
+          {/* Parameter Sweep Panel */}
+          <div className="panel">
+            <div className="panel-header" onClick={() => togglePanel('sweep')}>
+              <h2>Parameter Sweep</h2>
+              <span className={`panel-toggle ${collapsed['sweep'] ? 'collapsed' : ''}`}>
+                &#9660;
+              </span>
+            </div>
+            <div className={`panel-body ${collapsed['sweep'] ? 'collapsed' : ''}`}>
+              <ParameterSweep
+                mesh={project.mesh}
+                dirichlet={project.dirichlet}
+                neumann={project.neumann}
+                material={project.material}
+                planeType={project.planeType}
+                nx={project.nx}
+                ny={project.ny}
+                elemType={project.elemType}
+                shapesJson={JSON.stringify(project.shapes)}
+                onSweepComplete={setSweepResults}
+              />
+            </div>
+          </div>
         </aside>
 
         <main className="content">
@@ -597,6 +562,16 @@ function App() {
               </div>
             )}
           </div>
+
+          {/* Convergence chart overlay when sweep data exists */}
+          {sweepResults.length > 0 && (
+            <div className="sweep-chart-overlay">
+              <ConvergenceChart
+                results={sweepResults}
+                title="Parameter Sweep: Max Displacement vs Mesh Density"
+              />
+            </div>
+          )}
         </main>
       </div>
 
