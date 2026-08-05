@@ -301,8 +301,8 @@ function App() {
     setSolverTimeMs(null);
     try {
       const configJson = JSON.stringify({
-        planeType: project.planeType,
-        solverType: project.solverType,
+        plane: project.planeType,
+        solver: project.solverType,
       });
       const startTime = performance.now();
       const resultStr = await invoke<string>('run_fea_solve', {
