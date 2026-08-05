@@ -54,6 +54,7 @@ function App() {
   const [activeBCTool, setActiveBCTool] = useState<BCTool>(null);
   const [sweepResults, setSweepResults] = useState<SweepResult[]>([]);
   const [isDirty, setIsDirty] = useState(false);
+  const [solverTimeMs, setSolverTimeMs] = useState<number | null>(null);
 
   // Update document title when dirty state changes
   useEffect(() => {
@@ -78,7 +79,7 @@ function App() {
       }
       if (mod && e.shiftKey && e.key === 'E') {
         e.preventDefault();
-        handleExportPng();
+        void handleExportPng();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -285,15 +286,19 @@ function App() {
     if (!project.mesh) return;
     setIsSolving(true);
     setSolveError(null);
+    setSolverTimeMs(null);
     try {
       const configJson = JSON.stringify({
         planeType: project.planeType,
         solverType: project.solverType,
       });
+      const startTime = performance.now();
       const result = await invoke('run_fea_solve', {
         meshJson: JSON.stringify(project.mesh),
         configJson,
       });
+      const elapsed = performance.now() - startTime;
+      setSolverTimeMs(elapsed);
 
       // Runtime validation before type assertion
       const parsed = result as Record<string, unknown>;
@@ -359,8 +364,28 @@ function App() {
     }
   };
 
-  const handleExportPng = () => {
-    console.log('Export PNG');
+  const handleExportPng = async () => {
+    try {
+      const canvas = document.querySelector('.canvas-container canvas') as HTMLCanvasElement;
+      if (!canvas) return;
+
+      const path = await save({
+        defaultPath: 'fea-result.png',
+        filters: [{ name: 'PNG Image', extensions: ['png'] }],
+      });
+      if (path) {
+        const dataUrl = canvas.toDataURL('image/png');
+        const base64 = dataUrl.split(',')[1];
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        await writeFile(path, bytes);
+      }
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
   };
 
   const elemTypeLabel = (t: number) => {
@@ -640,6 +665,48 @@ function App() {
               />
             </div>
           </div>
+
+          {/* Keyboard Shortcuts */}
+          <div className="panel shortcuts-panel">
+            <div className="panel-header" onClick={() => togglePanel('shortcuts')}>
+              <h2>Shortcuts</h2>
+              <span
+                className={`panel-toggle ${collapsed['shortcuts'] ? 'collapsed' : ''}`}
+              >
+                &#9660;
+              </span>
+            </div>
+            <div
+              className={`panel-body shortcuts-body ${collapsed['shortcuts'] ? 'collapsed' : ''}`}
+            >
+              <div className="shortcuts-grid">
+                <div className="shortcut-row">
+                  <kbd>Ctrl+S</kbd>
+                  <span>Save project</span>
+                </div>
+                <div className="shortcut-row">
+                  <kbd>Ctrl+O</kbd>
+                  <span>Open project</span>
+                </div>
+                <div className="shortcut-row">
+                  <kbd>Ctrl+N</kbd>
+                  <span>New project</span>
+                </div>
+                <div className="shortcut-row">
+                  <kbd>Ctrl+Shift+E</kbd>
+                  <span>Export PNG</span>
+                </div>
+                <div className="shortcut-row">
+                  <kbd>Scroll</kbd>
+                  <span>Zoom canvas</span>
+                </div>
+                <div className="shortcut-row">
+                  <kbd>Drag</kbd>
+                  <span>Pan canvas</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </aside>
 
         <main className="content">
@@ -663,13 +730,100 @@ function App() {
               </div>
             ) : (
               <div className="canvas-placeholder">
-                <div className="canvas-placeholder-icon">&#9632;</div>
+                <div className="canvas-placeholder-icon">
+                  <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                    <rect x="8" y="16" width="48" height="32" rx="2" stroke="currentColor" strokeWidth="2" strokeDasharray="4 2" opacity="0.4" />
+                    <circle cx="32" cy="32" r="8" stroke="currentColor" strokeWidth="2" strokeDasharray="4 2" opacity="0.3" />
+                    <path d="M24 32 L40 32 M32 24 L32 40" stroke="currentColor" strokeWidth="2" opacity="0.5" />
+                  </svg>
+                </div>
                 <div className="canvas-placeholder-text">
                   Draw geometry to define your structural domain
                 </div>
-                <div className="canvas-placeholder-hint">
-                  Use the Geometry panel to add rectangles, circles, I-beams,
-                  or L-brackets
+                <div className="canvas-placeholder-steps">
+                  <div className="placeholder-step">
+                    <span className="step-number">1</span>
+                    <span>Add shapes in the Geometry panel</span>
+                  </div>
+                  <div className="placeholder-step">
+                    <span className="step-number">2</span>
+                    <span>Generate mesh and assign boundary conditions</span>
+                  </div>
+                  <div className="placeholder-step">
+                    <span className="step-number">3</span>
+                    <span>Run solver and visualize results</span>
+                  </div>
+                </div>
+                <div className="canvas-placeholder-presets">
+                  <span className="presets-label">Quick Start:</span>
+                  <button
+                    className="preset-btn"
+                    onClick={() => {
+                      const preset = {
+                        id: '1',
+                        type: 'rectangle' as const,
+                        name: 'Cantilever',
+                        x: Math.round(project.nx * 0.1),
+                        y: Math.round(project.ny * 0.25),
+                        width: Math.round(project.nx * 0.8),
+                        height: Math.round(project.ny * 0.5),
+                      };
+                      setProject((prev) => ({ ...prev, shapes: [preset] }));
+                      setShapesDirty(true);
+                      setIsDirty(true);
+                    }}
+                  >
+                    Cantilever
+                  </button>
+                  <button
+                    className="preset-btn"
+                    onClick={() => {
+                      const preset = {
+                        id: '1',
+                        type: 'lbracket' as const,
+                        name: 'L-Bracket',
+                        x: Math.round(project.nx / 2),
+                        y: Math.round(project.ny / 2),
+                        width: Math.round(project.nx * 0.6),
+                        height: Math.round(project.ny * 0.8),
+                        flange: Math.round(Math.min(project.nx, project.ny) * 0.1),
+                      };
+                      setProject((prev) => ({ ...prev, shapes: [preset] }));
+                      setShapesDirty(true);
+                      setIsDirty(true);
+                    }}
+                  >
+                    L-Bracket
+                  </button>
+                  <button
+                    className="preset-btn"
+                    onClick={() => {
+                      const shapes = [
+                        {
+                          id: '1',
+                          type: 'rectangle' as const,
+                          name: 'Plate',
+                          x: 0,
+                          y: 0,
+                          width: project.nx,
+                          height: project.ny,
+                        },
+                        {
+                          id: '2',
+                          type: 'circle' as const,
+                          name: 'Hole',
+                          x: Math.round(project.nx / 2),
+                          y: Math.round(project.ny / 2),
+                          radius: Math.round(Math.min(project.nx, project.ny) * 0.2),
+                        },
+                      ];
+                      setProject((prev) => ({ ...prev, shapes }));
+                      setShapesDirty(true);
+                      setIsDirty(true);
+                    }}
+                  >
+                    Plate+Hole
+                  </button>
                 </div>
                 {shapesDirty && project.shapes.length > 0 && (
                   <button
@@ -706,13 +860,24 @@ function App() {
           <span>
             {isSolving
               ? 'Solving...'
-              : project.result
-                ? 'Solved'
-                : meshGenerating
-                  ? 'Generating...'
+              : meshGenerating
+                ? 'Generating mesh...'
+                : project.result
+                  ? 'Solved'
                   : 'Ready'}
           </span>
         </div>
+        {activeBCTool && (
+          <>
+            <div className="status-separator" />
+            <div className="status-item status-tool">
+              <span className="status-tool-badge">
+                {activeBCTool.replace(/_/g, ' ').replace('fixed', 'Fix').replace('force', 'F').replace('roller', 'Roll')}
+              </span>
+              <span>Click a node to apply</span>
+            </div>
+          </>
+        )}
         <div className="status-separator" />
         <div className="status-item">
           <span>Nodes: {project.mesh?.num_nodes ?? 0}</span>
@@ -735,6 +900,24 @@ function App() {
             {project.planeType === 'stress' ? 'Plane Stress' : 'Plane Strain'}
           </span>
         </div>
+        {solverTimeMs !== null && (
+          <>
+            <div className="status-separator" />
+            <div className="status-item">
+              <span className="status-solve-time">
+                {solverTimeMs.toFixed(0)} ms
+              </span>
+            </div>
+          </>
+        )}
+        {project.result?.cg_iterations != null && project.result.cg_iterations > 0 && (
+          <>
+            <div className="status-separator" />
+            <div className="status-item">
+              <span>{project.result.cg_iterations} CG iters</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
