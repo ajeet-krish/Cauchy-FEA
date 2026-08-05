@@ -888,232 +888,7 @@ export default function GeometryEditor({ shapes, nx, ny, onChange }: GeometryEdi
 
   return (
     <div className="geometry-editor">
-      <div className="editor-toolbar">
-        <div className="tool-group">
-          <button
-            className={`tool-btn ${activeTool === 'rectangle' ? 'active' : ''}`}
-            onClick={() => { setActiveTool('rectangle'); setPolygonPoints([]); }}
-            title="Draw Rectangle (click-drag)"
-          >
-            []
-          </button>
-          <button
-            className={`tool-btn ${activeTool === 'circle' ? 'active' : ''}`}
-            onClick={() => { setActiveTool('circle'); setPolygonPoints([]); }}
-            title="Draw Circle (click-drag)"
-          >
-            O
-          </button>
-          <button
-            className={`tool-btn ${activeTool === 'polygon' ? 'active' : ''}`}
-            onClick={() => setActiveTool('polygon')}
-            title="Draw Polygon (click vertices, click first to close)"
-          >
-            /_/
-          </button>
-          <button
-            className={`tool-btn ${activeTool === 'ibeam' ? 'active' : ''}`}
-            onClick={() => { setActiveTool('ibeam'); setPolygonPoints([]); }}
-            title="Place I-Beam (click to place)"
-          >
-            I
-          </button>
-          <button
-            className={`tool-btn ${activeTool === 'lbracket' ? 'active' : ''}`}
-            onClick={() => { setActiveTool('lbracket'); setPolygonPoints([]); }}
-            title="Place L-Bracket (click to place)"
-          >
-            L
-          </button>
-          <button
-            className={`tool-btn ${activeTool === 'move' ? 'active' : ''}`}
-            onClick={() => { setActiveTool('move'); setPolygonPoints([]); }}
-            title="Move shapes (click-drag)"
-          >
-            Move
-          </button>
-        </div>
-        <div className="tool-group">
-          <button className="tool-btn danger" onClick={clearAll} title="Clear All">
-            Clear
-          </button>
-        </div>
-      </div>
-
-      {/* I-beam parameter inputs when tool is active */}
-      {activeTool === 'ibeam' && (
-        <div className="shape-params">
-          <span className="params-label">I-Beam Defaults</span>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Flange W</label>
-              <input
-                type="number"
-                min="4"
-                value={ibeamParams.flangeWidth}
-                onChange={(e) => setIbeamParams({ ...ibeamParams, flangeWidth: +e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Height</label>
-              <input
-                type="number"
-                min="4"
-                value={ibeamParams.totalHeight}
-                onChange={(e) => setIbeamParams({ ...ibeamParams, totalHeight: +e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Flange Thk</label>
-              <input
-                type="number"
-                min="1"
-                value={ibeamParams.flangeThickness}
-                onChange={(e) => setIbeamParams({ ...ibeamParams, flangeThickness: +e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Web Thk</label>
-              <input
-                type="number"
-                min="1"
-                value={ibeamParams.webThickness}
-                onChange={(e) => setIbeamParams({ ...ibeamParams, webThickness: +e.target.value })}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* L-bracket parameter inputs when tool is active */}
-      {activeTool === 'lbracket' && (
-        <div className="shape-params">
-          <span className="params-label">L-Bracket Defaults</span>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Width</label>
-              <input
-                type="number"
-                min="4"
-                value={lbracketParams.horizontalWidth}
-                onChange={(e) => setLbracketParams({ ...lbracketParams, horizontalWidth: +e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Height</label>
-              <input
-                type="number"
-                min="4"
-                value={lbracketParams.verticalHeight}
-                onChange={(e) => setLbracketParams({ ...lbracketParams, verticalHeight: +e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Leg Thk</label>
-            <input
-              type="number"
-              min="1"
-              value={lbracketParams.thickness}
-              onChange={(e) => setLbracketParams({ ...lbracketParams, thickness: +e.target.value })}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Selected I-beam/L-bracket parameter editing */}
-      {selectedShape && selectedShape.type === 'ibeam' && (
-        <div className="shape-params">
-          <span className="params-label">{selectedShape.name}</span>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Flange W</label>
-              <input
-                type="number"
-                min="4"
-                value={selectedShape.width ?? 20}
-                onChange={(e) => updateShapeParams(selectedShape.id, { width: +e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Height</label>
-              <input
-                type="number"
-                min="4"
-                value={selectedShape.height ?? 30}
-                onChange={(e) => updateShapeParams(selectedShape.id, { height: +e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Flange Thk</label>
-              <input
-                type="number"
-                min="1"
-                value={selectedShape.flange ?? 3}
-                onChange={(e) => updateShapeParams(selectedShape.id, { flange: +e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Web Thk</label>
-              <input
-                type="number"
-                min="1"
-                value={selectedShape.web ?? 2}
-                onChange={(e) => updateShapeParams(selectedShape.id, { web: +e.target.value })}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-      {selectedShape && selectedShape.type === 'lbracket' && (
-        <div className="shape-params">
-          <span className="params-label">{selectedShape.name}</span>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Width</label>
-              <input
-                type="number"
-                min="4"
-                value={selectedShape.width ?? 25}
-                onChange={(e) => updateShapeParams(selectedShape.id, { width: +e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Height</label>
-              <input
-                type="number"
-                min="4"
-                value={selectedShape.height ?? 25}
-                onChange={(e) => updateShapeParams(selectedShape.id, { height: +e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Leg Thk</label>
-            <input
-              type="number"
-              min="1"
-              value={selectedShape.flange ?? 3}
-              onChange={(e) => updateShapeParams(selectedShape.id, { flange: +e.target.value })}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Presets */}
-      <div className="editor-presets">
-        <span className="preset-label">Presets:</span>
-        <button className="preset-btn" onClick={() => loadPreset('cantilever')}>Cantilever</button>
-        <button className="preset-btn" onClick={() => loadPreset('lbracket')}>L-Bracket</button>
-        <button className="preset-btn" onClick={() => loadPreset('ibeam')}>I-Beam</button>
-        <button className="preset-btn" onClick={() => loadPreset('platehole')}>Plate+Hole</button>
-      </div>
-
-      {/* Canvas */}
+      {/* Canvas fills the entire container */}
       <div className="editor-canvas-container">
         <canvas
           ref={canvasRef}
@@ -1124,64 +899,303 @@ export default function GeometryEditor({ shapes, nx, ny, onChange }: GeometryEdi
         />
       </div>
 
-      {/* Collision warning */}
-      {collisionWarning && (
-        <div className="collision-warning">
-          {collisionWarning}
-        </div>
-      )}
-
-      {/* Hints */}
-      {activeTool === 'polygon' && polygonPoints.length > 0 && (
-        <div className="editor-hint">
-          Click to add points. Click near first point to close polygon.
-          ({polygonPoints.length} points)
-        </div>
-      )}
-      {activeTool === 'ibeam' && (
-        <div className="editor-hint">
-          Click on canvas to place I-Beam. Adjust parameters above.
-        </div>
-      )}
-      {activeTool === 'lbracket' && (
-        <div className="editor-hint">
-          Click on canvas to place L-Bracket. Adjust parameters above.
-        </div>
-      )}
-      {activeTool === 'move' && !draggingId && (
-        <div className="editor-hint">
-          Click and drag shapes to reposition them.
-        </div>
-      )}
-
-      {/* Shape list */}
-      {shapes.length > 0 && (
-        <div className="shape-list">
-          <h3>Shapes ({shapes.length})</h3>
-          {shapes.map((shape) => (
-            <div
-              key={shape.id}
-              className={`shape-item ${selectedId === shape.id ? 'selected' : ''}`}
-              onClick={() => setSelectedId(shape.id)}
+      {/* Floating toolbar -- top-left */}
+      <div className="geometry-overlay geometry-toolbar-overlay">
+        <div className="editor-toolbar">
+          <div className="tool-group">
+            <button
+              className={`tool-btn ${activeTool === 'rectangle' ? 'active' : ''}`}
+              onClick={() => { setActiveTool('rectangle'); setPolygonPoints([]); }}
+              title="Draw Rectangle (click-drag)"
             >
-              <span className="shape-info">
-                {shape.name}
-                {shape.type === 'circle' && shape.radius != null && ` (r=${shape.radius.toFixed(0)})`}
-                {shape.type === 'rectangle' && shape.width != null && shape.height != null
-                  && ` (${shape.width.toFixed(0)}x${shape.height.toFixed(0)})`}
-                {shape.type === 'polygon' && shape.points && ` (${shape.points.length} pts)`}
-                {shape.type === 'ibeam' && ` (fw=${(shape.width ?? 0).toFixed(0)}, h=${(shape.height ?? 0).toFixed(0)})`}
-                {shape.type === 'lbracket' && ` (w=${(shape.width ?? 0).toFixed(0)}, h=${(shape.height ?? 0).toFixed(0)})`}
-              </span>
-              <button
-                className="shape-delete"
-                onClick={(e) => { e.stopPropagation(); deleteShape(shape.id); }}
-                aria-label={`Delete ${shape.name}`}
-              >
-                &#10005;
-              </button>
+              []
+            </button>
+            <button
+              className={`tool-btn ${activeTool === 'circle' ? 'active' : ''}`}
+              onClick={() => { setActiveTool('circle'); setPolygonPoints([]); }}
+              title="Draw Circle (click-drag)"
+            >
+              O
+            </button>
+            <button
+              className={`tool-btn ${activeTool === 'polygon' ? 'active' : ''}`}
+              onClick={() => setActiveTool('polygon')}
+              title="Draw Polygon (click vertices, click first to close)"
+            >
+              /_/
+            </button>
+            <button
+              className={`tool-btn ${activeTool === 'ibeam' ? 'active' : ''}`}
+              onClick={() => { setActiveTool('ibeam'); setPolygonPoints([]); }}
+              title="Place I-Beam (click to place)"
+            >
+              I
+            </button>
+            <button
+              className={`tool-btn ${activeTool === 'lbracket' ? 'active' : ''}`}
+              onClick={() => { setActiveTool('lbracket'); setPolygonPoints([]); }}
+              title="Place L-Bracket (click to place)"
+            >
+              L
+            </button>
+            <button
+              className={`tool-btn ${activeTool === 'move' ? 'active' : ''}`}
+              onClick={() => { setActiveTool('move'); setPolygonPoints([]); }}
+              title="Move shapes (click-drag)"
+            >
+              Move
+            </button>
+          </div>
+          <div className="tool-group">
+            <button className="tool-btn danger" onClick={clearAll} title="Clear All">
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {/* I-beam parameter inputs when tool is active */}
+        {activeTool === 'ibeam' && (
+          <div className="shape-params">
+            <span className="params-label">I-Beam Defaults</span>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Flange W</label>
+                <input
+                  type="number"
+                  min="4"
+                  value={ibeamParams.flangeWidth}
+                  onChange={(e) => setIbeamParams({ ...ibeamParams, flangeWidth: +e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Height</label>
+                <input
+                  type="number"
+                  min="4"
+                  value={ibeamParams.totalHeight}
+                  onChange={(e) => setIbeamParams({ ...ibeamParams, totalHeight: +e.target.value })}
+                />
+              </div>
             </div>
-          ))}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Flange Thk</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={ibeamParams.flangeThickness}
+                  onChange={(e) => setIbeamParams({ ...ibeamParams, flangeThickness: +e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Web Thk</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={ibeamParams.webThickness}
+                  onChange={(e) => setIbeamParams({ ...ibeamParams, webThickness: +e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* L-bracket parameter inputs when tool is active */}
+        {activeTool === 'lbracket' && (
+          <div className="shape-params">
+            <span className="params-label">L-Bracket Defaults</span>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Width</label>
+                <input
+                  type="number"
+                  min="4"
+                  value={lbracketParams.horizontalWidth}
+                  onChange={(e) => setLbracketParams({ ...lbracketParams, horizontalWidth: +e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Height</label>
+                <input
+                  type="number"
+                  min="4"
+                  value={lbracketParams.verticalHeight}
+                  onChange={(e) => setLbracketParams({ ...lbracketParams, verticalHeight: +e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Leg Thk</label>
+              <input
+                type="number"
+                min="1"
+                value={lbracketParams.thickness}
+                onChange={(e) => setLbracketParams({ ...lbracketParams, thickness: +e.target.value })}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Selected I-beam/L-bracket parameter editing */}
+        {selectedShape && selectedShape.type === 'ibeam' && (
+          <div className="shape-params">
+            <span className="params-label">{selectedShape.name}</span>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Flange W</label>
+                <input
+                  type="number"
+                  min="4"
+                  value={selectedShape.width ?? 20}
+                  onChange={(e) => updateShapeParams(selectedShape.id, { width: +e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Height</label>
+                <input
+                  type="number"
+                  min="4"
+                  value={selectedShape.height ?? 30}
+                  onChange={(e) => updateShapeParams(selectedShape.id, { height: +e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Flange Thk</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={selectedShape.flange ?? 3}
+                  onChange={(e) => updateShapeParams(selectedShape.id, { flange: +e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Web Thk</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={selectedShape.web ?? 2}
+                  onChange={(e) => updateShapeParams(selectedShape.id, { web: +e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+        {selectedShape && selectedShape.type === 'lbracket' && (
+          <div className="shape-params">
+            <span className="params-label">{selectedShape.name}</span>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Width</label>
+                <input
+                  type="number"
+                  min="4"
+                  value={selectedShape.width ?? 25}
+                  onChange={(e) => updateShapeParams(selectedShape.id, { width: +e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Height</label>
+                <input
+                  type="number"
+                  min="4"
+                  value={selectedShape.height ?? 25}
+                  onChange={(e) => updateShapeParams(selectedShape.id, { height: +e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Leg Thk</label>
+              <input
+                type="number"
+                min="1"
+                value={selectedShape.flange ?? 3}
+                onChange={(e) => updateShapeParams(selectedShape.id, { flange: +e.target.value })}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Presets */}
+        <div className="editor-presets">
+          <span className="preset-label">Presets:</span>
+          <button className="preset-btn" onClick={() => loadPreset('cantilever')}>Cantilever</button>
+          <button className="preset-btn" onClick={() => loadPreset('lbracket')}>L-Bracket</button>
+          <button className="preset-btn" onClick={() => loadPreset('ibeam')}>I-Beam</button>
+          <button className="preset-btn" onClick={() => loadPreset('platehole')}>Plate+Hole</button>
+        </div>
+      </div>
+
+      {/* Collision warning -- top-center */}
+      {collisionWarning && (
+        <div className="geometry-overlay geometry-warning-overlay">
+          <div className="collision-warning">
+            {collisionWarning}
+          </div>
+        </div>
+      )}
+
+      {/* Hints -- bottom-center */}
+      {(activeTool === 'polygon' && polygonPoints.length > 0) ||
+       (activeTool === 'ibeam') ||
+       (activeTool === 'lbracket') ||
+       (activeTool === 'move' && !draggingId) ? (
+        <div className="geometry-overlay geometry-hint-overlay">
+          {activeTool === 'polygon' && polygonPoints.length > 0 && (
+            <div className="editor-hint">
+              Click to add points. Click near first point to close polygon.
+              ({polygonPoints.length} points)
+            </div>
+          )}
+          {activeTool === 'ibeam' && (
+            <div className="editor-hint">
+              Click on canvas to place I-Beam. Adjust parameters above.
+            </div>
+          )}
+          {activeTool === 'lbracket' && (
+            <div className="editor-hint">
+              Click on canvas to place L-Bracket. Adjust parameters above.
+            </div>
+          )}
+          {activeTool === 'move' && !draggingId && (
+            <div className="editor-hint">
+              Click and drag shapes to reposition them.
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {/* Shape list -- bottom-left */}
+      {shapes.length > 0 && (
+        <div className="geometry-overlay geometry-shape-list-overlay">
+          <div className="shape-list">
+            <h3>Shapes ({shapes.length})</h3>
+            {shapes.map((shape) => (
+              <div
+                key={shape.id}
+                className={`shape-item ${selectedId === shape.id ? 'selected' : ''}`}
+                onClick={() => setSelectedId(shape.id)}
+              >
+                <span className="shape-info">
+                  {shape.name}
+                  {shape.type === 'circle' && shape.radius != null && ` (r=${shape.radius.toFixed(0)})`}
+                  {shape.type === 'rectangle' && shape.width != null && shape.height != null
+                    && ` (${shape.width.toFixed(0)}x${shape.height.toFixed(0)})`}
+                  {shape.type === 'polygon' && shape.points && ` (${shape.points.length} pts)`}
+                  {shape.type === 'ibeam' && ` (fw=${(shape.width ?? 0).toFixed(0)}, h=${(shape.height ?? 0).toFixed(0)})`}
+                  {shape.type === 'lbracket' && ` (w=${(shape.width ?? 0).toFixed(0)}, h=${(shape.height ?? 0).toFixed(0)})`}
+                </span>
+                <button
+                  className="shape-delete"
+                  onClick={(e) => { e.stopPropagation(); deleteShape(shape.id); }}
+                  aria-label={`Delete ${shape.name}`}
+                >
+                  &#10005;
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

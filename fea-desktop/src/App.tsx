@@ -43,6 +43,8 @@ const EMPTY_PROJECT: ProjectState = {
   elemType: 0,
 };
 
+type ViewMode = 'geometry' | 'mesh' | 'results';
+
 function App() {
   const [project, setProject] = useState<ProjectState>(EMPTY_PROJECT);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -50,11 +52,11 @@ function App() {
   const [meshError, setMeshError] = useState<string | null>(null);
   const [isSolving, setIsSolving] = useState(false);
   const [solveError, setSolveError] = useState<string | null>(null);
-  const [shapesDirty, setShapesDirty] = useState(false);
   const [activeBCTool, setActiveBCTool] = useState<BCTool>(null);
   const [sweepResults, setSweepResults] = useState<SweepResult[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [solverTimeMs, setSolverTimeMs] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('geometry');
 
   // Update document title when dirty state changes
   useEffect(() => {
@@ -92,8 +94,8 @@ function App() {
 
   const handleShapesChange = (shapes: Shape[]) => {
     setProject((prev) => ({ ...prev, shapes, mesh: null, result: null }));
-    setShapesDirty(true);
     setIsDirty(true);
+    setViewMode('geometry');
   };
 
   const handleMaterialChange = (material: Material) => {
@@ -272,8 +274,8 @@ function App() {
         elemType: project.elemType,
       });
       setProject((prev) => ({ ...prev, mesh: meshJson as ProjectState['mesh'] }));
-      setShapesDirty(false);
       setIsDirty(true);
+      setViewMode('mesh');
     } catch (err) {
       console.error('Mesh generation failed:', err);
       setMeshError('Mesh generation failed. Check geometry and mesh density.');
@@ -315,6 +317,7 @@ function App() {
         result: parsed as unknown as SolveResult,
       }));
       setIsDirty(true);
+      setViewMode('results');
     } catch (err) {
       console.error('Solve failed:', err);
       setSolveError('Solver failed. Check mesh and boundary conditions.');
@@ -325,9 +328,9 @@ function App() {
 
   const handleNew = () => {
     setProject(EMPTY_PROJECT);
-    setShapesDirty(false);
     setIsDirty(false);
     setSweepResults([]);
+    setViewMode('geometry');
   };
 
   const handleOpen = async () => {
@@ -341,6 +344,14 @@ function App() {
         const loaded = JSON.parse(content) as ProjectState;
         setProject(loaded);
         setIsDirty(false);
+        // Determine initial view mode from loaded project
+        if (loaded.result && loaded.mesh) {
+          setViewMode('results');
+        } else if (loaded.mesh) {
+          setViewMode('mesh');
+        } else {
+          setViewMode('geometry');
+        }
       }
     } catch (err) {
       console.error('Open failed:', err);
@@ -411,32 +422,7 @@ function App() {
 
       <div className="main-layout">
         <aside className="sidebar">
-          {/* Geometry Panel */}
-          <div className="panel">
-            <div
-              className="panel-header"
-              onClick={() => togglePanel('geometry')}
-            >
-              <h2>Geometry</h2>
-              <span
-                className={`panel-toggle ${collapsed['geometry'] ? 'collapsed' : ''}`}
-              >
-                &#9660;
-              </span>
-            </div>
-            <div
-              className={`panel-body ${collapsed['geometry'] ? 'collapsed' : ''}`}
-            >
-              <GeometryEditor
-                shapes={project.shapes}
-                nx={project.nx}
-                ny={project.ny}
-                onChange={handleShapesChange}
-              />
-            </div>
-          </div>
-
-          {/* Material Panel */}
+          {/* Material Panel (collapsed by default) */}
           <div className="panel">
             <div
               className="panel-header"
@@ -543,30 +529,32 @@ function App() {
             </div>
           </div>
 
-          {/* Boundary Conditions Panel */}
-          <div className="panel">
-            <div className="panel-header" onClick={() => togglePanel('bc')}>
-              <h2>Boundary Conditions</h2>
-              <span
-                className={`panel-toggle ${collapsed['bc'] ? 'collapsed' : ''}`}
+          {/* Boundary Conditions Panel (only when mesh exists and view is mesh) */}
+          {project.mesh && viewMode === 'mesh' && (
+            <div className="panel">
+              <div className="panel-header" onClick={() => togglePanel('bc')}>
+                <h2>Boundary Conditions</h2>
+                <span
+                  className={`panel-toggle ${collapsed['bc'] ? 'collapsed' : ''}`}
+                >
+                  &#9660;
+                </span>
+              </div>
+              <div
+                className={`panel-body ${collapsed['bc'] ? 'collapsed' : ''}`}
               >
-                &#9660;
-              </span>
+                <BCLoadEditor
+                  mesh={project.mesh}
+                  dirichlet={project.dirichlet}
+                  neumann={project.neumann}
+                  activeBCTool={activeBCTool}
+                  onBCToolChange={handleBCToolChange}
+                  onDirichletChange={handleDirichletChange}
+                  onNeumannChange={handleNeumannChange}
+                />
+              </div>
             </div>
-            <div
-              className={`panel-body ${collapsed['bc'] ? 'collapsed' : ''}`}
-            >
-              <BCLoadEditor
-                mesh={project.mesh}
-                dirichlet={project.dirichlet}
-                neumann={project.neumann}
-                activeBCTool={activeBCTool}
-                onBCToolChange={handleBCToolChange}
-                onDirichletChange={handleDirichletChange}
-                onNeumannChange={handleNeumannChange}
-              />
-            </div>
-          </div>
+          )}
 
           {/* Solver Panel */}
           <div className="panel">
@@ -594,20 +582,20 @@ function App() {
             </div>
           </div>
 
-          {/* Results Panel */}
-          <div className="panel">
-            <div className="panel-header" onClick={() => togglePanel('results')}>
-              <h2>Results</h2>
-              <span
-                className={`panel-toggle ${collapsed['results'] ? 'collapsed' : ''}`}
+          {/* Results Panel (compact summary) */}
+          {project.result && (
+            <div className="panel">
+              <div className="panel-header" onClick={() => togglePanel('results')}>
+                <h2>Results</h2>
+                <span
+                  className={`panel-toggle ${collapsed['results'] ? 'collapsed' : ''}`}
+                >
+                  &#9660;
+                </span>
+              </div>
+              <div
+                className={`panel-body ${collapsed['results'] ? 'collapsed' : ''}`}
               >
-                &#9660;
-              </span>
-            </div>
-            <div
-              className={`panel-body ${collapsed['results'] ? 'collapsed' : ''}`}
-            >
-              {project.result ? (
                 <div className="results-summary">
                   <div className="result-card">
                     <div className="label">Max Displacement</div>
@@ -632,11 +620,9 @@ function App() {
                     <div className="value">{project.result.cg_iterations}</div>
                   </div>
                 </div>
-              ) : (
-                <div className="placeholder">No results yet. Run solver.</div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Parameter Sweep Panel */}
           <div className="panel">
@@ -710,12 +696,45 @@ function App() {
         </aside>
 
         <main className="content">
+          {/* View mode tabs */}
+          <div className="view-mode-tabs">
+            <button
+              className={`view-mode-tab ${viewMode === 'geometry' ? 'active' : ''}`}
+              onClick={() => setViewMode('geometry')}
+            >
+              Geometry
+            </button>
+            <button
+              className={`view-mode-tab ${viewMode === 'mesh' ? 'active' : ''}`}
+              onClick={() => setViewMode('mesh')}
+              disabled={!project.mesh}
+            >
+              Mesh
+            </button>
+            <button
+              className={`view-mode-tab ${viewMode === 'results' ? 'active' : ''}`}
+              onClick={() => setViewMode('results')}
+              disabled={!project.result}
+            >
+              Results
+            </button>
+          </div>
+
           <div className="canvas-area">
-            {project.result && project.mesh ? (
-              <div className="canvas-container">
-                <ResultsCanvas mesh={project.mesh} result={project.result} />
+            {/* Geometry view */}
+            {viewMode === 'geometry' && (
+              <div className="canvas-container geometry-canvas">
+                <GeometryEditor
+                  shapes={project.shapes}
+                  nx={project.nx}
+                  ny={project.ny}
+                  onChange={handleShapesChange}
+                />
               </div>
-            ) : project.mesh ? (
+            )}
+
+            {/* Mesh view */}
+            {viewMode === 'mesh' && project.mesh && (
               <div className="canvas-container">
                 <MeshCanvas
                   mesh={project.mesh}
@@ -728,113 +747,19 @@ function App() {
                   onNodeClick={handleNodeClick}
                 />
               </div>
-            ) : (
-              <div className="canvas-placeholder">
-                <div className="canvas-placeholder-icon">
-                  <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                    <rect x="8" y="16" width="48" height="32" rx="2" stroke="currentColor" strokeWidth="2" strokeDasharray="4 2" opacity="0.4" />
-                    <circle cx="32" cy="32" r="8" stroke="currentColor" strokeWidth="2" strokeDasharray="4 2" opacity="0.3" />
-                    <path d="M24 32 L40 32 M32 24 L32 40" stroke="currentColor" strokeWidth="2" opacity="0.5" />
-                  </svg>
-                </div>
-                <div className="canvas-placeholder-text">
-                  Draw geometry to define your structural domain
-                </div>
-                <div className="canvas-placeholder-steps">
-                  <div className="placeholder-step">
-                    <span className="step-number">1</span>
-                    <span>Add shapes in the Geometry panel</span>
-                  </div>
-                  <div className="placeholder-step">
-                    <span className="step-number">2</span>
-                    <span>Generate mesh and assign boundary conditions</span>
-                  </div>
-                  <div className="placeholder-step">
-                    <span className="step-number">3</span>
-                    <span>Run solver and visualize results</span>
-                  </div>
-                </div>
-                <div className="canvas-placeholder-presets">
-                  <span className="presets-label">Quick Start:</span>
-                  <button
-                    className="preset-btn"
-                    onClick={() => {
-                      const preset = {
-                        id: '1',
-                        type: 'rectangle' as const,
-                        name: 'Cantilever',
-                        x: Math.round(project.nx * 0.1),
-                        y: Math.round(project.ny * 0.25),
-                        width: Math.round(project.nx * 0.8),
-                        height: Math.round(project.ny * 0.5),
-                      };
-                      setProject((prev) => ({ ...prev, shapes: [preset] }));
-                      setShapesDirty(true);
-                      setIsDirty(true);
-                    }}
-                  >
-                    Cantilever
-                  </button>
-                  <button
-                    className="preset-btn"
-                    onClick={() => {
-                      const preset = {
-                        id: '1',
-                        type: 'lbracket' as const,
-                        name: 'L-Bracket',
-                        x: Math.round(project.nx / 2),
-                        y: Math.round(project.ny / 2),
-                        width: Math.round(project.nx * 0.6),
-                        height: Math.round(project.ny * 0.8),
-                        flange: Math.round(Math.min(project.nx, project.ny) * 0.1),
-                      };
-                      setProject((prev) => ({ ...prev, shapes: [preset] }));
-                      setShapesDirty(true);
-                      setIsDirty(true);
-                    }}
-                  >
-                    L-Bracket
-                  </button>
-                  <button
-                    className="preset-btn"
-                    onClick={() => {
-                      const shapes = [
-                        {
-                          id: '1',
-                          type: 'rectangle' as const,
-                          name: 'Plate',
-                          x: 0,
-                          y: 0,
-                          width: project.nx,
-                          height: project.ny,
-                        },
-                        {
-                          id: '2',
-                          type: 'circle' as const,
-                          name: 'Hole',
-                          x: Math.round(project.nx / 2),
-                          y: Math.round(project.ny / 2),
-                          radius: Math.round(Math.min(project.nx, project.ny) * 0.2),
-                        },
-                      ];
-                      setProject((prev) => ({ ...prev, shapes }));
-                      setShapesDirty(true);
-                      setIsDirty(true);
-                    }}
-                  >
-                    Plate+Hole
-                  </button>
-                </div>
-                {shapesDirty && project.shapes.length > 0 && (
-                  <button
-                    className="btn-primary"
-                    onClick={handleGenerateMesh}
-                    disabled={meshGenerating}
-                    style={{ marginTop: 12, width: 'auto', padding: '8px 24px' }}
-                  >
-                    {meshGenerating ? 'Generating...' : 'Generate Mesh'}
-                  </button>
-                )}
+            )}
+
+            {/* Results view */}
+            {viewMode === 'results' && project.mesh && project.result && (
+              <div className="canvas-container">
+                <ResultsCanvas mesh={project.mesh} result={project.result} />
+              </div>
+            )}
+
+            {/* Empty state when no mesh and geometry view is active */}
+            {viewMode === 'geometry' && project.shapes.length === 0 && (
+              <div className="canvas-empty-hint">
+                Draw shapes using the toolbar above, or load a preset
               </div>
             )}
           </div>
