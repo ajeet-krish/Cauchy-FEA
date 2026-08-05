@@ -304,9 +304,15 @@ function App() {
         plane: project.planeType,
         solver: project.solverType,
       });
+      // Combine mesh with BCs for the solver
+      const fullMesh = {
+        ...project.mesh,
+        dirichlet: project.dirichlet,
+        neumann: project.neumann,
+      };
       const startTime = performance.now();
       const resultStr = await invoke<string>('run_fea_solve', {
-        meshJson: JSON.stringify(project.mesh),
+        meshJson: JSON.stringify(fullMesh),
         configJson,
       });
       const elapsed = performance.now() - startTime;
