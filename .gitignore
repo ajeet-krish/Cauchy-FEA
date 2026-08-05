@@ -32,11 +32,18 @@ pinn/models/
 *.swo
 *~
 
+# Testing
+Testing/
+
 # Node.js / Desktop app
 node_modules/
 dist/
 package-lock.json
 *.tgz
+pnpm-lock.yaml
 
 # Rust / Tauri build
 src-tauri/target/
+fea-desktop/src-tauri/target/
+fea-desktop/src-tauri/gen/
+fea-desktop/src-tauri/Cargo.lock
