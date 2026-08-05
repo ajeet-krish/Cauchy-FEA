@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import type { ProjectState, Shape, Material, DirichletBC, NeumannBC } from './types';
 import GeometryEditor from './components/GeometryEditor';
 import BCLoadEditor from './components/BCLoadEditor';
@@ -23,16 +24,22 @@ function App() {
     material: DEFAULT_MATERIAL,
     planeType: 'stress',
     result: null,
+    nx: 16,
+    ny: 8,
+    elemType: 0,
   });
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [meshGenerating, setMeshGenerating] = useState(false);
+  const [shapesDirty, setShapesDirty] = useState(false);
 
   const togglePanel = (name: string) => {
     setCollapsed((prev) => ({ ...prev, [name]: !prev[name] }));
   };
 
   const handleShapesChange = (shapes: Shape[]) => {
-    setProject((prev) => ({ ...prev, shapes }));
+    setProject((prev) => ({ ...prev, shapes, mesh: null, result: null }));
+    setShapesDirty(true);
   };
 
   const handleMaterialChange = (material: Material) => {
@@ -40,11 +47,15 @@ function App() {
   };
 
   const handleNxChange = (nx: number) => {
-    setProject((prev) => ({ ...prev, nx } as ProjectState & { nx: number }));
+    setProject((prev) => ({ ...prev, nx }));
   };
 
   const handleNyChange = (ny: number) => {
-    setProject((prev) => ({ ...prev, ny } as ProjectState & { ny: number }));
+    setProject((prev) => ({ ...prev, ny }));
+  };
+
+  const handleElemTypeChange = (elemType: number) => {
+    setProject((prev) => ({ ...prev, elemType }));
   };
 
   const handlePlaneTypeChange = (planeType: 'stress' | 'strain') => {
@@ -59,9 +70,39 @@ function App() {
     setProject((prev) => ({ ...prev, neumann }));
   };
 
-  const handleSolve = () => {
-    // Phase 2: invoke Tauri command
-    console.log('Solve requested', project);
+  const handleGenerateMesh = async () => {
+    if (project.shapes.length === 0) return;
+    setMeshGenerating(true);
+    try {
+      const meshJson = await invoke('generate_mesh', {
+        shapesJson: JSON.stringify(project.shapes),
+        nx: project.nx,
+        ny: project.ny,
+        elemType: project.elemType,
+      });
+      setProject((prev) => ({ ...prev, mesh: meshJson as ProjectState['mesh'] }));
+      setShapesDirty(false);
+    } catch (err) {
+      console.error('Mesh generation failed:', err);
+    } finally {
+      setMeshGenerating(false);
+    }
+  };
+
+  const handleSolve = async () => {
+    if (!project.mesh) return;
+    try {
+      const result = await invoke('solve', {
+        meshJson: JSON.stringify(project.mesh),
+        materialJson: JSON.stringify(project.material),
+        dirichletJson: JSON.stringify(project.dirichlet),
+        neumannJson: JSON.stringify(project.neumann),
+        planeType: project.planeType,
+      });
+      setProject((prev) => ({ ...prev, result: result as ProjectState['result'] }));
+    } catch (err) {
+      console.error('Solve failed:', err);
+    }
   };
 
   const handleNew = () => {
@@ -73,22 +114,29 @@ function App() {
       material: DEFAULT_MATERIAL,
       planeType: 'stress',
       result: null,
+      nx: 16,
+      ny: 8,
+      elemType: 0,
     });
+    setShapesDirty(false);
   };
 
   const handleOpen = () => {
-    // Phase 3: Tauri dialog
     console.log('Open project');
   };
 
   const handleSave = () => {
-    // Phase 3: Tauri dialog
     console.log('Save project');
   };
 
   const handleExportPng = () => {
-    // Phase 5: canvas export
     console.log('Export PNG');
+  };
+
+  const elemTypeLabel = (t: number) => {
+    if (t === 0) return 'Q4';
+    if (t === 1) return 'Q8';
+    return 'T3';
   };
 
   return (
@@ -115,7 +163,12 @@ function App() {
               </span>
             </div>
             <div className={`panel-body ${collapsed['geometry'] ? 'collapsed' : ''}`}>
-              <GeometryEditor shapes={project.shapes} onChange={handleShapesChange} />
+              <GeometryEditor
+                shapes={project.shapes}
+                nx={project.nx}
+                ny={project.ny}
+                onChange={handleShapesChange}
+              />
             </div>
           </div>
 
@@ -215,7 +268,7 @@ function App() {
                     type="number"
                     min="2"
                     max="200"
-                    value={(project as ProjectState & { nx?: number }).nx ?? 16}
+                    value={project.nx}
                     onChange={(e) => handleNxChange(+e.target.value)}
                   />
                 </div>
@@ -225,7 +278,7 @@ function App() {
                     type="number"
                     min="2"
                     max="200"
-                    value={(project as ProjectState & { ny?: number }).ny ?? 8}
+                    value={project.ny}
                     onChange={(e) => handleNyChange(+e.target.value)}
                   />
                 </div>
@@ -233,12 +286,35 @@ function App() {
 
               <div className="form-group">
                 <label>Element Type</label>
-                <select defaultValue="Q4">
-                  <option value="Q4">Q4 (4-node quad)</option>
-                  <option value="Q8">Q8 (8-node serendipity)</option>
-                  <option value="T3">T3 (3-node triangle)</option>
+                <select
+                  value={project.elemType}
+                  onChange={(e) => handleElemTypeChange(+e.target.value)}
+                >
+                  <option value={0}>Q4 (4-node quad)</option>
+                  <option value={1}>Q8 (8-node serendipity)</option>
+                  <option value={2}>T3 (3-node triangle)</option>
                 </select>
               </div>
+
+              {/* Generate Mesh button */}
+              <button
+                className="btn-primary"
+                onClick={handleGenerateMesh}
+                disabled={project.shapes.length === 0 || meshGenerating}
+                style={{ marginTop: 8 }}
+              >
+                {meshGenerating
+                  ? 'Generating...'
+                  : `Generate Mesh (${elemTypeLabel(project.elemType)}, ${project.nx}x${project.ny})`}
+              </button>
+
+              {project.mesh && (
+                <div className="mesh-info" style={{ marginTop: 8 }}>
+                  <span>Nodes: <span className="value">{project.mesh.num_nodes}</span></span>
+                  <span>Elements: <span className="value">{project.mesh.num_elements}</span></span>
+                  <span>DOFs: <span className="value">{project.mesh.num_dofs}</span></span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -323,16 +399,16 @@ function App() {
 
         <main className="content">
           <div className="canvas-area">
-            {project.mesh ? (
-              <div className="canvas-container">
-                <MeshCanvas mesh={project.mesh} />
-              </div>
-            ) : project.result ? (
+            {project.result && project.mesh ? (
               <div className="canvas-container">
                 <ResultsCanvas
-                  mesh={project.mesh!}
+                  mesh={project.mesh}
                   result={project.result}
                 />
+              </div>
+            ) : project.mesh ? (
+              <div className="canvas-container">
+                <MeshCanvas mesh={project.mesh} showGrid showNodes />
               </div>
             ) : (
               <div className="canvas-placeholder">
@@ -341,8 +417,18 @@ function App() {
                   Draw geometry to define your structural domain
                 </div>
                 <div className="canvas-placeholder-hint">
-                  Use the Geometry panel to add rectangles, circles, or polygons
+                  Use the Geometry panel to add rectangles, circles, I-beams, or L-brackets
                 </div>
+                {shapesDirty && project.shapes.length > 0 && (
+                  <button
+                    className="btn-primary"
+                    onClick={handleGenerateMesh}
+                    disabled={meshGenerating}
+                    style={{ marginTop: 12, width: 'auto', padding: '8px 24px' }}
+                  >
+                    {meshGenerating ? 'Generating...' : 'Generate Mesh'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -353,7 +439,7 @@ function App() {
       <div className="status-bar">
         <div className="status-item">
           <div className={`status-dot ${project.result ? '' : 'idle'}`} />
-          <span>{project.result ? 'Solved' : 'Ready'}</span>
+          <span>{project.result ? 'Solved' : meshGenerating ? 'Generating...' : 'Ready'}</span>
         </div>
         <div className="status-separator" />
         <div className="status-item">
@@ -364,6 +450,10 @@ function App() {
         </div>
         <div className="status-item">
           <span>DOFs: {project.mesh?.num_dofs ?? 0}</span>
+        </div>
+        <div className="status-separator" />
+        <div className="status-item">
+          <span>{elemTypeLabel(project.elemType)} | {project.nx}x{project.ny}</span>
         </div>
         <div className="status-separator" />
         <div className="status-item">

@@ -76,4 +76,7 @@ export interface ProjectState {
   material: Material;
   planeType: 'stress' | 'strain';
   result: SolveResult | null;
+  nx: number;
+  ny: number;
+  elemType: number; // 0=Q4, 1=Q8, 2=T3
 }

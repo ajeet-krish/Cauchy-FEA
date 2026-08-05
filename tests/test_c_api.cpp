@@ -821,3 +821,228 @@ TEST_F(CApiTest, SmallDisplacementsSurviveJsonSerialisation) {
         << "sub-micrometre displacements must not be truncated to zero by the"
         << " fixed 6-decimal JSON writer";
 }
+
+
+// ==========================================================================
+// PHASE 2 -- I-BEAM AND L-BRACKET SHAPE SUPPORT
+//
+// The GeometryEditor frontend gained I-beam and L-bracket primitives. The C
+// FFI layer must generate and solve meshes for them too. These tests pin the
+// centroid-in-domain filtering and a cantilever solve for both cross-sections.
+// ==========================================================================
+
+// Independent re-implementation of the I-beam membership test (mirrors the
+// spec in fea_solver_c_api.cpp) so the test validates geometry, not a copy.
+static bool point_in_ibeam_test(double px, double py, double ox, double oy,
+                                double width, double height,
+                                double flange, double web) {
+    const double x0 = ox, y0 = oy;
+    const double x1 = ox + width, y1 = oy + height;
+    if (px < x0 || px > x1 || py < y0 || py > y1) return false;
+    if (py >= y1 - flange) return true;   // top flange
+    if (py <= y0 + flange) return true;   // bottom flange
+    const double web_left = ox + (width - web) / 2.0;
+    const double web_right = web_left + web;
+    if (px >= web_left && px <= web_right) return true;  // web
+    return false;
+}
+
+// Independent re-implementation of the L-bracket membership test.
+static bool point_in_lbracket_test(double px, double py, double ox, double oy,
+                                   double width, double height,
+                                   double flange, double web) {
+    if (px < ox || px > ox + width || py < oy || py > oy + height) return false;
+    if (py <= oy + flange) return true;   // horizontal flange (bottom)
+    if (px <= ox + web) return true;      // vertical web (left)
+    return false;
+}
+
+const char* kIBeamShapes =
+    "[{\"type\":\"ibeam\",\"x\":0.0,\"y\":0.0,"
+    "\"width\":1.0,\"height\":1.0,\"flange\":0.1,\"web\":0.05}]";
+
+const char* kLBracketShapes =
+    "[{\"type\":\"lbracket\",\"x\":0.0,\"y\":0.0,"
+    "\"width\":1.0,\"height\":1.0,\"flange\":0.1,\"web\":0.05}]";
+
+TEST_F(CApiTest, MeshGenerationIBeam) {
+    TempDir dir("ibeam");
+
+    ASSERT_EQ(fea_generate_mesh_c(kIBeamShapes, 20, 20, 0, dir.c_str()), 0);
+
+    const std::string text = read_file(dir.file("mesh.json"));
+    auto nodes = parse_nodes(text);
+    auto elems = parse_q4_elements(text);
+
+    ASSERT_GT(nodes.size(), 0u) << "node count must be > 0";
+    ASSERT_GT(elems.size(), 0u) << "element count must be > 0";
+
+    // A 20x20 grid has 400 cells; the I-beam keeps only the flanges + web
+    EXPECT_LT(elems.size(), 400u) << "elements outside the I-beam must be culled";
+    EXPECT_EQ(elems.size(), 112u)
+        << "exact I-beam element count for a 20x20 grid"
+        << " (2 flange rows x 20 + 16 web rows x 2)";
+
+    // Reported counts must agree with the written arrays
+    EXPECT_EQ(static_cast<int>(json_number_or(text, "num_nodes", -1)),
+              static_cast<int>(nodes.size()));
+    EXPECT_EQ(static_cast<int>(json_number_or(text, "num_elements", -1)),
+              static_cast<int>(elems.size()));
+    EXPECT_EQ(static_cast<int>(json_number_or(text, "num_dofs", -1)),
+              static_cast<int>(2 * nodes.size()));
+
+    // Every surviving element centroid must sit inside the I-beam
+    for (const auto& e : elems) {
+        double cx = 0.0, cy = 0.0;
+        for (int n : e) {
+            ASSERT_GE(n, 0);
+            ASSERT_LT(n, static_cast<int>(nodes.size()));
+            cx += nodes[n].first;
+            cy += nodes[n].second;
+        }
+        cx /= 4.0;
+        cy /= 4.0;
+        EXPECT_TRUE(point_in_ibeam_test(cx, cy, 0.0, 0.0, 1.0, 1.0, 0.1, 0.05))
+            << "centroid (" << cx << ", " << cy << ") lies outside the I-beam";
+    }
+
+    // Connectivity must stay in range after renumbering
+    for (const auto& e : elems) {
+        for (int n : e) {
+            EXPECT_GE(n, 0);
+            EXPECT_LT(n, static_cast<int>(nodes.size()));
+        }
+    }
+}
+
+TEST_F(CApiTest, MeshGenerationLBracket) {
+    TempDir dir("lbracket");
+
+    ASSERT_EQ(fea_generate_mesh_c(kLBracketShapes, 20, 20, 0, dir.c_str()), 0);
+
+    const std::string text = read_file(dir.file("mesh.json"));
+    auto nodes = parse_nodes(text);
+    auto elems = parse_q4_elements(text);
+
+    ASSERT_GT(nodes.size(), 0u) << "node count must be > 0";
+    ASSERT_GT(elems.size(), 0u) << "element count must be > 0";
+
+    // A 20x20 grid has 400 cells; the L-bracket keeps the flange + web
+    EXPECT_LT(elems.size(), 400u) << "elements outside the L-bracket must be culled";
+    EXPECT_EQ(elems.size(), 58u)
+        << "exact L-bracket element count for a 20x20 grid"
+        << " (2 flange rows x 20 + 18 web rows x 1)";
+
+    // Reported counts must agree with the written arrays
+    EXPECT_EQ(static_cast<int>(json_number_or(text, "num_nodes", -1)),
+              static_cast<int>(nodes.size()));
+    EXPECT_EQ(static_cast<int>(json_number_or(text, "num_elements", -1)),
+              static_cast<int>(elems.size()));
+    EXPECT_EQ(static_cast<int>(json_number_or(text, "num_dofs", -1)),
+              static_cast<int>(2 * nodes.size()));
+
+    // Every surviving element centroid must sit inside the L-bracket
+    for (const auto& e : elems) {
+        double cx = 0.0, cy = 0.0;
+        for (int n : e) {
+            ASSERT_GE(n, 0);
+            ASSERT_LT(n, static_cast<int>(nodes.size()));
+            cx += nodes[n].first;
+            cy += nodes[n].second;
+        }
+        cx /= 4.0;
+        cy /= 4.0;
+        EXPECT_TRUE(point_in_lbracket_test(cx, cy, 0.0, 0.0, 1.0, 1.0, 0.1, 0.05))
+            << "centroid (" << cx << ", " << cy << ") lies outside the L-bracket";
+    }
+
+    // Connectivity must stay in range after renumbering
+    for (const auto& e : elems) {
+        for (int n : e) {
+            EXPECT_GE(n, 0);
+            EXPECT_LT(n, static_cast<int>(nodes.size()));
+        }
+    }
+}
+
+TEST_F(CApiTest, MeshGenerationIBeamSolve) {
+    TempDir dir("ibeam_solve");
+
+    ASSERT_EQ(fea_generate_mesh_c(kIBeamShapes, 20, 20, 0, dir.c_str()), 0);
+
+    const std::string mesh_json =
+        build_cantilever_mesh_json(read_file(dir.file("mesh.json")),
+                                   0.0, 1.0, -1000.0);
+    ASSERT_NE(mesh_json.find("\"dirichlet\": [{"), std::string::npos)
+        << "test harness must have injected Dirichlet BCs";
+    ASSERT_NE(mesh_json.find("\"neumann\": [{"), std::string::npos)
+        << "test harness must have injected Neumann BCs";
+
+    ASSERT_EQ(fea_solve_c(mesh_json.c_str(), kCantileverConfig, dir.c_str()), 0)
+        << "I-beam cantilever solve should succeed";
+
+    const std::string meta = read_file(dir.file("meta.json"));
+    ASSERT_FALSE(meta.empty());
+
+    const double max_disp = json_number_or(meta, "max_displacement", -1.0);
+    const double max_stress = json_number_or(meta, "max_stress", -1.0);
+
+    EXPECT_GT(max_disp, 0.0) << "max_displacement must be positive";
+    EXPECT_GT(max_stress, 0.0) << "max_stress must be positive";
+    EXPECT_TRUE(std::isfinite(max_disp));
+    EXPECT_TRUE(std::isfinite(max_stress));
+
+    // Displacement field must be written for every node
+    const std::string disp = read_file(dir.file("displacement.json"));
+    EXPECT_TRUE(json_is_balanced(disp));
+    auto nodes = parse_nodes(read_file(dir.file("mesh.json")));
+    EXPECT_EQ(count_occurrences(disp, "{\"ux\":"),
+              static_cast<int>(nodes.size()))
+        << "displacement.json must contain one entry per node";
+
+    // Stress field must be written for every element
+    const std::string stress = read_file(dir.file("stress.json"));
+    EXPECT_TRUE(json_is_balanced(stress));
+    EXPECT_GT(json_number_or(stress, "max_stress", -1.0), 0.0);
+}
+
+TEST_F(CApiTest, MeshGenerationLBracketSolve) {
+    TempDir dir("lbracket_solve");
+
+    ASSERT_EQ(fea_generate_mesh_c(kLBracketShapes, 20, 20, 0, dir.c_str()), 0);
+
+    const std::string mesh_json =
+        build_cantilever_mesh_json(read_file(dir.file("mesh.json")),
+                                   0.0, 1.0, -1000.0);
+    ASSERT_NE(mesh_json.find("\"dirichlet\": [{"), std::string::npos)
+        << "test harness must have injected Dirichlet BCs";
+    ASSERT_NE(mesh_json.find("\"neumann\": [{"), std::string::npos)
+        << "test harness must have injected Neumann BCs";
+
+    ASSERT_EQ(fea_solve_c(mesh_json.c_str(), kCantileverConfig, dir.c_str()), 0)
+        << "L-bracket cantilever solve should succeed";
+
+    const std::string meta = read_file(dir.file("meta.json"));
+    ASSERT_FALSE(meta.empty());
+
+    const double max_disp = json_number_or(meta, "max_displacement", -1.0);
+    const double max_stress = json_number_or(meta, "max_stress", -1.0);
+
+    EXPECT_GT(max_disp, 0.0) << "max_displacement must be positive";
+    EXPECT_GT(max_stress, 0.0) << "max_stress must be positive";
+    EXPECT_TRUE(std::isfinite(max_disp));
+    EXPECT_TRUE(std::isfinite(max_stress));
+
+    // Displacement field must be written for every node
+    const std::string disp = read_file(dir.file("displacement.json"));
+    EXPECT_TRUE(json_is_balanced(disp));
+    auto nodes = parse_nodes(read_file(dir.file("mesh.json")));
+    EXPECT_EQ(count_occurrences(disp, "{\"ux\":"),
+              static_cast<int>(nodes.size()))
+        << "displacement.json must contain one entry per node";
+
+    // Stress field must be written for every element
+    const std::string stress = read_file(dir.file("stress.json"));
+    EXPECT_TRUE(json_is_balanced(stress));
+    EXPECT_GT(json_number_or(stress, "max_stress", -1.0), 0.0);
+}
