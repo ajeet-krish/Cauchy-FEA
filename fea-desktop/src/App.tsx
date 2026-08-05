@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { ProjectState, SolveResult, Shape, Material, DirichletBC, NeumannBC, BCTool, SweepResult } from './types';
+import { save, open } from '@tauri-apps/plugin-dialog';
+import { writeFile, readTextFile } from '@tauri-apps/plugin-fs';
+import type {
+  ProjectState,
+  SolveResult,
+  Shape,
+  Material,
+  DirichletBC,
+  NeumannBC,
+  BCTool,
+  SweepResult,
+} from './types';
 import GeometryEditor from './components/GeometryEditor';
 import BCLoadEditor from './components/BCLoadEditor';
 import MeshCanvas from './components/MeshCanvas';
@@ -18,21 +29,22 @@ const DEFAULT_MATERIAL: Material = {
   t: 0.01,
 };
 
-function App() {
-  const [project, setProject] = useState<ProjectState>({
-    shapes: [],
-    mesh: null,
-    dirichlet: [],
-    neumann: [],
-    material: DEFAULT_MATERIAL,
-    planeType: 'stress',
-    solverType: 'cg',
-    result: null,
-    nx: 16,
-    ny: 8,
-    elemType: 0,
-  });
+const EMPTY_PROJECT: ProjectState = {
+  shapes: [],
+  mesh: null,
+  dirichlet: [],
+  neumann: [],
+  material: DEFAULT_MATERIAL,
+  planeType: 'stress',
+  solverType: 'cg',
+  result: null,
+  nx: 16,
+  ny: 8,
+  elemType: 0,
+};
 
+function App() {
+  const [project, setProject] = useState<ProjectState>(EMPTY_PROJECT);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [meshGenerating, setMeshGenerating] = useState(false);
   const [meshError, setMeshError] = useState<string | null>(null);
@@ -41,6 +53,37 @@ function App() {
   const [shapesDirty, setShapesDirty] = useState(false);
   const [activeBCTool, setActiveBCTool] = useState<BCTool>(null);
   const [sweepResults, setSweepResults] = useState<SweepResult[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Update document title when dirty state changes
+  useEffect(() => {
+    document.title = isDirty ? 'Cauchy *' : 'Cauchy';
+  }, [isDirty]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+      if (mod && e.key === 'o') {
+        e.preventDefault();
+        handleOpen();
+      }
+      if (mod && e.key === 'n') {
+        e.preventDefault();
+        handleNew();
+      }
+      if (mod && e.shiftKey && e.key === 'E') {
+        e.preventDefault();
+        handleExportPng();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [project]);
 
   const togglePanel = (name: string) => {
     setCollapsed((prev) => ({ ...prev, [name]: !prev[name] }));
@@ -49,6 +92,7 @@ function App() {
   const handleShapesChange = (shapes: Shape[]) => {
     setProject((prev) => ({ ...prev, shapes, mesh: null, result: null }));
     setShapesDirty(true);
+    setIsDirty(true);
   };
 
   const handleMaterialChange = (material: Material) => {
@@ -57,36 +101,44 @@ function App() {
     if (!Number.isFinite(material.rho) || material.rho <= 0) return;
     if (!Number.isFinite(material.t) || material.t <= 0) return;
     setProject((prev) => ({ ...prev, material }));
+    setIsDirty(true);
   };
 
   const handleNxChange = (nx: number) => {
     const clamped = Math.max(2, Math.min(200, Math.floor(nx) || 2));
     setProject((prev) => ({ ...prev, nx: clamped }));
+    setIsDirty(true);
   };
 
   const handleNyChange = (ny: number) => {
     const clamped = Math.max(2, Math.min(200, Math.floor(ny) || 2));
     setProject((prev) => ({ ...prev, ny: clamped }));
+    setIsDirty(true);
   };
 
   const handleElemTypeChange = (elemType: number) => {
     setProject((prev) => ({ ...prev, elemType }));
+    setIsDirty(true);
   };
 
   const handlePlaneTypeChange = (planeType: 'stress' | 'strain') => {
     setProject((prev) => ({ ...prev, planeType }));
+    setIsDirty(true);
   };
 
   const handleSolverTypeChange = (solverType: 'cg' | 'cholesky') => {
     setProject((prev) => ({ ...prev, solverType }));
+    setIsDirty(true);
   };
 
   const handleDirichletChange = (dirichlet: DirichletBC[]) => {
     setProject((prev) => ({ ...prev, dirichlet }));
+    setIsDirty(true);
   };
 
   const handleNeumannChange = (neumann: NeumannBC[]) => {
     setProject((prev) => ({ ...prev, neumann }));
+    setIsDirty(true);
   };
 
   const handleBCToolChange = (tool: BCTool) => {
@@ -104,6 +156,7 @@ function App() {
       if (activeBCTool === 'fixed_ux_uy') {
         const existing = prev.dirichlet.filter((bc) => bc.node === nodeIndex);
         if (existing.length > 0) return prev;
+        setIsDirty(true);
         return {
           ...prev,
           dirichlet: [
@@ -120,6 +173,7 @@ function App() {
           (bc) => bc.node === nodeIndex && bc.dof === 0,
         );
         if (existing.length > 0) return prev;
+        setIsDirty(true);
         return {
           ...prev,
           dirichlet: [
@@ -135,6 +189,7 @@ function App() {
           (bc) => bc.node === nodeIndex && bc.dof === 1,
         );
         if (existing.length > 0) return prev;
+        setIsDirty(true);
         return {
           ...prev,
           dirichlet: [
@@ -150,6 +205,7 @@ function App() {
           (bc) => bc.node === nodeIndex && bc.dof === 1,
         );
         if (existing.length > 0) return prev;
+        setIsDirty(true);
         return {
           ...prev,
           dirichlet: [
@@ -165,6 +221,7 @@ function App() {
           (bc) => bc.node === nodeIndex && bc.dof === 0,
         );
         if (existing.length > 0) return prev;
+        setIsDirty(true);
         return {
           ...prev,
           dirichlet: [
@@ -176,6 +233,7 @@ function App() {
 
       // Force X
       if (activeBCTool === 'force_x') {
+        setIsDirty(true);
         return {
           ...prev,
           neumann: [
@@ -187,6 +245,7 @@ function App() {
 
       // Force Y
       if (activeBCTool === 'force_y') {
+        setIsDirty(true);
         return {
           ...prev,
           neumann: [
@@ -213,6 +272,7 @@ function App() {
       });
       setProject((prev) => ({ ...prev, mesh: meshJson as ProjectState['mesh'] }));
       setShapesDirty(false);
+      setIsDirty(true);
     } catch (err) {
       console.error('Mesh generation failed:', err);
       setMeshError('Mesh generation failed. Check geometry and mesh density.');
@@ -237,11 +297,19 @@ function App() {
 
       // Runtime validation before type assertion
       const parsed = result as Record<string, unknown>;
-      if (!parsed?.displacements || !parsed?.stresses || parsed.max_displacement == null) {
+      if (
+        !parsed?.displacements ||
+        !parsed?.stresses ||
+        parsed.max_displacement == null
+      ) {
         setSolveError('Invalid solver response.');
         return;
       }
-      setProject((prev) => ({ ...prev, result: parsed as unknown as SolveResult }));
+      setProject((prev) => ({
+        ...prev,
+        result: parsed as unknown as SolveResult,
+      }));
+      setIsDirty(true);
     } catch (err) {
       console.error('Solve failed:', err);
       setSolveError('Solver failed. Check mesh and boundary conditions.');
@@ -251,29 +319,44 @@ function App() {
   };
 
   const handleNew = () => {
-    setProject({
-      shapes: [],
-      mesh: null,
-      dirichlet: [],
-      neumann: [],
-      material: DEFAULT_MATERIAL,
-      planeType: 'stress',
-      solverType: 'cg',
-      result: null,
-      nx: 16,
-      ny: 8,
-      elemType: 0,
-    });
+    setProject(EMPTY_PROJECT);
     setShapesDirty(false);
+    setIsDirty(false);
     setSweepResults([]);
   };
 
-  const handleOpen = () => {
-    console.log('Open project');
+  const handleOpen = async () => {
+    try {
+      const path = await open({
+        filters: [{ name: 'Cauchy Project', extensions: ['cauchy'] }],
+        multiple: false,
+      });
+      if (path) {
+        const content = await readTextFile(path);
+        const loaded = JSON.parse(content) as ProjectState;
+        setProject(loaded);
+        setIsDirty(false);
+      }
+    } catch (err) {
+      console.error('Open failed:', err);
+    }
   };
 
-  const handleSave = () => {
-    console.log('Save project');
+  const handleSave = async () => {
+    try {
+      const path = await save({
+        defaultPath: 'project.cauchy',
+        filters: [{ name: 'Cauchy Project', extensions: ['cauchy'] }],
+      });
+      if (path) {
+        const projectJson = JSON.stringify(project, null, 2);
+        const encoder = new TextEncoder();
+        await writeFile(path, encoder.encode(projectJson));
+        setIsDirty(false);
+      }
+    } catch (err) {
+      console.error('Save failed:', err);
+    }
   };
 
   const handleExportPng = () => {
@@ -296,6 +379,8 @@ function App() {
           onOpen={handleOpen}
           onSave={handleSave}
           onExportPng={handleExportPng}
+          isDirty={isDirty}
+          hasResults={!!project.result}
         />
       </header>
 
@@ -303,13 +388,20 @@ function App() {
         <aside className="sidebar">
           {/* Geometry Panel */}
           <div className="panel">
-            <div className="panel-header" onClick={() => togglePanel('geometry')}>
+            <div
+              className="panel-header"
+              onClick={() => togglePanel('geometry')}
+            >
               <h2>Geometry</h2>
-              <span className={`panel-toggle ${collapsed['geometry'] ? 'collapsed' : ''}`}>
+              <span
+                className={`panel-toggle ${collapsed['geometry'] ? 'collapsed' : ''}`}
+              >
                 &#9660;
               </span>
             </div>
-            <div className={`panel-body ${collapsed['geometry'] ? 'collapsed' : ''}`}>
+            <div
+              className={`panel-body ${collapsed['geometry'] ? 'collapsed' : ''}`}
+            >
               <GeometryEditor
                 shapes={project.shapes}
                 nx={project.nx}
@@ -321,13 +413,20 @@ function App() {
 
           {/* Material Panel */}
           <div className="panel">
-            <div className="panel-header" onClick={() => togglePanel('material')}>
+            <div
+              className="panel-header"
+              onClick={() => togglePanel('material')}
+            >
               <h2>Material</h2>
-              <span className={`panel-toggle ${collapsed['material'] ? 'collapsed' : ''}`}>
+              <span
+                className={`panel-toggle ${collapsed['material'] ? 'collapsed' : ''}`}
+              >
                 &#9660;
               </span>
             </div>
-            <div className={`panel-body ${collapsed['material'] ? 'collapsed' : ''}`}>
+            <div
+              className={`panel-body ${collapsed['material'] ? 'collapsed' : ''}`}
+            >
               <MaterialLibrary
                 material={project.material}
                 onChange={handleMaterialChange}
@@ -339,11 +438,15 @@ function App() {
           <div className="panel">
             <div className="panel-header" onClick={() => togglePanel('mesh')}>
               <h2>Mesh</h2>
-              <span className={`panel-toggle ${collapsed['mesh'] ? 'collapsed' : ''}`}>
+              <span
+                className={`panel-toggle ${collapsed['mesh'] ? 'collapsed' : ''}`}
+              >
                 &#9660;
               </span>
             </div>
-            <div className={`panel-body ${collapsed['mesh'] ? 'collapsed' : ''}`}>
+            <div
+              className={`panel-body ${collapsed['mesh'] ? 'collapsed' : ''}`}
+            >
               <div className="form-row">
                 <div className="form-group">
                   <label>Elements X</label>
@@ -393,9 +496,16 @@ function App() {
 
               {project.mesh && (
                 <div className="mesh-info" style={{ marginTop: 8 }}>
-                  <span>Nodes: <span className="value">{project.mesh.num_nodes}</span></span>
-                  <span>Elements: <span className="value">{project.mesh.num_elements}</span></span>
-                  <span>DOFs: <span className="value">{project.mesh.num_dofs}</span></span>
+                  <span>
+                    Nodes: <span className="value">{project.mesh.num_nodes}</span>
+                  </span>
+                  <span>
+                    Elements:{' '}
+                    <span className="value">{project.mesh.num_elements}</span>
+                  </span>
+                  <span>
+                    DOFs: <span className="value">{project.mesh.num_dofs}</span>
+                  </span>
                 </div>
               )}
 
@@ -412,11 +522,15 @@ function App() {
           <div className="panel">
             <div className="panel-header" onClick={() => togglePanel('bc')}>
               <h2>Boundary Conditions</h2>
-              <span className={`panel-toggle ${collapsed['bc'] ? 'collapsed' : ''}`}>
+              <span
+                className={`panel-toggle ${collapsed['bc'] ? 'collapsed' : ''}`}
+              >
                 &#9660;
               </span>
             </div>
-            <div className={`panel-body ${collapsed['bc'] ? 'collapsed' : ''}`}>
+            <div
+              className={`panel-body ${collapsed['bc'] ? 'collapsed' : ''}`}
+            >
               <BCLoadEditor
                 mesh={project.mesh}
                 dirichlet={project.dirichlet}
@@ -433,11 +547,15 @@ function App() {
           <div className="panel">
             <div className="panel-header" onClick={() => togglePanel('solver')}>
               <h2>Solver</h2>
-              <span className={`panel-toggle ${collapsed['solver'] ? 'collapsed' : ''}`}>
+              <span
+                className={`panel-toggle ${collapsed['solver'] ? 'collapsed' : ''}`}
+              >
                 &#9660;
               </span>
             </div>
-            <div className={`panel-body ${collapsed['solver'] ? 'collapsed' : ''}`}>
+            <div
+              className={`panel-body ${collapsed['solver'] ? 'collapsed' : ''}`}
+            >
               <SolverPanel
                 planeType={project.planeType}
                 solverType={project.solverType}
@@ -455,11 +573,15 @@ function App() {
           <div className="panel">
             <div className="panel-header" onClick={() => togglePanel('results')}>
               <h2>Results</h2>
-              <span className={`panel-toggle ${collapsed['results'] ? 'collapsed' : ''}`}>
+              <span
+                className={`panel-toggle ${collapsed['results'] ? 'collapsed' : ''}`}
+              >
                 &#9660;
               </span>
             </div>
-            <div className={`panel-body ${collapsed['results'] ? 'collapsed' : ''}`}>
+            <div
+              className={`panel-body ${collapsed['results'] ? 'collapsed' : ''}`}
+            >
               {project.result ? (
                 <div className="results-summary">
                   <div className="result-card">
@@ -482,9 +604,7 @@ function App() {
                   </div>
                   <div className="result-card">
                     <div className="label">CG Iterations</div>
-                    <div className="value">
-                      {project.result.cg_iterations}
-                    </div>
+                    <div className="value">{project.result.cg_iterations}</div>
                   </div>
                 </div>
               ) : (
@@ -497,11 +617,15 @@ function App() {
           <div className="panel">
             <div className="panel-header" onClick={() => togglePanel('sweep')}>
               <h2>Parameter Sweep</h2>
-              <span className={`panel-toggle ${collapsed['sweep'] ? 'collapsed' : ''}`}>
+              <span
+                className={`panel-toggle ${collapsed['sweep'] ? 'collapsed' : ''}`}
+              >
                 &#9660;
               </span>
             </div>
-            <div className={`panel-body ${collapsed['sweep'] ? 'collapsed' : ''}`}>
+            <div
+              className={`panel-body ${collapsed['sweep'] ? 'collapsed' : ''}`}
+            >
               <ParameterSweep
                 mesh={project.mesh}
                 dirichlet={project.dirichlet}
@@ -522,10 +646,7 @@ function App() {
           <div className="canvas-area">
             {project.result && project.mesh ? (
               <div className="canvas-container">
-                <ResultsCanvas
-                  mesh={project.mesh}
-                  result={project.result}
-                />
+                <ResultsCanvas mesh={project.mesh} result={project.result} />
               </div>
             ) : project.mesh ? (
               <div className="canvas-container">
@@ -547,7 +668,8 @@ function App() {
                   Draw geometry to define your structural domain
                 </div>
                 <div className="canvas-placeholder-hint">
-                  Use the Geometry panel to add rectangles, circles, I-beams, or L-brackets
+                  Use the Geometry panel to add rectangles, circles, I-beams,
+                  or L-brackets
                 </div>
                 {shapesDirty && project.shapes.length > 0 && (
                   <button
@@ -578,7 +700,9 @@ function App() {
       {/* Status Bar */}
       <div className="status-bar">
         <div className="status-item">
-          <div className={`status-dot ${isSolving ? 'running' : project.result ? '' : 'idle'}`} />
+          <div
+            className={`status-dot ${isSolving ? 'running' : project.result ? '' : 'idle'}`}
+          />
           <span>
             {isSolving
               ? 'Solving...'
@@ -601,11 +725,15 @@ function App() {
         </div>
         <div className="status-separator" />
         <div className="status-item">
-          <span>{elemTypeLabel(project.elemType)} | {project.nx}x{project.ny}</span>
+          <span>
+            {elemTypeLabel(project.elemType)} | {project.nx}x{project.ny}
+          </span>
         </div>
         <div className="status-separator" />
         <div className="status-item">
-          <span>{project.planeType === 'stress' ? 'Plane Stress' : 'Plane Strain'}</span>
+          <span>
+            {project.planeType === 'stress' ? 'Plane Stress' : 'Plane Strain'}
+          </span>
         </div>
       </div>
     </div>

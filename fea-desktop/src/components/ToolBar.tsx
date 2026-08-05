@@ -3,9 +3,11 @@ interface ToolBarProps {
   onOpen: () => void;
   onSave: () => void;
   onExportPng: () => void;
+  isDirty?: boolean;
+  hasResults?: boolean;
 }
 
-function ToolBar({ onNew, onOpen, onSave, onExportPng }: ToolBarProps) {
+function ToolBar({ onNew, onOpen, onSave, onExportPng, isDirty, hasResults }: ToolBarProps) {
   return (
     <div className="toolbar-buttons">
       <button className="toolbar-btn" onClick={onNew} aria-label="New project">
@@ -15,10 +17,15 @@ function ToolBar({ onNew, onOpen, onSave, onExportPng }: ToolBarProps) {
         Open
       </button>
       <button className="toolbar-btn" onClick={onSave} aria-label="Save project">
-        Save
+        Save{isDirty ? '*' : ''}
       </button>
       <div className="toolbar-separator" />
-      <button className="toolbar-btn" onClick={onExportPng} aria-label="Export PNG">
+      <button
+        className="toolbar-btn"
+        onClick={onExportPng}
+        aria-label="Export PNG"
+        disabled={!hasResults}
+      >
         Export PNG
       </button>
     </div>
