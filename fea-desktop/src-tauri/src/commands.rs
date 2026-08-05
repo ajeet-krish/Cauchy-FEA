@@ -76,23 +76,35 @@ pub fn run_fea_solve(
 
     solver_bridge::run_solve(&mesh_json, &config_json, &output_dir)?;
 
-    // Read results and return as JSON
+    // Read results and flatten into single response
     let disp_path = format!("{}/displacement.json", output_dir);
     let stress_path = format!("{}/stress.json", output_dir);
     let meta_path = format!("{}/meta.json", output_dir);
 
-    let disp = std::fs::read_to_string(&disp_path).unwrap_or_default();
-    let stress = std::fs::read_to_string(&stress_path).unwrap_or_default();
-    let meta = std::fs::read_to_string(&meta_path).unwrap_or_default();
+    let disp_str = std::fs::read_to_string(&disp_path).unwrap_or_default();
+    let stress_str = std::fs::read_to_string(&stress_path).unwrap_or_default();
+    let meta_str = std::fs::read_to_string(&meta_path).unwrap_or_default();
 
-    // Combine into single response
-    let result = format!(
-        "{{\"displacement\":{},\"stress\":{},\"meta\":{}}}",
-        disp, stress, meta
-    );
+    // Parse each JSON to extract inner values
+    let disp: serde_json::Value = serde_json::from_str(&disp_str).unwrap_or(serde_json::Value::Null);
+    let stress: serde_json::Value = serde_json::from_str(&stress_str).unwrap_or(serde_json::Value::Null);
+    let meta: serde_json::Value = serde_json::from_str(&meta_str).unwrap_or(serde_json::Value::Null);
+
+    // Build flat response matching frontend SolveResult type
+    let result = serde_json::json!({
+        "displacements": disp.get("displacements").cloned().unwrap_or(serde_json::Value::Array(vec![])),
+        "stresses": stress.get("stresses").cloned().unwrap_or(serde_json::Value::Array(vec![])),
+        "max_displacement": disp.get("max_displacement").cloned().unwrap_or(serde_json::json!(0.0)),
+        "max_stress": stress.get("max_stress").cloned().unwrap_or(serde_json::json!(0.0)),
+        "solve_time_ms": meta.get("solve_time_ms").cloned().unwrap_or(serde_json::json!(0.0)),
+        "cg_iterations": meta.get("cg_iterations").cloned().unwrap_or(serde_json::json!(0)),
+        "cg_converged": meta.get("cg_converged").cloned().unwrap_or(serde_json::json!(false)),
+        "num_nodes": meta.get("num_nodes").cloned().unwrap_or(serde_json::json!(0)),
+        "num_elements": meta.get("num_elements").cloned().unwrap_or(serde_json::json!(0)),
+    });
 
     log_message("[solver] FEA solve complete.");
-    Ok(result)
+    Ok(result.to_string())
 }
 
 #[command]

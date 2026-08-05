@@ -693,6 +693,7 @@ export default function GeometryEditor({ shapes, nx, ny, onChange }: GeometryEdi
         width: lbracketParams.horizontalWidth,
         height: lbracketParams.verticalHeight,
         flange: lbracketParams.thickness,
+        web: lbracketParams.thickness,
       };
       const warning = checkCollision(newShape);
       setCollisionWarning(warning);

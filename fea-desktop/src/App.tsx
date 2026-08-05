@@ -267,13 +267,23 @@ function App() {
     setMeshGenerating(true);
     setMeshError(null);
     try {
-      const meshJson = await invoke('generate_mesh', {
-        shapesJson: JSON.stringify(project.shapes),
+      // Transform shapes to match C API expectations
+      // C API expects cx/cy for circles, x/y for rectangles
+      const apiShapes = project.shapes.map((s) => {
+        if (s.type === 'circle') {
+          return { ...s, cx: s.x, cy: s.y };
+        }
+        return s;
+      });
+      const meshJson = await invoke<string>('generate_mesh', {
+        shapesJson: JSON.stringify(apiShapes),
         nx: project.nx,
         ny: project.ny,
         elemType: project.elemType,
       });
-      setProject((prev) => ({ ...prev, mesh: meshJson as ProjectState['mesh'] }));
+      // Parse the JSON string returned by the backend
+      const mesh = JSON.parse(meshJson) as ProjectState['mesh'];
+      setProject((prev) => ({ ...prev, mesh }));
       setIsDirty(true);
       setViewMode('mesh');
     } catch (err) {
@@ -295,15 +305,17 @@ function App() {
         solverType: project.solverType,
       });
       const startTime = performance.now();
-      const result = await invoke('run_fea_solve', {
+      const resultStr = await invoke<string>('run_fea_solve', {
         meshJson: JSON.stringify(project.mesh),
         configJson,
       });
       const elapsed = performance.now() - startTime;
       setSolverTimeMs(elapsed);
 
-      // Runtime validation before type assertion
-      const parsed = result as Record<string, unknown>;
+      // Parse the JSON string returned by the backend
+      const parsed = JSON.parse(resultStr) as Record<string, unknown>;
+
+      // Runtime validation
       if (
         !parsed?.displacements ||
         !parsed?.stresses ||
