@@ -243,12 +243,28 @@ export default function ResultsCanvas({
 
     const observer = new ResizeObserver(() => {
       const rect = parent.getBoundingClientRect();
-      canvas.width = Math.floor(rect.width);
-      canvas.height = Math.floor(rect.height);
-      draw();
+      if (rect.width > 0 && rect.height > 0) {
+        canvas.width = Math.floor(rect.width);
+        canvas.height = Math.floor(rect.height);
+        draw();
+      }
     });
     observer.observe(parent);
-    return () => observer.disconnect();
+
+    // Initial draw after mount
+    const timer = setTimeout(() => {
+      const rect = parent.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        canvas.width = Math.floor(rect.width);
+        canvas.height = Math.floor(rect.height);
+        draw();
+      }
+    }, 50);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+    };
   }, [draw]);
 
   // Reset view when mesh changes

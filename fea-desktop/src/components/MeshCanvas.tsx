@@ -134,6 +134,9 @@ export default function MeshCanvas({
     const w = canvas.width;
     const h = canvas.height;
 
+    // Skip drawing if canvas has no dimensions
+    if (w === 0 || h === 0) return;
+
     // Clear
     ctx.fillStyle = BG_COLOR;
     ctx.fillRect(0, 0, w, h);
@@ -315,12 +318,28 @@ export default function MeshCanvas({
 
     const observer = new ResizeObserver(() => {
       const rect = parent.getBoundingClientRect();
-      canvas.width = Math.floor(rect.width);
-      canvas.height = Math.floor(rect.height);
-      draw();
+      if (rect.width > 0 && rect.height > 0) {
+        canvas.width = Math.floor(rect.width);
+        canvas.height = Math.floor(rect.height);
+        draw();
+      }
     });
     observer.observe(parent);
-    return () => observer.disconnect();
+
+    // Initial draw after mount (ensures canvas gets dimensions)
+    const timer = setTimeout(() => {
+      const rect = parent.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        canvas.width = Math.floor(rect.width);
+        canvas.height = Math.floor(rect.height);
+        draw();
+      }
+    }, 50);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+    };
   }, [draw]);
 
   // Reset view when mesh changes
