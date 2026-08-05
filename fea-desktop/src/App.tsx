@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { ProjectState, Shape, Material, DirichletBC, NeumannBC, BCTool } from './types';
+import type { ProjectState, SolveResult, Shape, Material, DirichletBC, NeumannBC, BCTool } from './types';
 import GeometryEditor from './components/GeometryEditor';
 import BCLoadEditor from './components/BCLoadEditor';
 import MeshCanvas from './components/MeshCanvas';
@@ -23,6 +23,7 @@ function App() {
     neumann: [],
     material: DEFAULT_MATERIAL,
     planeType: 'stress',
+    solverType: 'cg',
     result: null,
     nx: 16,
     ny: 8,
@@ -31,6 +32,9 @@ function App() {
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [meshGenerating, setMeshGenerating] = useState(false);
+  const [meshError, setMeshError] = useState<string | null>(null);
+  const [isSolving, setIsSolving] = useState(false);
+  const [solveError, setSolveError] = useState<string | null>(null);
   const [shapesDirty, setShapesDirty] = useState(false);
   const [activeBCTool, setActiveBCTool] = useState<BCTool>(null);
 
@@ -67,6 +71,10 @@ function App() {
 
   const handlePlaneTypeChange = (planeType: 'stress' | 'strain') => {
     setProject((prev) => ({ ...prev, planeType }));
+  };
+
+  const handleSolverTypeChange = (solverType: 'cg' | 'cholesky') => {
+    setProject((prev) => ({ ...prev, solverType }));
   };
 
   const handleDirichletChange = (dirichlet: DirichletBC[]) => {
@@ -191,6 +199,7 @@ function App() {
   const handleGenerateMesh = async () => {
     if (project.shapes.length === 0) return;
     setMeshGenerating(true);
+    setMeshError(null);
     try {
       const meshJson = await invoke('generate_mesh', {
         shapesJson: JSON.stringify(project.shapes),
@@ -202,6 +211,7 @@ function App() {
       setShapesDirty(false);
     } catch (err) {
       console.error('Mesh generation failed:', err);
+      setMeshError('Mesh generation failed. Check geometry and mesh density.');
     } finally {
       setMeshGenerating(false);
     }
@@ -209,17 +219,30 @@ function App() {
 
   const handleSolve = async () => {
     if (!project.mesh) return;
+    setIsSolving(true);
+    setSolveError(null);
     try {
       const configJson = JSON.stringify({
         planeType: project.planeType,
+        solverType: project.solverType,
       });
       const result = await invoke('run_fea_solve', {
         meshJson: JSON.stringify(project.mesh),
         configJson,
       });
-      setProject((prev) => ({ ...prev, result: result as ProjectState['result'] }));
+
+      // Runtime validation before type assertion
+      const parsed = result as Record<string, unknown>;
+      if (!parsed?.displacements || !parsed?.stresses || parsed.max_displacement == null) {
+        setSolveError('Invalid solver response.');
+        return;
+      }
+      setProject((prev) => ({ ...prev, result: parsed as unknown as SolveResult }));
     } catch (err) {
       console.error('Solve failed:', err);
+      setSolveError('Solver failed. Check mesh and boundary conditions.');
+    } finally {
+      setIsSolving(false);
     }
   };
 
@@ -231,6 +254,7 @@ function App() {
       neumann: [],
       material: DEFAULT_MATERIAL,
       planeType: 'stress',
+      solverType: 'cg',
       result: null,
       nx: 16,
       ny: 8,
@@ -433,6 +457,13 @@ function App() {
                   <span>DOFs: <span className="value">{project.mesh.num_dofs}</span></span>
                 </div>
               )}
+
+              {meshError && (
+                <div className="solve-error" style={{ marginTop: 8 }}>
+                  <span className="solve-error-icon">&#10007;</span>
+                  <span>{meshError}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -468,9 +499,13 @@ function App() {
             <div className={`panel-body ${collapsed['solver'] ? 'collapsed' : ''}`}>
               <SolverPanel
                 planeType={project.planeType}
+                solverType={project.solverType}
                 onPlaneTypeChange={handlePlaneTypeChange}
+                onSolverTypeChange={handleSolverTypeChange}
                 onSolve={handleSolve}
                 result={project.result}
+                isSolving={isSolving}
+                solveError={solveError}
               />
             </div>
           </div>
@@ -568,8 +603,16 @@ function App() {
       {/* Status Bar */}
       <div className="status-bar">
         <div className="status-item">
-          <div className={`status-dot ${project.result ? '' : 'idle'}`} />
-          <span>{project.result ? 'Solved' : meshGenerating ? 'Generating...' : 'Ready'}</span>
+          <div className={`status-dot ${isSolving ? 'running' : project.result ? '' : 'idle'}`} />
+          <span>
+            {isSolving
+              ? 'Solving...'
+              : project.result
+                ? 'Solved'
+                : meshGenerating
+                  ? 'Generating...'
+                  : 'Ready'}
+          </span>
         </div>
         <div className="status-separator" />
         <div className="status-item">

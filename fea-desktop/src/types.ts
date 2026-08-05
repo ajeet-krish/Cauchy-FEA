@@ -85,6 +85,7 @@ export interface ProjectState {
   neumann: NeumannBC[];
   material: Material;
   planeType: 'stress' | 'strain';
+  solverType: 'cg' | 'cholesky';
   result: SolveResult | null;
   nx: number;
   ny: number;
