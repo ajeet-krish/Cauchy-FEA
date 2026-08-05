@@ -96,6 +96,21 @@ target_include_directories(FEA_Tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(FEA_Tests PRIVATE GTest::gtest_main OpenMP::OpenMP_CXX)
 
 # ------------------------------------------------------------------
+# Shared library for Tauri desktop app
+# ------------------------------------------------------------------
+add_library(fea_solver_shared SHARED
+  src/fea_solver_c_api.cpp
+  ${FEA_HEADERS}
+)
+target_include_directories(fea_solver_shared PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(fea_solver_shared PRIVATE OpenMP::OpenMP_CXX)
+set_target_properties(fea_solver_shared PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN ON
+)
+
+# ------------------------------------------------------------------
 # Custom targets
 # ------------------------------------------------------------------
 add_custom_target(cantilever
