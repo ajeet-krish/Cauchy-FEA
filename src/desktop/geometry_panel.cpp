@@ -1,6 +1,7 @@
 #include "geometry_panel.hpp"
 #include "geometry_primitive.hpp"
 #include "undo_commands.hpp"
+#include "material_library.hpp"
 #include "../fea_types.hpp"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -14,6 +15,7 @@
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QUndoStack>
+#include <QSignalBlocker>
 
 GeometryPanel::GeometryPanel(EditorState* state, GeometryModel* model,
                              BCModel* bc_model, QWidget* parent)
@@ -38,6 +40,14 @@ void GeometryPanel::setupUI() {
     // ------------------------------------------------------------------
     auto* matGroup = new QGroupBox("Material", this);
     auto* matLayout = new QFormLayout(matGroup);
+
+    // Material preset dropdown
+    m_materialCombo = new QComboBox(this);
+    const auto& library = getMaterialLibrary();
+    for (const auto& preset : library) {
+        m_materialCombo->addItem(preset.name);
+    }
+    matLayout->addRow("Preset:", m_materialCombo);
 
     m_ESpin = new QDoubleSpinBox(this);
     m_ESpin->setRange(1e6, 1e15);
@@ -65,6 +75,9 @@ void GeometryPanel::setupUI() {
     m_planeCombo = new QComboBox(this);
     m_planeCombo->addItems({"Plane Stress", "Plane Strain"});
     matLayout->addRow("Plane Type:", m_planeCombo);
+
+    connect(m_materialCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &GeometryPanel::onMaterialPresetChanged);
 
     mainLayout->addWidget(matGroup);
 
@@ -368,4 +381,28 @@ double GeometryPanel::thickness() const {
 
 PlaneType GeometryPanel::planeType() const {
     return (m_planeCombo->currentIndex() == 0) ? PlaneType::STRESS : PlaneType::STRAIN;
+}
+
+void GeometryPanel::onMaterialPresetChanged(int index) {
+    const auto& library = getMaterialLibrary();
+    if (index < 0 || index >= static_cast<int>(library.size())) return;
+
+    const auto& preset = library[index];
+    bool isCustom = (preset.name == "Custom");
+
+    // Temporarily block signals to avoid recursive emission
+    QSignalBlocker blockE(m_ESpin);
+    QSignalBlocker blockNu(m_nuSpin);
+    QSignalBlocker blockT(m_tSpin);
+
+    if (!isCustom) {
+        m_ESpin->setValue(preset.E);
+        m_nuSpin->setValue(preset.nu);
+        m_tSpin->setValue(preset.t);
+    }
+
+    // Enable/disable fields: preset locks them, custom allows editing
+    m_ESpin->setEnabled(isCustom);
+    m_nuSpin->setEnabled(isCustom);
+    m_tSpin->setEnabled(isCustom);
 }

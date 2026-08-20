@@ -185,6 +185,7 @@ if(CRUCIBLE_FEA_DESKTOP)
     src/desktop/selection_model.hpp
     src/desktop/tool_context.hpp
     src/desktop/geometry_panel.hpp
+    src/desktop/material_library.hpp
     src/desktop/bc_panel.hpp
     src/desktop/mesh_generator.hpp
     src/desktop/undo_commands.hpp

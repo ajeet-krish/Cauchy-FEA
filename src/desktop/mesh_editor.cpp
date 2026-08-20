@@ -1,4 +1,5 @@
 #include "mesh_editor.hpp"
+#include "material_library.hpp"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -8,6 +9,7 @@
 #include <QSpinBox>
 #include <QDoubleSpinBox>
 #include <QCheckBox>
+#include <QSignalBlocker>
 
 MeshEditor::MeshEditor(QWidget* parent)
     : QWidget(parent) {
@@ -61,6 +63,14 @@ void MeshEditor::createMaterialControls() {
     auto* matGroup = new QGroupBox("Material", this);
     auto* matLayout = new QFormLayout(matGroup);
 
+    // Material preset dropdown
+    m_materialCombo = new QComboBox(this);
+    const auto& library = getMaterialLibrary();
+    for (const auto& preset : library) {
+        m_materialCombo->addItem(preset.name);
+    }
+    matLayout->addRow("Preset:", m_materialCombo);
+
     m_ESpin = new QDoubleSpinBox(this);
     m_ESpin->setRange(1e6, 1e15);
     m_ESpin->setValue(210e9);
@@ -83,6 +93,9 @@ void MeshEditor::createMaterialControls() {
     m_tSpin->setSingleStep(0.001);
     m_tSpin->setSuffix(" m");
     matLayout->addRow("Thickness (t):", m_tSpin);
+
+    connect(m_materialCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MeshEditor::onMaterialPresetChanged);
 
     m_mainLayout->addWidget(matGroup);
 }
@@ -159,3 +172,30 @@ bool MeshEditor::is3D() const { return m_elemCombo->currentIndex() == 4 || m_ele
 double MeshEditor::youngsModulus() const { return m_ESpin->value(); }
 double MeshEditor::poissonsRatio() const { return m_nuSpin->value(); }
 double MeshEditor::thickness() const { return m_tSpin->value(); }
+
+void MeshEditor::onMaterialPresetChanged(int index) {
+    const auto& library = getMaterialLibrary();
+    if (index < 0 || index >= static_cast<int>(library.size())) return;
+
+    const auto& preset = library[index];
+    bool isCustom = (preset.name == "Custom");
+
+    // Temporarily block signals to avoid recursive materialChanged emission
+    QSignalBlocker blockE(m_ESpin);
+    QSignalBlocker blockNu(m_nuSpin);
+    QSignalBlocker blockT(m_tSpin);
+
+    if (!isCustom) {
+        m_ESpin->setValue(preset.E);
+        m_nuSpin->setValue(preset.nu);
+        m_tSpin->setValue(preset.t);
+    }
+
+    // Enable/disable fields: preset locks them, custom allows editing
+    m_ESpin->setEnabled(isCustom);
+    m_nuSpin->setEnabled(isCustom);
+    m_tSpin->setEnabled(isCustom);
+
+    // Emit a single materialChanged signal
+    emit materialChanged();
+}

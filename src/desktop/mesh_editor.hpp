@@ -31,6 +31,9 @@ signals:
     void caseChanged();
     void materialChanged();
 
+private slots:
+    void onMaterialPresetChanged(int index);
+
 private:
     void createCaseControls();
     void createMaterialControls();
@@ -45,6 +48,7 @@ private:
     QSpinBox* m_nzSpin = nullptr;
     QLabel* m_nzLabel = nullptr;
     QCheckBox* m_q8Check = nullptr;
+    QComboBox* m_materialCombo = nullptr;
     QDoubleSpinBox* m_ESpin = nullptr;
     QDoubleSpinBox* m_nuSpin = nullptr;
     QDoubleSpinBox* m_tSpin = nullptr;

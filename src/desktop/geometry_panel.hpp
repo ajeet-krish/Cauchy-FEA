@@ -48,6 +48,7 @@ private slots:
     void onDeletePrimitive();
     void onGenerateMesh();
     void onWorktreeItemClicked(QTreeWidgetItem* item, int column);
+    void onMaterialPresetChanged(int index);
 
 private:
     void setupUI();
@@ -58,6 +59,7 @@ private:
     QUndoStack* m_undoStack = nullptr;
 
     // Material controls
+    QComboBox* m_materialCombo;
     QDoubleSpinBox* m_ESpin;
     QDoubleSpinBox* m_nuSpin;
     QDoubleSpinBox* m_tSpin;
