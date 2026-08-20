@@ -46,6 +46,7 @@ signals:
     void primitiveSelected(int index);
     void statusMessage(const QString& msg);
     void modeChanged(ToolMode mode);
+    void probeRequested(double wx, double wy);
 
 private:
     EditorState* m_state;

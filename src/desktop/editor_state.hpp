@@ -11,6 +11,7 @@ enum class ToolMode {
     ASSIGN_ROLLER_X,
     ASSIGN_ROLLER_Y,
     APPLY_FORCE,
+    PROBE,
     PAN_ZOOM
 };
 

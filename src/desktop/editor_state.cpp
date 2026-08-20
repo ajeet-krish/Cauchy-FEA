@@ -26,6 +26,7 @@ QString EditorState::currentToolName() const {
     case ToolMode::ASSIGN_ROLLER_X: return QStringLiteral("Assign Roller (X-fixed)");
     case ToolMode::ASSIGN_ROLLER_Y: return QStringLiteral("Assign Roller (Y-fixed)");
     case ToolMode::APPLY_FORCE:     return QStringLiteral("Apply Force");
+    case ToolMode::PROBE:           return QStringLiteral("Probe");
     case ToolMode::PAN_ZOOM:        return QStringLiteral("Pan / Zoom");
     }
     return QStringLiteral("Unknown");

@@ -43,6 +43,9 @@ MainWindow::MainWindow(QWidget* parent)
     m_toolContext->setUndoStack(m_undoStack);
     m_meshGenerator = new MeshGenerator();
 
+    // Probe tool
+    m_probeTool = new ProbeTool(this);
+
     // Stacked widget for 2D/3D viewport switching
     m_viewStack = new QStackedWidget(this);
     m_viewport = new ViewportWidget(this);
@@ -555,6 +558,11 @@ void MainWindow::createEditorToolbar() {
     m_forceAction->setShortcut(Qt::Key_P);
     m_forceAction->setToolTip("Apply force (P)");
 
+    m_probeAction = m_editorToolbar->addAction("Probe");
+    m_probeAction->setCheckable(true);
+    m_probeAction->setShortcut(Qt::Key_I);
+    m_probeAction->setToolTip("Probe node/element data (I)");
+
     // Make actions exclusive
     QActionGroup* toolGroup = new QActionGroup(this);
     toolGroup->addAction(m_selectAction);
@@ -565,6 +573,7 @@ void MainWindow::createEditorToolbar() {
     toolGroup->addAction(m_rollerXAction);
     toolGroup->addAction(m_rollerYAction);
     toolGroup->addAction(m_forceAction);
+    toolGroup->addAction(m_probeAction);
     toolGroup->setExclusive(true);
 
     // Default to select mode
@@ -626,6 +635,17 @@ void MainWindow::connectEditorSignals() {
         m_toolContext->modeChanged(ToolMode::APPLY_FORCE);
         m_statusLabel->setText("Tool: Apply Force");
     });
+    connect(m_probeAction, &QAction::triggered, this, [this]() {
+        m_editorState->current_mode = ToolMode::PROBE;
+        m_toolContext->modeChanged(ToolMode::PROBE);
+        m_statusLabel->setText("Tool: Probe");
+    });
+
+    // Probe tool connections
+    connect(m_toolContext, &ToolContext::probeRequested,
+            this, &MainWindow::onProbeRequested);
+    connect(m_probeTool, &ProbeTool::probed,
+            this, &MainWindow::onProbed);
 
     // BCPanel -> EditorState
     connect(m_bcPanel, &BCPanel::toolChanged, this, [this](ToolMode mode) {
@@ -717,6 +737,7 @@ void MainWindow::updateToolbarState() {
         case ToolMode::ASSIGN_ROLLER_X: m_rollerXAction->setChecked(true); break;
         case ToolMode::ASSIGN_ROLLER_Y: m_rollerYAction->setChecked(true); break;
         case ToolMode::APPLY_FORCE:    m_forceAction->setChecked(true); break;
+        case ToolMode::PROBE:          m_probeAction->setChecked(true); break;
         default:                       m_selectAction->setChecked(true); break;
     }
     m_statusLabel->setText("Tool: " + m_editorState->currentToolName());
@@ -747,4 +768,26 @@ void MainWindow::onRedo() {
 void MainWindow::onPrimitiveSelected(int index) {
     m_geometryPanel->selectPrimitiveInTree(index);
     m_viewport->update();
+}
+
+void MainWindow::onProbeRequested(double wx, double wy) {
+    if (m_lastResult.displacement.empty()) {
+        m_statusLabel->setText("No solve results available. Run solver first.");
+        return;
+    }
+    m_probeTool->probe(wx, wy, m_lastMesh, m_lastResult);
+}
+
+void MainWindow::onProbed(const ProbeResult& result) {
+    if (!result.valid) {
+        m_statusLabel->setText("Probe: no valid result");
+        return;
+    }
+    QString msg = QString("Node %1 | Element %2 | sigma_vm = %3 Pa | u = (%4, %5) m")
+        .arg(result.nodeId)
+        .arg(result.elemId)
+        .arg(result.vonMises, 0, 'g', 4)
+        .arg(result.ux, 0, 'g', 4)
+        .arg(result.uy, 0, 'g', 4);
+    m_statusLabel->setText(msg);
 }

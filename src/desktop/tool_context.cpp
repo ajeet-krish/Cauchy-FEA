@@ -52,6 +52,9 @@ void ToolContext::handleMousePress(QMouseEvent* event, const QPointF& worldPos) 
     case ToolMode::APPLY_FORCE:
         handleForcePress(worldPos);
         break;
+    case ToolMode::PROBE:
+        emit probeRequested(worldPos.x(), worldPos.y());
+        break;
     case ToolMode::PAN_ZOOM:
         // Handled by ViewportWidget directly
         break;

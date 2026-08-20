@@ -15,6 +15,7 @@
 #include "displacement_line_chart.hpp"
 #include "load_displacement_chart.hpp"
 #include "error_heatmap.hpp"
+#include "probe_tool.hpp"
 #include "editor_state.hpp"
 #include "geometry_model.hpp"
 #include "bc_model.hpp"
@@ -55,6 +56,8 @@ private slots:
     void onUndo();
     void onRedo();
     void onPrimitiveSelected(int index);
+    void onProbeRequested(double wx, double wy);
+    void onProbed(const ProbeResult& result);
 
 private:
     void createActions();
@@ -107,6 +110,10 @@ private:
     QAction* m_rollerXAction = nullptr;
     QAction* m_rollerYAction = nullptr;
     QAction* m_forceAction = nullptr;
+    QAction* m_probeAction = nullptr;
+
+    // Probe tool
+    ProbeTool* m_probeTool = nullptr;
 
     // Left dock with tabs
     QDockWidget* m_leftDock = nullptr;

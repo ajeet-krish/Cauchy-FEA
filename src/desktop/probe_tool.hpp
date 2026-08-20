@@ -22,7 +22,7 @@ public:
     explicit ProbeTool(QObject* parent = nullptr);
 
     ProbeResult probe(double wx, double wy, const Mesh& mesh,
-                      fea::SolveResult& result);
+                      const fea::SolveResult& result);
 
 signals:
     void probed(const ProbeResult& result);
