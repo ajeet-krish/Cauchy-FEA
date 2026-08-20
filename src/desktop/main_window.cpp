@@ -181,6 +181,9 @@ void MainWindow::createMenuBar() {
 
     QMenu* viewMenu = menuBar->addMenu("&View");
     viewMenu->addAction("Reset View");
+    viewMenu->addSeparator();
+    viewMenu->addAction(m_playAction);
+    viewMenu->addAction(m_resetAnimAction);
 
     QMenu* helpMenu = menuBar->addMenu("&Help");
     helpMenu->addAction("About");
@@ -222,6 +225,17 @@ void MainWindow::createToolbars() {
     viewToolbar->addWidget(scaleSlider);
     m_scaleLabel = new QLabel("100x", this);
     viewToolbar->addWidget(m_scaleLabel);
+
+    viewToolbar->addSeparator();
+
+    // Animation controls
+    m_playAction = viewToolbar->addAction("Play");
+    m_playAction->setToolTip("Play/pause deformation animation (10s)");
+    connect(m_playAction, &QAction::triggered, this, &MainWindow::onPlayAnimation);
+
+    m_resetAnimAction = viewToolbar->addAction("Reset Anim");
+    m_resetAnimAction->setToolTip("Reset animation to undeformed state");
+    connect(m_resetAnimAction, &QAction::triggered, this, &MainWindow::onResetAnimation);
 }
 
 void MainWindow::createStatusBar() {
@@ -473,11 +487,13 @@ void MainWindow::onToggleBoundary(bool checked) {
 }
 
 void MainWindow::onPlayAnimation() {
-    // TODO: Implement deformation animation
+    if (!m_lastResult.displacement.empty()) {
+        m_viewport->startAnimation();
+    }
 }
 
 void MainWindow::onResetAnimation() {
-    // TODO: Reset animation
+    m_viewport->resetAnimation();
 }
 
 void MainWindow::createBottomPlots() {

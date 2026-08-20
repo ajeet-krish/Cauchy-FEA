@@ -22,6 +22,11 @@ ViewportWidget::ViewportWidget(QWidget* parent)
         update();
     });
     m_updateTimer->start(100); // Update every 100ms
+
+    // Deformation animation timer (~60 FPS)
+    m_animTimer = new QTimer(this);
+    connect(m_animTimer, &QTimer::timeout, this, &ViewportWidget::onAnimationTick);
+    m_animTimer->setInterval(16);
 }
 
 void ViewportWidget::setMeshAndResults(const Mesh& mesh, const fea::SolveResult& result) {
@@ -32,6 +37,14 @@ void ViewportWidget::setMeshAndResults(const Mesh& mesh, const fea::SolveResult&
     m_panX = 0.5;
     m_panY = 0.5;
     m_zoom = 1.0;
+
+    // Reset animation state when new results arrive
+    m_animPlaying = false;
+    m_animActive = false;
+    m_animProgress = 0.0;
+    m_animPausedElapsed = 0.0;
+    if (m_animTimer) m_animTimer->stop();
+
     update();
 }
 
@@ -85,6 +98,74 @@ void ViewportWidget::resetView() {
     m_panX = 0.5;
     m_panY = 0.5;
     m_zoom = 1.0;
+    update();
+}
+
+// ------------------------------------------------------------------
+// Deformation animation
+// ------------------------------------------------------------------
+double ViewportWidget::easeInOutCubic(double t) {
+    if (t < 0.5) {
+        return 4.0 * t * t * t;
+    }
+    return 1.0 - std::pow(-2.0 * t + 2.0, 3) / 2.0;
+}
+
+void ViewportWidget::startAnimation() {
+    if (!m_hasData || m_result.displacement.empty()) return;
+
+    if (m_animPlaying) {
+        pauseAnimation();
+        return;
+    }
+
+    m_animActive = true;
+    m_animPlaying = true;
+
+    // If restarting from end, reset progress
+    if (m_animProgress >= 1.0) {
+        m_animProgress = 0.0;
+        m_animPausedElapsed = 0.0;
+    }
+
+    m_animElapsed.start();
+    m_animTimer->start();
+    update();
+}
+
+void ViewportWidget::pauseAnimation() {
+    if (!m_animPlaying) return;
+
+    m_animPausedElapsed += m_animElapsed.elapsed();
+    m_animTimer->stop();
+    m_animPlaying = false;
+    update();
+}
+
+void ViewportWidget::resetAnimation() {
+    m_animTimer->stop();
+    m_animPlaying = false;
+    m_animActive = true;
+    m_animProgress = 0.0;
+    m_animPausedElapsed = 0.0;
+    update();
+}
+
+void ViewportWidget::onAnimationTick() {
+    if (!m_animPlaying) return;
+
+    double totalElapsed = m_animPausedElapsed + m_animElapsed.elapsed();
+    double rawProgress = totalElapsed / ANIM_DURATION_MS;
+
+    if (rawProgress >= 1.0) {
+        rawProgress = 1.0;
+        m_animProgress = 1.0;
+        m_animPlaying = false;
+        m_animTimer->stop();
+    } else {
+        m_animProgress = rawProgress;
+    }
+
     update();
 }
 
@@ -879,6 +960,12 @@ void ViewportWidget::paintEvent(QPaintEvent*) {
         updateFieldRange();
     }
 
+    // Compute effective displacement scale (animation or static)
+    double effectiveScale = m_dispScale;
+    if (m_animActive) {
+        effectiveScale = easeInOutCubic(m_animProgress) * m_dispScale;
+    }
+
     auto worldToWidget = [&](double wx, double wy) -> QPointF {
         double halfRange = 0.6 / m_zoom;
         double aspect = static_cast<double>(width()) / static_cast<double>(height());
@@ -921,8 +1008,8 @@ void ViewportWidget::paintEvent(QPaintEvent*) {
                 int n = elem[i];
                 double ux = m_result.displacement[n * 2];
                 double uy = m_result.displacement[n * 2 + 1];
-                poly << worldToWidget(m_mesh.nodes[n].x + ux * m_dispScale,
-                                       m_mesh.nodes[n].y + uy * m_dispScale);
+                poly << worldToWidget(m_mesh.nodes[n].x + ux * effectiveScale,
+                                       m_mesh.nodes[n].y + uy * effectiveScale);
             }
             // Use average nodal value for element color
             double val = 0.0;
@@ -943,8 +1030,8 @@ void ViewportWidget::paintEvent(QPaintEvent*) {
                 int n = elem[i];
                 double ux = m_result.displacement[n * 2];
                 double uy = m_result.displacement[n * 2 + 1];
-                poly << worldToWidget(m_mesh.nodes[n].x + ux * m_dispScale,
-                                       m_mesh.nodes[n].y + uy * m_dispScale);
+                poly << worldToWidget(m_mesh.nodes[n].x + ux * effectiveScale,
+                                       m_mesh.nodes[n].y + uy * effectiveScale);
             }
             // Use average nodal value for element color
             double val = 0.0;

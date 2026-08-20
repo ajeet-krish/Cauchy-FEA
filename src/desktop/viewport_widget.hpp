@@ -5,6 +5,7 @@
 #include <QKeyEvent>
 #include <QPoint>
 #include <QColor>
+#include <QElapsedTimer>
 #include <memory>
 #include "fea.hpp"
 
@@ -54,6 +55,11 @@ public:
     
     // Find nearest node to point (for context menu)
     int findNearestNode(const QPointF& worldPos, double tolerance = 0.05) const;
+
+public slots:
+    void startAnimation();
+    void pauseAnimation();
+    void resetAnimation();
 
 signals:
     void pointProbed(int nodeId, int elemId, double x, double y, double ux, double uy, double stressVal);
@@ -117,7 +123,20 @@ private:
     double getFieldValueForNode(int nodeIdx) const;
     double getFieldValueForElement(int elemIdx) const;
     void updateFieldRange();
-    
+
+    // Animation
+    void onAnimationTick();
+    static double easeInOutCubic(double t);
+
     // Periodic update timer to prevent blank screen
     QTimer* m_updateTimer = nullptr;
+
+    // Deformation animation state
+    bool m_animPlaying = false;
+    bool m_animActive = false;
+    double m_animProgress = 0.0;
+    QTimer* m_animTimer = nullptr;
+    QElapsedTimer m_animElapsed;
+    double m_animPausedElapsed = 0.0;
+    static constexpr double ANIM_DURATION_MS = 10000.0;
 };

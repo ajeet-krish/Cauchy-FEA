@@ -115,6 +115,10 @@ private:
     // Probe tool
     ProbeTool* m_probeTool = nullptr;
 
+    // Animation actions
+    QAction* m_playAction = nullptr;
+    QAction* m_resetAnimAction = nullptr;
+
     // Left dock with tabs
     QDockWidget* m_leftDock = nullptr;
     QTabWidget* m_leftTabs = nullptr;
