@@ -147,6 +147,7 @@ if(CRUCIBLE_FEA_DESKTOP)
     src/desktop/displacement_line_chart.cpp
     src/desktop/load_displacement_chart.cpp
     src/desktop/error_heatmap.cpp
+    src/desktop/analytical_panel.cpp
     src/desktop/editor_state.cpp
     src/desktop/geometry_primitive.cpp
     src/desktop/geometry_model.cpp
@@ -178,6 +179,8 @@ if(CRUCIBLE_FEA_DESKTOP)
     src/desktop/displacement_line_chart.hpp
     src/desktop/load_displacement_chart.hpp
     src/desktop/error_heatmap.hpp
+    src/desktop/analytical.hpp
+    src/desktop/analytical_panel.hpp
     src/desktop/editor_state.hpp
     src/desktop/geometry_primitive.hpp
     src/desktop/geometry_model.hpp

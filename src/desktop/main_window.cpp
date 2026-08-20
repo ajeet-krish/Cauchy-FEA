@@ -1,4 +1,5 @@
 #include "main_window.hpp"
+#include "analytical.hpp"
 #include <QMenuBar>
 #include <QMenu>
 #include <QAction>
@@ -311,6 +312,14 @@ void MainWindow::onSolveFinished(const fea::SolveResult& result, const Mesh& mes
         totalForce += std::abs(bc.value);
     }
     m_ldChart->addPoint(totalForce, maxDisp);
+
+    // Update analytical comparison panel
+    if (!is3d) {
+        auto analytical_rows = compute_analytical(m_config.case_type, mesh, result);
+        m_analyticalPanel->setData(analytical_rows);
+    } else {
+        m_analyticalPanel->clear();
+    }
 }
 
 void MainWindow::onSolverError(const QString& errorMessage) {
@@ -484,6 +493,15 @@ void MainWindow::onLoadCase() {
         m_resultModel->setData(config.result, config.mesh, ResultTableType::DISPLACEMENT);
         m_solverPanel->setResult(config.result);
 
+        // Restore analytical comparison panel
+        if (!is3d) {
+            auto analytical_rows = compute_analytical(
+                config.solverConfig.case_type, config.mesh, config.result);
+            m_analyticalPanel->setData(analytical_rows);
+        } else {
+            m_analyticalPanel->clear();
+        }
+
         m_statusLabel->setText(QString("Loaded: %1 (%2 nodes, %3 elements, %4 DOFs)")
             .arg(QFileInfo(fileName).fileName())
             .arg(config.mesh.num_nodes())
@@ -499,6 +517,11 @@ void MainWindow::onLoadCase() {
                                            static_cast<int>(config.mesh.dirichlet.size() + config.mesh.neumann.size()));
         }
         m_statusLabel->setText("Loaded: " + QFileInfo(fileName).fileName());
+    }
+
+    // Clear analytical panel if no results
+    if (!config.hasResults) {
+        m_analyticalPanel->clear();
     }
 
     // Update panels
@@ -728,6 +751,7 @@ void MainWindow::createBottomPlots() {
     m_ldChart = new LoadDisplacementChart(this);
     m_errorHeatmap = new ErrorHeatmap(this);
     m_convChart = new ConvergenceChart(this);
+    m_analyticalPanel = new AnalyticalPanel(this);
 
     m_plotTabs->addTab(m_stressHist, "Stress Distribution");
     m_plotTabs->addTab(m_energyChart, "Energy Balance");
@@ -735,6 +759,7 @@ void MainWindow::createBottomPlots() {
     m_plotTabs->addTab(m_ldChart, "Load-Displacement");
     m_plotTabs->addTab(m_errorHeatmap, "Error Map");
     m_plotTabs->addTab(m_convChart, "Convergence");
+    m_plotTabs->addTab(m_analyticalPanel, "Validation");
 
     QDockWidget* plotsDock = new QDockWidget("Analysis Plots", this);
     plotsDock->setWidget(m_plotTabs);

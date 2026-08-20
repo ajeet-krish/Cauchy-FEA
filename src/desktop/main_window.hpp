@@ -15,6 +15,7 @@
 #include "displacement_line_chart.hpp"
 #include "load_displacement_chart.hpp"
 #include "error_heatmap.hpp"
+#include "analytical_panel.hpp"
 #include "probe_tool.hpp"
 #include "editor_state.hpp"
 #include "geometry_model.hpp"
@@ -133,6 +134,7 @@ private:
     LoadDisplacementChart* m_ldChart = nullptr;
     ErrorHeatmap* m_errorHeatmap = nullptr;
     ConvergenceChart* m_convChart = nullptr;
+    AnalyticalPanel* m_analyticalPanel = nullptr;
 
     SolveConfig m_config;
     Mesh m_lastMesh;
