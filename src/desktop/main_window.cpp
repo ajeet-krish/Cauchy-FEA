@@ -80,6 +80,13 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_solverRunner, &SolverRunner::progress,
             this, &MainWindow::onProgress);
 
+    // Modal analysis runner
+    m_modalRunner = new ModalRunner(this);
+    connect(m_modalRunner, &ModalRunner::modalFinished,
+            this, &MainWindow::onModalFinished);
+    connect(m_modalRunner, &ModalRunner::modalError,
+            this, &MainWindow::onModalError);
+
     // Result model
     m_resultModel = new ResultModel(this);
 
@@ -104,6 +111,25 @@ MainWindow::MainWindow(QWidget* parent)
     tabifyDockWidget(solverDock, inspectorDock);
     inspectorDock->setVisible(false);
 
+    // Mode shape panel (right dock, below inspector)
+    m_modeShapePanel = new ModeShapePanel(this);
+    QDockWidget* modeShapeDock = new QDockWidget("Mode Shapes", this);
+    modeShapeDock->setWidget(m_modeShapePanel);
+    modeShapeDock->setAllowedAreas(Qt::RightDockWidgetArea);
+    addDockWidget(Qt::RightDockWidgetArea, modeShapeDock);
+    tabifyDockWidget(solverDock, modeShapeDock);
+    modeShapeDock->setVisible(false);
+
+    // Connect modal analysis signals
+    connect(m_modeShapePanel, &ModeShapePanel::modeChanged,
+            this, &MainWindow::onModeChanged);
+    connect(m_modeShapePanel, &ModeShapePanel::animationToggled,
+            this, &MainWindow::onModeAnimationToggled);
+    connect(m_modeShapePanel, &ModeShapePanel::amplitudeChanged,
+            this, &MainWindow::onModeAmplitudeChanged);
+    connect(m_modeShapePanel, &ModeShapePanel::resetRequested,
+            this, &MainWindow::onModeReset);
+
     // Create menus, toolbars, status bar, plots
     createActions();
     createMenuBar();
@@ -117,6 +143,8 @@ MainWindow::MainWindow(QWidget* parent)
             this, &MainWindow::onRunSolver);
     connect(m_solverPanel, &SolverPanel::resetClicked,
             this, &MainWindow::onResetView);
+    connect(m_solverPanel, &SolverPanel::modalClicked,
+            this, &MainWindow::onRunModalAnalysis);
     connectEditorSignals();
 }
 
@@ -1093,4 +1121,78 @@ void MainWindow::onProbed(const ProbeResult& result) {
         .arg(result.ux, 0, 'g', 4)
         .arg(result.uy, 0, 'g', 4);
     m_statusLabel->setText(msg);
+}
+
+// ------------------------------------------------------------------
+// Modal analysis
+// ------------------------------------------------------------------
+void MainWindow::onRunModalAnalysis() {
+    if (m_lastResult.K_csr.nrows == 0) {
+        m_statusLabel->setText("No stiffness matrix available. Run a static solve first.");
+        return;
+    }
+    if (m_lastMesh.num_nodes() == 0) {
+        m_statusLabel->setText("No mesh available. Run a static solve first.");
+        return;
+    }
+
+    m_statusLabel->setText("Running modal analysis...");
+    m_modalRunner->setMesh(m_lastMesh);
+    m_modalRunner->setK(m_lastResult.K_csr);
+    m_modalRunner->setNumModes(10);
+    m_modalRunner->start();
+}
+
+void MainWindow::onModalFinished(const dynamics::ModalResult& result) {
+    m_lastModalResult = result;
+
+    // Pass result to viewport
+    m_viewport->setModalResult(result);
+
+    // Pass result to mode shape panel
+    m_modeShapePanel->setModalResult(result);
+
+    // Show mode shape dock
+    for (QDockWidget* dock : findChildren<QDockWidget*>()) {
+        if (dock->widget() == m_modeShapePanel) {
+            dock->setVisible(true);
+            dock->raise();
+            break;
+        }
+    }
+
+    // Update status
+    QString msg = QString("Modal analysis complete: %1 modes computed. f1 = %2 Hz")
+        .arg(result.num_modes)
+        .arg(result.frequencies_hz.empty() ? 0.0 : result.frequencies_hz[0], 0, 'f', 2);
+    m_statusLabel->setText(msg);
+}
+
+void MainWindow::onModalError(const QString& errorMessage) {
+    m_statusLabel->setText("Modal analysis error: " + errorMessage);
+    QMessageBox::warning(this, "Modal Analysis Error", errorMessage);
+}
+
+void MainWindow::onModeChanged(int modeIndex) {
+    if (!m_modeShapePanel) return;
+    m_viewport->startModeAnimation(modeIndex);
+}
+
+void MainWindow::onModeAnimationToggled(bool playing) {
+    if (playing) {
+        int modeIdx = m_modeShapePanel->currentModeIndex();
+        if (modeIdx >= 0 && modeIdx < m_lastModalResult.num_modes) {
+            m_viewport->startModeAnimation(modeIdx);
+        }
+    } else {
+        m_viewport->stopModeAnimation();
+    }
+}
+
+void MainWindow::onModeAmplitudeChanged(double amplitude) {
+    m_viewport->setModeAmplitude(amplitude);
+}
+
+void MainWindow::onModeReset() {
+    m_viewport->stopModeAnimation();
 }

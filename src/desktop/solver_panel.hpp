@@ -25,6 +25,7 @@ public:
 signals:
     void runClicked();
     void resetClicked();
+    void modalClicked();
 
 private:
     void createSolverControls();
@@ -36,6 +37,7 @@ private:
     QSpinBox* m_adaptIters = nullptr;
     QPushButton* m_runButton = nullptr;
     QPushButton* m_resetButton = nullptr;
+    QPushButton* m_modalButton = nullptr;
     QTextEdit* m_resultsText = nullptr;
     QProgressBar* m_progressBar = nullptr;
 };

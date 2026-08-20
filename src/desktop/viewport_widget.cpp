@@ -27,6 +27,11 @@ ViewportWidget::ViewportWidget(QWidget* parent)
     m_animTimer = new QTimer(this);
     connect(m_animTimer, &QTimer::timeout, this, &ViewportWidget::onAnimationTick);
     m_animTimer->setInterval(16);
+
+    // Mode shape animation timer (~60 FPS)
+    m_modeAnimTimer = new QTimer(this);
+    connect(m_modeAnimTimer, &QTimer::timeout, this, &ViewportWidget::onModeAnimTick);
+    m_modeAnimTimer->setInterval(16);
 }
 
 void ViewportWidget::setMeshAndResults(const Mesh& mesh, const fea::SolveResult& result) {
@@ -44,6 +49,12 @@ void ViewportWidget::setMeshAndResults(const Mesh& mesh, const fea::SolveResult&
     m_animProgress = 0.0;
     m_animPausedElapsed = 0.0;
     if (m_animTimer) m_animTimer->stop();
+
+    // Reset mode shape animation
+    m_modeAnimPlaying = false;
+    m_currentModeIndex = -1;
+    m_modeTime = 0.0;
+    if (m_modeAnimTimer) m_modeAnimTimer->stop();
 
     // Clear cached streamline paths (will recompute on next toggle)
     m_streamlineResult.paths.clear();
@@ -186,6 +197,66 @@ void ViewportWidget::onAnimationTick() {
         m_animTimer->stop();
     } else {
         m_animProgress = rawProgress;
+    }
+
+    update();
+}
+
+// ------------------------------------------------------------------
+// Mode shape animation
+// ------------------------------------------------------------------
+void ViewportWidget::setModalResult(const dynamics::ModalResult& result) {
+    m_modalResult = result;
+    m_hasModalResult = true;
+}
+
+void ViewportWidget::startModeAnimation(int modeIndex) {
+    if (!m_hasModalResult) return;
+    if (modeIndex < 0 || modeIndex >= m_modalResult.num_modes) return;
+
+    // Stop any existing deformation animation
+    if (m_animPlaying) {
+        pauseAnimation();
+    }
+
+    m_currentModeIndex = modeIndex;
+    m_modeTime = 0.0;
+    m_modeAnimPlaying = true;
+    m_modeAnimElapsed.start();
+    m_modeAnimTimer->start();
+    update();
+}
+
+void ViewportWidget::stopModeAnimation() {
+    m_modeAnimPlaying = false;
+    m_modeTime = 0.0;
+    if (m_modeAnimTimer) m_modeAnimTimer->stop();
+    update();
+}
+
+void ViewportWidget::setModeAmplitude(double amplitude) {
+    m_modeAmplitude = amplitude;
+}
+
+void ViewportWidget::onModeAnimTick() {
+    if (!m_modeAnimPlaying || !m_hasModalResult) return;
+    if (m_currentModeIndex < 0 || m_currentModeIndex >= m_modalResult.num_modes) return;
+
+    // Elapsed time in seconds
+    double elapsedSec = m_modeAnimElapsed.elapsed() / 1000.0;
+
+    // Sinusoidal oscillation at natural frequency
+    // natural_frequencies stores omega (rad/s), so phase = sin(omega * t)
+    double omega = m_modalResult.natural_frequencies[m_currentModeIndex];
+    double phase = std::sin(omega * elapsedSec);
+
+    int ndof = m_mesh.num_dofs();
+    const auto& modeShape = m_modalResult.mode_shapes[m_currentModeIndex];
+
+    // Scale the mode shape by amplitude and sinusoidal phase
+    m_result.displacement.resize(ndof, 0.0);
+    for (int i = 0; i < ndof; ++i) {
+        m_result.displacement[i] = m_modeAmplitude * phase * modeShape[i];
     }
 
     update();
@@ -1098,7 +1169,10 @@ void ViewportWidget::paintEvent(QPaintEvent*) {
 
     // Compute effective displacement scale (animation or static)
     double effectiveScale = m_dispScale;
-    if (m_animActive) {
+    if (m_modeAnimPlaying) {
+        // Mode shape displacement already has amplitude baked in
+        effectiveScale = 1.0;
+    } else if (m_animActive) {
         effectiveScale = easeInOutCubic(m_animProgress) * m_dispScale;
     }
 

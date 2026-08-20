@@ -26,6 +26,8 @@
 #include "geometry_panel.hpp"
 #include "bc_panel.hpp"
 #include "mesh_generator.hpp"
+#include "modal_runner.hpp"
+#include "mode_shape_panel.hpp"
 
 class QStackedWidget;
 class QActionGroup;
@@ -63,6 +65,13 @@ private slots:
     void onPrimitiveSelected(int index);
     void onProbeRequested(double wx, double wy);
     void onProbed(const ProbeResult& result);
+    void onRunModalAnalysis();
+    void onModalFinished(const dynamics::ModalResult& result);
+    void onModalError(const QString& errorMessage);
+    void onModeChanged(int modeIndex);
+    void onModeAnimationToggled(bool playing);
+    void onModeAmplitudeChanged(double amplitude);
+    void onModeReset();
 
 private:
     void createActions();
@@ -144,4 +153,9 @@ private:
     Mesh m_lastMesh;
     fea::SolveResult m_lastResult;
     QString m_currentFilePath;
+
+    // Modal analysis
+    ModalRunner* m_modalRunner = nullptr;
+    ModeShapePanel* m_modeShapePanel = nullptr;
+    dynamics::ModalResult m_lastModalResult;
 };

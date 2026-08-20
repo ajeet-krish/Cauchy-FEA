@@ -48,14 +48,21 @@ void SolverPanel::createSolverControls() {
     auto* runLayout = new QHBoxLayout();
     m_runButton = new QPushButton("Run Solver", this);
     m_resetButton = new QPushButton("Reset View", this);
+    m_modalButton = new QPushButton("Modal Analysis", this);
     runLayout->addWidget(m_runButton);
     runLayout->addWidget(m_resetButton);
     m_mainLayout->addLayout(runLayout);
+
+    auto* modalLayout = new QHBoxLayout();
+    modalLayout->addWidget(m_modalButton);
+    m_mainLayout->addLayout(modalLayout);
 
     connect(m_runButton, &QPushButton::clicked,
             this, &SolverPanel::runClicked);
     connect(m_resetButton, &QPushButton::clicked,
             this, &SolverPanel::resetClicked);
+    connect(m_modalButton, &QPushButton::clicked,
+            this, &SolverPanel::modalClicked);
 }
 
 void SolverPanel::createResultsDisplay() {

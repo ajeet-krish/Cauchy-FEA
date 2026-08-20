@@ -9,6 +9,7 @@
 #include <memory>
 #include "fea.hpp"
 #include "streamline_tracer.hpp"
+#include "dynamics.hpp"
 
 enum class ContourField { VON_MISES, SIGMA_XX, SIGMA_YY, SIGMA_XY, SIGMA_1, SIGMA_2, DISPLACEMENT_MAG };
 enum class ColormapType { TURBO, VIRIDIS, HOT, COOLWARM, RDBU_R };
@@ -40,6 +41,12 @@ public:
     void toggleStreamlines(bool show);
 
     void resetView();
+
+    // Mode shape animation
+    void setModalResult(const dynamics::ModalResult& result);
+    void startModeAnimation(int modeIndex);
+    void stopModeAnimation();
+    void setModeAmplitude(double amplitude);
 
     // Getters for save/load
     ContourField contourField() const { return m_field; }
@@ -163,4 +170,16 @@ private:
     QElapsedTimer m_animElapsed;
     double m_animPausedElapsed = 0.0;
     static constexpr double ANIM_DURATION_MS = 10000.0;
+
+    // Mode shape animation state
+    bool m_modeAnimPlaying = false;
+    int m_currentModeIndex = -1;
+    double m_modeAmplitude = 1.0;
+    double m_modeTime = 0.0;
+    QTimer* m_modeAnimTimer = nullptr;
+    QElapsedTimer m_modeAnimElapsed;
+    dynamics::ModalResult m_modalResult;
+    bool m_hasModalResult = false;
+
+    void onModeAnimTick();
 };
