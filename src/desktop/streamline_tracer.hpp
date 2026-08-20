@@ -3,6 +3,7 @@
 #include "../elements.hpp"
 #include "../postprocess.hpp"
 #include "../adaptivity.hpp"
+#include <QDebug>
 #include <vector>
 #include <cmath>
 #include <algorithm>
@@ -544,10 +545,9 @@ inline StreamlineResult trace_all(
         result.min_sigma_1 = 0.0;
     }
 
-    std::cout << "Streamline tracer: " << result.paths.size()
-              << " paths, sigma_1 range: ["
-              << result.min_sigma_1 << ", " << result.max_sigma_1 << "]"
-              << std::endl;
+    qDebug() << "Streamline tracer:" << result.paths.size()
+             << "paths, sigma_1 range: ["
+             << result.min_sigma_1 << "," << result.max_sigma_1 << "]";
 
     return result;
 }

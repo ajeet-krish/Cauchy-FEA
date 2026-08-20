@@ -49,6 +49,11 @@ fea::SolveResult ParametricEngine::rescale(double newE, double newForce, double 
         return result;
     }
 
+    // Guard against division by zero when baseline parameters are near zero
+    if (std::abs(m_baseline.E) < 1e-30 || std::abs(m_baseline.t) < 1e-30) {
+        return m_baseline.original_result;
+    }
+
     auto t_start = std::chrono::high_resolution_clock::now();
 
     // Compute scale factor for stiffness matrix

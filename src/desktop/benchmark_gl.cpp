@@ -97,8 +97,8 @@ GLBenchmarkWidget::~GLBenchmarkWidget() {
     m_value_vbo.destroy();
     m_filled_vao.destroy();
     m_edge_vao.destroy();
-    delete m_shader;
-    delete m_colormap_texture;
+    m_shader.reset();
+    m_colormap_texture.reset();
     doneCurrent();
 }
 
@@ -251,7 +251,7 @@ void GLBenchmarkWidget::createColormapTexture() {
     unsigned char rgba[COLORMAP_SIZE * 4];
     generateTurboColormap(rgba);
 
-    m_colormap_texture = new QOpenGLTexture(QOpenGLTexture::Target1D);
+    m_colormap_texture = std::make_unique<QOpenGLTexture>(QOpenGLTexture::Target1D);
     m_colormap_texture->create();
     m_colormap_texture->setSize(COLORMAP_SIZE, 1, 1);
     m_colormap_texture->setFormat(QOpenGLTexture::RGBA8_UNorm);
@@ -267,7 +267,7 @@ void GLBenchmarkWidget::createColormapTexture() {
 // Compile shaders
 // ------------------------------------------------------------------
 void GLBenchmarkWidget::createShaders() {
-    m_shader = new QOpenGLShaderProgram(this);
+    m_shader = std::make_unique<QOpenGLShaderProgram>();
 
     // Vertex shader
     m_shader->addShaderFromSourceCode(QOpenGLShader::Vertex, vertexShaderSrc);
@@ -280,8 +280,7 @@ void GLBenchmarkWidget::createShaders() {
     m_shader->link();
     if (!m_shader->isLinked()) {
         qWarning() << "Shader link failed:" << m_shader->log();
-        delete m_shader;
-        m_shader = nullptr;
+        m_shader.reset();
         return;
     }
 }

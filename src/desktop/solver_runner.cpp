@@ -145,6 +145,12 @@ void SolverRunner::run() {
                     m.mat.t = m_config.t;
                     m.plane = m_config.plane_type;
                     break;
+
+                case CaseType::CANTILEVER_3D:
+                case CaseType::PLATE_HOLE_3D:
+                case CaseType::LAME_3D:
+                    // 3D cases: handled by 3D mesh generation above
+                    break;
                 }
             }
         }

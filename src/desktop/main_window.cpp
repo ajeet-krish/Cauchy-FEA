@@ -32,7 +32,7 @@
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
-    setWindowTitle("Crucible-FEA -- 2D/3D Finite Element Structural Solver");
+    setWindowTitle("Crucible-FEA: 2D/3D Finite Element Structural Solver");
     resize(1400, 900);
 
     // Undo/redo stack (created first so all editors can reference it)
@@ -373,6 +373,7 @@ void MainWindow::onSolveFinished(const fea::SolveResult& result, const Mesh& mes
     int dofPerNode = is3d ? 3 : 2;
     double maxDisp = 0.0;
     for (int i = 0; i < mesh.num_nodes(); ++i) {
+        if (dofPerNode * i + 1 >= static_cast<int>(result.displacement.size())) continue;
         double ux = result.displacement[dofPerNode * i];
         double uy = result.displacement[dofPerNode * i + 1];
         double d = std::sqrt(ux * ux + uy * uy);
@@ -1272,6 +1273,7 @@ void MainWindow::onParamChanged(ParamID param, double value) {
             int dofPerNode = is3d ? 3 : 2;
             double maxDisp = 0.0;
             for (int i = 0; i < m_lastMesh.num_nodes(); ++i) {
+                if (dofPerNode * i + 1 >= static_cast<int>(result.displacement.size())) continue;
                 double ux = result.displacement[dofPerNode * i];
                 double uy = result.displacement[dofPerNode * i + 1];
                 double d = std::sqrt(ux * ux + uy * uy);

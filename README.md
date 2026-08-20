@@ -45,9 +45,51 @@ A C++20 finite element solver with a native Qt 6 desktop application for interac
       <br><em>Mesh quality heatmap overlay for pre-solve validation</em>
     </td>
   </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/probe_tool.png" alt="Probe Tool" width="400">
+      <br><em>Click-to-probe stress and displacement at any point (I key)</em>
+    </td>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/deformation_animation.gif" alt="Deformation Animation" width="400">
+      <br><em>10-second smooth deformation animation with play/pause/reset</em>
+    </td>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/material_library.png" alt="Material Library" width="400">
+      <br><em>Material preset dropdown: Steel, Aluminum, Titanium, Copper, Concrete</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/analytical_comparison.png" alt="Analytical Comparison" width="400">
+      <br><em>Expected vs. computed values with color-coded pass/fail</em>
+    </td>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/element_inspector.png" alt="Element Inspector" width="400">
+      <br><em>Double-click to inspect stress tensor, strain, and quality metrics</em>
+    </td>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/stress_streamlines.png" alt="Stress Streamlines" width="400">
+      <br><em>Principal stress direction tracing (red=tension, blue=compression)</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/mode_shape_animator.gif" alt="Mode Shape Animator" width="400">
+      <br><em>Async modal analysis with sinusoidal oscillation at natural frequency</em>
+    </td>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/parametric_study.png" alt="Parametric Study" width="400">
+      <br><em>Real-time sliders for E, nu, force, thickness with fast rescaling</em>
+    </td>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/project_save_load.png" alt="Project Save/Load" width="400">
+      <br><em>Full v2 JSON format with Ctrl+S quick-save</em>
+    </td>
+  </tr>
 </table>
 
-*Desktop application panels: mesh editor, boundary conditions, stress contour, principal stress arrows, analysis plots, and mesh quality overlay.*
+*Desktop application panels: mesh editor, boundary conditions, stress contour, principal stress arrows, analysis plots, mesh quality overlay, probe tool, deformation animation, material library, analytical comparison, element inspector, stress streamlines, mode shape animator, parametric study, and project save/load.*
 
 ---
 
@@ -60,6 +102,9 @@ Most FEA projects stop at a single element type or a handful of validation cases
 3. **Solve** static, dynamic, nonlinear, and contact problems with verified element formulations
 4. **Visualize** stress contours, principal stress arrows, deformed shapes, and mesh quality overlays
 5. **Analyze** convergence, energy balance, and error distributions through six built-in plot modules
+6. **Probe** any point in the mesh for exact stress and displacement values
+7. **Animate** deformation and mode shapes with smooth, configurable playback
+8. **Compare** FEA results against analytical solutions in real time
 
 ---
 
@@ -78,6 +123,12 @@ Most FEA projects stop at a single element type or a handful of validation cases
 | **Thermal Loading** | Steady-state thermoelastic analysis with temperature fields |
 | **Assembly** | COO natural assembly (append-only) compressed to CSR for fast SpMV |
 | **Parallelization** | OpenMP for element assembly and stress recovery |
+| **Material Library** | Steel, Aluminum, Titanium, Copper, Concrete presets with custom option |
+| **Probe Tool** | Click-to-query stress/displacement at any mesh point |
+| **Stress Streamlines** | Principal stress direction tracing with RK4 integration |
+| **Analytical Comparison** | Real-time FEA vs. closed-form solution validation for all 7 cases |
+| **Parametric Study** | Real-time sliders for E, nu, force, thickness with fast rescaling |
+| **Mode Shape Animation** | Async modal analysis with sinusoidal oscillation playback |
 | **Output** | JSON pipeline: meta, displacement, stress, mesh, convergence, adaptive convergence |
 
 ---
@@ -155,6 +206,100 @@ open http://localhost:8765
 
 ---
 
+## Desktop Application Walkthrough
+
+The desktop application provides an interactive GUI for every stage of the FEA workflow. The following sections describe each major feature.
+
+### Probe Tool (I key)
+
+Press **I** to enter probe mode, then click any point in the viewport. The status bar displays the interpolated stress tensor, displacement vector, and element ID at that location. The probe tool uses shape function interpolation for sub-element accuracy, making it useful for checking values at specific geometric features like fillets or hole edges.
+
+<!-- GIF: probe_tool -->
+![Probe Tool](docs/assets/images/desktop_screenshots/probe_tool.gif)
+<!-- END GIF -->
+
+### Deformation Animation
+
+After solving, press the play button to watch a 10-second smooth animation of the deformed shape. The animation uses ease-in-out cubic interpolation and includes a progress bar. Play, pause, and reset controls are available in the toolbar. The displacement scale updates in real time so you can observe how each load step contributes to the total deformation.
+
+<!-- GIF: deformation_animation -->
+![Deformation Animation](docs/assets/images/desktop_screenshots/deformation_animation.gif)
+<!-- END GIF -->
+
+### Material Library
+
+The material dropdown in the mesh editor provides five engineering presets:
+
+| Material | E (GPa) | nu | rho (kg/m3) | alpha (1/K) |
+|----------|---------|------|------------|-------------|
+| Steel (A36) | 200.0 | 0.30 | 7800 | 12.0e-6 |
+| Aluminum (6061-T6) | 68.9 | 0.33 | 2700 | 23.6e-6 |
+| Titanium (Ti-6Al-4V) | 113.8 | 0.34 | 4430 | 8.6e-6 |
+| Copper (C11000) | 117.0 | 0.34 | 8960 | 17.0e-6 |
+| Concrete (C30) | 30.0 | 0.20 | 2400 | 10.0e-6 |
+
+Selecting a preset automatically populates E, nu, density, thickness, and thermal expansion coefficient. A "Custom" option lets you enter arbitrary values.
+
+<!-- SCREENSHOT: material_library -->
+![Material Library](docs/assets/images/desktop_screenshots/material_library.png)
+<!-- END SCREENSHOT -->
+
+### Project Save/Load
+
+Use **Ctrl+S** to quick-save the current project as a `.cauchy` JSON file. The v2 format captures the full project state: mesh geometry, boundary conditions, material properties, solver settings, and results. Use **File > Open** to reload a saved project. The save/load system uses QFileDialog for native OS file pickers.
+
+<!-- SCREENSHOT: project_save_load -->
+![Project Save/Load](docs/assets/images/desktop_screenshots/project_save_load.png)
+<!-- END SCREENSHOT -->
+
+### Analytical Comparison Panel
+
+The right dock includes a comparison table that shows expected vs. computed values for all 7 validation cases: cantilever tip deflection, cantilever max stress, Cook's membrane tip displacement, L-bracket stress concentration factor, plate with hole max stress, patch test constant stress, and Michell truss deflection. Each row is color-coded green (pass, error < 5%) or red (fail) with the analytical formula displayed inline.
+
+<!-- SCREENSHOT: analytical_comparison -->
+![Analytical Comparison](docs/assets/images/desktop_screenshots/analytical_comparison.png)
+<!-- END SCREENSHOT -->
+
+### Element Inspector
+
+Double-click any element in the viewport to open the element inspector panel. The inspector displays:
+
+- **Stress tensor**: sigma_xx, sigma_yy, sigma_xy, von Mises, principal stresses sigma_1 and sigma_2
+- **Strain tensor**: epsilon_xx, epsilon_yy, gamma_xy
+- **Quality metrics**: aspect ratio, Jacobian determinant, skew angle
+
+This is useful for debugging stress concentrations and identifying elements with poor quality that may need refinement.
+
+<!-- SCREENSHOT: element_inspector -->
+![Element Inspector](docs/assets/images/desktop_screenshots/element_inspector.png)
+<!-- END SCREENSHOT -->
+
+### Stress Streamlines
+
+Enable stress streamlines via the **View > Streamlines** menu. The tracer seeds points across the mesh and integrates principal stress directions using RK4 stepping. Red streamlines indicate tension (sigma > 0), blue streamlines indicate compression (sigma < 0). Streamline density adapts to the stress field, concentrating in high-gradient regions. This visualization is standard in FEA post-processors and provides intuitive insight into load paths.
+
+<!-- GIF: stress_streamlines -->
+![Stress Streamlines](docs/assets/images/desktop_screenshots/stress_streamlines.gif)
+<!-- END GIF -->
+
+### Mode Shape Animator
+
+The mode shape panel provides modal analysis visualization. After solving, select a natural frequency from the dropdown and press play to see sinusoidal oscillation at that frequency. The animator runs asynchronously so the UI stays responsive. Amplitude and playback speed are adjustable via sliders. Each mode shape is overlaid on the original mesh so you can see how the structure deforms at resonance.
+
+<!-- GIF: mode_shape_animator -->
+![Mode Shape Animator](docs/assets/images/desktop_screenshots/mode_shape_animator.gif)
+<!-- END GIF -->
+
+### Parametric Study
+
+The parametric panel provides real-time sliders for Young's modulus (E), Poisson's ratio (nu), applied force, and plate thickness. When you drag a slider, the parametric engine rescales the baseline stiffness matrix and force vector without reassembling from scratch, giving near-instant feedback. This is useful for exploring design sensitivity and understanding how material or load changes affect the stress and displacement fields.
+
+<!-- GIF: parametric_study -->
+![Parametric Study](docs/assets/images/desktop_screenshots/parametric_study.gif)
+<!-- END GIF -->
+
+---
+
 ## Architecture
 
 ```
@@ -173,6 +318,51 @@ fea.hpp  (assembly + solve orchestration)
 ├── nonlinear.hpp        (Total Lagrangian Newton-Raphson)
 ├── dynamics.hpp         (Newmark-beta, modal analysis)
 └── contact.hpp          (node-to-surface penalty)
+```
+
+### Desktop Application Architecture
+
+```
+src/desktop/
+├── main.cpp                    # Qt application entry point
+├── cauchy_app.hpp/cpp          # QApplication subclass
+├── main_window.hpp/cpp         # Main window (menus, docks, toolbar)
+├── mesh_editor.hpp/cpp         # Left dock: mesh generation + BC editor
+├── solver_panel.hpp/cpp        # Right dock: solver controls + results
+├── viewport_widget.hpp/cpp     # Central: 2D QPainter mesh renderer
+├── viewport_3d.hpp/cpp         # 3D OpenGL viewport
+├── analytical.hpp              # Closed-form formulas for 7 validation cases
+├── analytical_panel.hpp/cpp    # Expected vs. computed comparison table
+├── element_inspector_panel.hpp # Double-click element detail view
+├── streamline_tracer.hpp       # Principal stress direction RK4 integration
+├── parametric_engine.hpp       # Fast rescaling for parameter sweeps
+├── parametric_panel.hpp/cpp    # Real-time E/nu/force/thickness sliders
+├── material_library.hpp        # Steel, Al, Ti, Cu, Concrete presets
+├── mode_shape_panel.hpp/cpp    # Modal analysis animation controls
+├── modal_runner.hpp/cpp        # Async eigenvalue solver
+├── benchmark_gl.hpp            # OpenGL benchmark for GPU performance
+├── probe_tool.hpp/cpp          # Click-to-probe stress/displacement
+├── mesh_quality_overlay.hpp    # Aspect ratio / Jacobian heatmap
+├── mesh_generator.hpp/cpp      # Structured mesh generation
+├── geometry_model.hpp/cpp      # Geometric model representation
+├── geometry_panel.hpp/cpp      # Geometry editing panel
+├── geometry_primitive.hpp      # Basic geometry shapes
+├── selection_model.hpp/cpp     # Element/node selection handling
+├── editor_state.hpp/cpp        # Editor undo/redo state
+├── tool_context.hpp/cpp        # Active tool context
+├── bc_model.hpp/cpp            # Boundary condition data model
+├── bc_panel.hpp/cpp            # Boundary condition editor panel
+├── result_model.hpp/cpp        # QAbstractItemModel for tables
+├── solver_runner.hpp/cpp       # QThread async solver execution
+├── project_io.hpp/cpp          # Save/load .cauchy JSON files
+├── convergence_chart.hpp/cpp   # Log-log convergence plot
+├── stress_histogram.hpp/cpp    # Element stress distribution
+├── energy_balance_chart.hpp/cpp # Strain energy vs work done
+├── displacement_line_chart.hpp/cpp # Displacement profile along edge
+├── load_displacement_chart.hpp/cpp # Force vs max displacement
+├── error_heatmap.hpp/cpp       # ZZ error indicator overlay
+├── undo_commands.hpp/cpp       # Undo/redo command stack
+└── about_dialog.hpp/cpp        # About/help dialog
 ```
 
 ### Data Flow
@@ -271,7 +461,8 @@ Node-to-surface frictionless penalty method:
 |-----------|-----------|---------|
 | Language | C++20 | Header-only pattern |
 | GUI | Qt 6 (QWidgets, OpenGLWidgets, WebEngineWidgets) | 6.x |
-| 2D Rendering | QPainter (CPU) | -- |
+| 2D Rendering | QPainter (CPU) for main viewport | -- |
+| 3D Benchmark | QOpenGLWidget for GPU performance tests | -- |
 | Build | CMake + FetchContent | 3.15+ |
 | Testing | Google Test | v1.15.2 |
 | CPU Parallel | OpenMP | -- |
@@ -328,6 +519,27 @@ fea-2d/
 │       ├── solver_panel.hpp/cpp    # Right dock: solver controls
 │       ├── viewport_widget.hpp/cpp # Central: 2D QPainter renderer
 │       ├── viewport_3d.hpp/cpp     # 3D OpenGL viewport
+│       ├── analytical.hpp          # Closed-form formulas for 7 cases
+│       ├── analytical_panel.hpp/cpp # Expected vs. computed table
+│       ├── element_inspector_panel.hpp # Double-click element detail
+│       ├── streamline_tracer.hpp   # Principal stress direction tracing
+│       ├── parametric_engine.hpp   # Fast rescaling for parameter sweeps
+│       ├── parametric_panel.hpp/cpp # Real-time sliders
+│       ├── material_library.hpp    # Steel, Al, Ti, Cu, Concrete presets
+│       ├── mode_shape_panel.hpp/cpp # Modal analysis animation
+│       ├── modal_runner.hpp/cpp    # Async eigenvalue solver
+│       ├── benchmark_gl.hpp        # OpenGL GPU performance benchmark
+│       ├── probe_tool.hpp/cpp      # Click-to-probe stress/displacement
+│       ├── mesh_quality_overlay.hpp # Aspect ratio / Jacobian heatmap
+│       ├── mesh_generator.hpp/cpp  # Structured mesh generation
+│       ├── geometry_model.hpp/cpp  # Geometric model representation
+│       ├── geometry_panel.hpp/cpp  # Geometry editing panel
+│       ├── geometry_primitive.hpp  # Basic geometry shapes
+│       ├── selection_model.hpp/cpp # Element/node selection handling
+│       ├── editor_state.hpp/cpp    # Editor undo/redo state
+│       ├── tool_context.hpp/cpp    # Active tool context
+│       ├── bc_model.hpp/cpp        # Boundary condition data model
+│       ├── bc_panel.hpp/cpp        # BC editor panel
 │       ├── result_model.hpp/cpp    # QAbstractItemModel for tables
 │       ├── solver_runner.hpp/cpp   # QThread async solver
 │       ├── project_io.hpp/cpp      # Save/load .cauchy files
@@ -337,8 +549,7 @@ fea-2d/
 │       ├── displacement_line_chart.hpp/cpp
 │       ├── load_displacement_chart.hpp/cpp
 │       ├── error_heatmap.hpp/cpp
-│       ├── probe_tool.hpp/cpp      # Click-to-probe stress/displacement
-│       ├── mesh_quality_overlay.hpp/cpp
+│       ├── undo_commands.hpp/cpp   # Undo/redo command stack
 │       └── about_dialog.hpp/cpp
 │
 ├── scripts/
@@ -369,6 +580,7 @@ fea-2d/
 │       ├── js/                     # Three.js viewer components
 │       ├── data/                   # Pre-processed browser JSON
 │       └── images/                 # Generated PNG plots
+│           └── desktop_screenshots/ # Desktop app screenshots and GIFs
 │
 ├── output/                         # Simulation output (gitignored)
 └── build/                          # CMake build (gitignored)

@@ -7,6 +7,7 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLTexture>
 #include <QElapsedTimer>
+#include <memory>
 #include <vector>
 
 #include "fea_types.hpp"
@@ -65,8 +66,8 @@ private:
     QOpenGLBuffer m_value_vbo{QOpenGLBuffer::VertexBuffer};
     QOpenGLBuffer m_tri_ibo{QOpenGLBuffer::IndexBuffer};
     QOpenGLBuffer m_line_ibo{QOpenGLBuffer::IndexBuffer};
-    QOpenGLShaderProgram* m_shader = nullptr;
-    QOpenGLTexture* m_colormap_texture = nullptr;
+    std::unique_ptr<QOpenGLShaderProgram> m_shader;
+    std::unique_ptr<QOpenGLTexture> m_colormap_texture;
 
     // Benchmark state
     BenchmarkScenario m_scenario;

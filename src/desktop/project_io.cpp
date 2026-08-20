@@ -275,7 +275,9 @@ static void deserializeBoundaryConditions(const QJsonArray& arr, std::vector<Bou
         QJsonObject obj = v.toObject();
         BoundaryCondition bc;
         bc.node_index = obj["node_index"].toInt();
-        bc.type = static_cast<BCType>(obj["type"].toInt());
+        int typeVal = obj["type"].toInt();
+        if (typeVal < 0 || typeVal > static_cast<int>(BCType::FORCE)) continue;
+        bc.type = static_cast<BCType>(typeVal);
         bc.value = obj["value"].toDouble();
         bc.angle = obj["angle"].toDouble();
         bc.group = obj["group"].toString();
@@ -487,9 +489,15 @@ bool ProjectIO::load(const QString& filePath, ProjectConfig& config) {
     // Solver config
     if (root.contains("solver_config") && root["solver_config"].isObject()) {
         QJsonObject cfgObj = root["solver_config"].toObject();
-        config.solverConfig.case_type = static_cast<CaseType>(cfgObj["case_type"].toInt());
-        config.solverConfig.element_type = static_cast<ElementType>(cfgObj["element_type"].toInt());
-        config.solverConfig.plane_type = static_cast<PlaneType>(cfgObj["plane_type"].toInt());
+        int caseVal = cfgObj["case_type"].toInt();
+        int elemVal = cfgObj["element_type"].toInt();
+        int planeVal = cfgObj["plane_type"].toInt();
+        if (caseVal >= 0 && caseVal <= static_cast<int>(CaseType::LAME_3D))
+            config.solverConfig.case_type = static_cast<CaseType>(caseVal);
+        if (elemVal >= 0 && elemVal <= static_cast<int>(ElementType::T3))
+            config.solverConfig.element_type = static_cast<ElementType>(elemVal);
+        if (planeVal >= 0 && planeVal <= static_cast<int>(PlaneType::STRAIN))
+            config.solverConfig.plane_type = static_cast<PlaneType>(planeVal);
         config.solverConfig.nx = cfgObj["nx"].toInt();
         config.solverConfig.ny = cfgObj["ny"].toInt();
         if (cfgObj.contains("nz")) config.solverConfig.nz = cfgObj["nz"].toInt();

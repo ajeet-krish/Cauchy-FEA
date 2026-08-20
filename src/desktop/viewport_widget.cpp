@@ -253,6 +253,9 @@ void ViewportWidget::onModeAnimTick() {
     int ndof = m_mesh.num_dofs();
     const auto& modeShape = m_modalResult.mode_shapes[m_currentModeIndex];
 
+    // Bounds check: ensure mode shape is large enough
+    if (modeShape.size() < static_cast<size_t>(ndof)) return;
+
     // Scale the mode shape by amplitude and sinusoidal phase
     m_result.displacement.resize(ndof, 0.0);
     for (int i = 0; i < ndof; ++i) {
@@ -415,6 +418,7 @@ QColor ViewportWidget::getColorForValue(double val) const {
 
 double ViewportWidget::getFieldValueForNode(int nodeIdx) const {
     if (m_result.displacement.empty()) return 0.0;
+    if (nodeIdx * 2 + 1 >= static_cast<int>(m_result.displacement.size())) return 0.0;
     switch (m_field) {
     case ContourField::DISPLACEMENT_MAG: {
         double ux = m_result.displacement[nodeIdx * 2];
@@ -1216,6 +1220,7 @@ void ViewportWidget::paintEvent(QPaintEvent*) {
             QPolygonF poly;
             for (int i = 0; i < 4; ++i) {
                 int n = elem[i];
+                if (n * 2 + 1 >= static_cast<int>(m_result.displacement.size())) continue;
                 double ux = m_result.displacement[n * 2];
                 double uy = m_result.displacement[n * 2 + 1];
                 poly << worldToWidget(m_mesh.nodes[n].x + ux * effectiveScale,
@@ -1238,6 +1243,7 @@ void ViewportWidget::paintEvent(QPaintEvent*) {
             QPolygonF poly;
             for (int i = 0; i < 3; ++i) {
                 int n = elem[i];
+                if (n * 2 + 1 >= static_cast<int>(m_result.displacement.size())) continue;
                 double ux = m_result.displacement[n * 2];
                 double uy = m_result.displacement[n * 2 + 1];
                 poly << worldToWidget(m_mesh.nodes[n].x + ux * effectiveScale,
@@ -1310,6 +1316,7 @@ void ViewportWidget::paintEvent(QPaintEvent*) {
 
     if (m_showArrows && !m_result.stresses.empty()) {
         for (int e = 0; e < static_cast<int>(m_result.stresses.size()); ++e) {
+            if (e >= m_mesh.num_quads()) continue;
             const auto& s = m_result.stresses[e];
             int n0 = m_mesh.quad_elements[e][0];
             int n1 = m_mesh.quad_elements[e][1];

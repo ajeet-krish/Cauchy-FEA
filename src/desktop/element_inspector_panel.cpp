@@ -215,6 +215,7 @@ void ElementInspectorPanel::inspectElement(int elemIndex, const Mesh& mesh,
                     double dNdx = invJ11 * dN_dxi + invJ12 * dN_deta;
                     double dNdy = invJ21 * dN_dxi + invJ22 * dN_deta;
                     int n = nodeIds[i];
+                    if (n * DOF_PER_NODE + 1 >= static_cast<int>(result.displacement.size())) continue;
                     double ux = result.displacement[n * DOF_PER_NODE];
                     double uy = result.displacement[n * DOF_PER_NODE + 1];
                     eps_xx += dNdx * ux;
@@ -240,6 +241,7 @@ void ElementInspectorPanel::inspectElement(int elemIndex, const Mesh& mesh,
                     double dNdx = invJ11 * dN_dxi[i] + invJ12 * dN_deta[i];
                     double dNdy = invJ21 * dN_dxi[i] + invJ22 * dN_deta[i];
                     int n = nodeIds[i];
+                    if (n * DOF_PER_NODE + 1 >= static_cast<int>(result.displacement.size())) continue;
                     double ux = result.displacement[n * DOF_PER_NODE];
                     double uy = result.displacement[n * DOF_PER_NODE + 1];
                     eps_xx += dNdx * ux;
@@ -296,7 +298,7 @@ void ElementInspectorPanel::inspectElement(int elemIndex, const Mesh& mesh,
     for (int i = 0; i < nNodes; ++i) {
         int n = nodeIds[i];
         double ux = 0.0, uy = 0.0;
-        if (hasDisplacement) {
+        if (hasDisplacement && n * DOF_PER_NODE + 1 < static_cast<int>(result.displacement.size())) {
             ux = result.displacement[n * DOF_PER_NODE];
             uy = result.displacement[n * DOF_PER_NODE + 1];
         }
