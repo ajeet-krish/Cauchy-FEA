@@ -27,6 +27,8 @@
 #include <QImageWriter>
 #include <QShortcut>
 #include "project_io.hpp"
+#include "parametric_panel.hpp"
+#include "parametric_engine.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
@@ -129,6 +131,19 @@ MainWindow::MainWindow(QWidget* parent)
             this, &MainWindow::onModeAmplitudeChanged);
     connect(m_modeShapePanel, &ModeShapePanel::resetRequested,
             this, &MainWindow::onModeReset);
+
+    // Parametric study panel and engine
+    m_parametricEngine = new ParametricEngine();
+    m_parametricPanel = new ParametricPanel(this);
+    QDockWidget* parametricDock = new QDockWidget("Parametric Study", this);
+    parametricDock->setWidget(m_parametricPanel);
+    parametricDock->setAllowedAreas(Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
+    addDockWidget(Qt::RightDockWidgetArea, parametricDock);
+    tabifyDockWidget(solverDock, parametricDock);
+    parametricDock->setVisible(false);
+
+    connect(m_parametricPanel, &ParametricPanel::paramChanged,
+            this, &MainWindow::onParamChanged);
 
     // Create menus, toolbars, status bar, plots
     createActions();
@@ -328,6 +343,16 @@ void MainWindow::onSolveFinished(const fea::SolveResult& result, const Mesh& mes
     // Store for plot access
     m_lastMesh = mesh;
     m_lastResult = result;
+
+    // Capture baseline for parametric study
+    double baselineForce = 0.0;
+    for (const auto& bc : mesh.neumann) {
+        baselineForce += std::abs(bc.value);
+    }
+    if (baselineForce < 1e-20) baselineForce = 1.0;
+    m_baselineForceScale = 1.0;
+    m_parametricEngine->captureBaseline(mesh, result, m_config.E, m_config.nu, m_config.t, 1.0);
+    m_parametricPanel->setInitialValues(m_config.E, m_config.nu, baselineForce, m_config.t);
 
     // Update stress histogram
     m_stressHist->setData(result.stresses);
@@ -1195,4 +1220,90 @@ void MainWindow::onModeAmplitudeChanged(double amplitude) {
 
 void MainWindow::onModeReset() {
     m_viewport->stopModeAnimation();
+}
+
+// ------------------------------------------------------------------
+// Parametric study: real-time parameter changes
+// ------------------------------------------------------------------
+void MainWindow::onParamChanged(ParamID param, double value) {
+    if (!m_parametricEngine->isValid()) {
+        m_statusLabel->setText("No baseline data. Run a solve first.");
+        return;
+    }
+
+    double newE = m_parametricPanel->youngsModulus();
+    double newNu = m_parametricPanel->poissonsRatio();
+    double newForce = m_parametricPanel->forceMagnitude();
+    double newT = m_parametricPanel->thickness();
+
+    // Update config from panel values
+    m_config.E = newE;
+    m_config.nu = newNu;
+    m_config.t = newT;
+
+    if (m_parametricEngine->canRescale(newE, newNu, newT)) {
+        // Fast path: scale-only rescale (no reassembly)
+        m_statusLabel->setText("Parametric rescale (fast path)...");
+        auto result = m_parametricEngine->rescale(newE, newForce, newT);
+
+        if (!result.displacement.empty()) {
+            m_lastResult = result;
+            bool is3d = m_lastMesh.is_3d();
+            if (is3d) {
+                m_viewport3d->setMeshAndResults(m_lastMesh, result);
+            } else {
+                m_viewport->setMeshAndResults(m_lastMesh, result);
+            }
+
+            // Update plots
+            m_stressHist->setData(result.stresses);
+
+            EnergyBalanceData ed;
+            ed.strain_energy = fea::compute_strain_energy(result.K_csr, result.displacement);
+            ed.work_done = fea::compute_work_done(result.f, result.displacement);
+            ed.valid = true;
+            m_energyChart->setData(ed);
+
+            if (!is3d) {
+                m_dispLineChart->setData(m_lastMesh, result);
+            }
+
+            // Compute max displacement for result display
+            int dofPerNode = is3d ? 3 : 2;
+            double maxDisp = 0.0;
+            for (int i = 0; i < m_lastMesh.num_nodes(); ++i) {
+                double ux = result.displacement[dofPerNode * i];
+                double uy = result.displacement[dofPerNode * i + 1];
+                double d = std::sqrt(ux * ux + uy * uy);
+                if (d > maxDisp) maxDisp = d;
+            }
+            double maxStress = 0.0;
+            for (const auto& s : result.stresses) {
+                if (s.von_mises > maxStress) maxStress = s.von_mises;
+            }
+
+            m_parametricPanel->updateFromResult(maxDisp, maxStress, result.solve_time_ms);
+            m_solverPanel->setResult(result);
+            m_statusLabel->setText(QString("Rescale complete (%1 ms)").arg(result.solve_time_ms, 0, 'f', 1));
+        }
+    } else {
+        // Nu changed: need full reassembly
+        m_statusLabel->setText("Nu changed: triggering full reassembly...");
+
+        // Update material in mesh
+        m_lastMesh.mat.E = newE;
+        m_lastMesh.mat.nu = newNu;
+        m_lastMesh.mat.t = newT;
+
+        // Store mesh for solver
+        m_currentMesh = std::make_unique<Mesh>(m_lastMesh);
+
+        // Run full solve asynchronously
+        m_config.use_cg = m_solverPanel->useCG();
+        m_progressBar->setVisible(true);
+        m_progressBar->setValue(0);
+        m_solverRunner->setConfig(m_config);
+        m_solverRunner->setMesh(m_lastMesh, m_config.use_cg);
+        m_solverRunner->start();
+    }
 }

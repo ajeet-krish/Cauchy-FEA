@@ -28,6 +28,8 @@
 #include "mesh_generator.hpp"
 #include "modal_runner.hpp"
 #include "mode_shape_panel.hpp"
+#include "parametric_panel.hpp"
+#include "parametric_engine.hpp"
 
 class QStackedWidget;
 class QActionGroup;
@@ -72,6 +74,7 @@ private slots:
     void onModeAnimationToggled(bool playing);
     void onModeAmplitudeChanged(double amplitude);
     void onModeReset();
+    void onParamChanged(ParamID param, double value);
 
 private:
     void createActions();
@@ -158,4 +161,9 @@ private:
     ModalRunner* m_modalRunner = nullptr;
     ModeShapePanel* m_modeShapePanel = nullptr;
     dynamics::ModalResult m_lastModalResult;
+
+    // Parametric study
+    ParametricPanel* m_parametricPanel = nullptr;
+    ParametricEngine* m_parametricEngine = nullptr;
+    double m_baselineForceScale = 1.0;
 };

@@ -161,6 +161,8 @@ if(CRUCIBLE_FEA_DESKTOP)
     src/desktop/element_inspector_panel.cpp
     src/desktop/modal_runner.cpp
     src/desktop/mode_shape_panel.cpp
+    src/desktop/parametric_panel.cpp
+    src/desktop/parametric_engine.cpp
   )
 
   set(DESKTOP_HEADERS
@@ -198,6 +200,8 @@ if(CRUCIBLE_FEA_DESKTOP)
     src/desktop/element_inspector_panel.hpp
     src/desktop/modal_runner.hpp
     src/desktop/mode_shape_panel.hpp
+    src/desktop/parametric_panel.hpp
+    src/desktop/parametric_engine.hpp
   )
 
   set(DESKTOP_RESOURCES src/desktop/resources.qrc)
