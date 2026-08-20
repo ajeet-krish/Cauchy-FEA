@@ -8,6 +8,7 @@
 #include <QElapsedTimer>
 #include <memory>
 #include "fea.hpp"
+#include "streamline_tracer.hpp"
 
 enum class ContourField { VON_MISES, SIGMA_XX, SIGMA_YY, SIGMA_XY, SIGMA_1, SIGMA_2, DISPLACEMENT_MAG };
 enum class ColormapType { TURBO, VIRIDIS, HOT, COOLWARM, RDBU_R };
@@ -36,6 +37,7 @@ public:
     void toggleEdges(bool show);
     void toggleArrows(bool show);
     void toggleBoundary(bool show);
+    void toggleStreamlines(bool show);
 
     void resetView();
 
@@ -48,6 +50,7 @@ public:
     bool showEdges() const { return m_showEdges; }
     bool showArrows() const { return m_showArrows; }
     bool showBoundary() const { return m_showBoundary; }
+    bool showStreamlines() const { return m_showStreamlines; }
     double panX() const { return m_panX; }
     double panY() const { return m_panY; }
     double zoomLevel() const { return m_zoom; }
@@ -104,6 +107,7 @@ private:
     bool m_showEdges = true;
     bool m_showArrows = false;
     bool m_showBoundary = true;
+    bool m_showStreamlines = false;
 
     double m_panX = 0.5;
     double m_panY = 0.5;
@@ -113,6 +117,10 @@ private:
 
     double m_fieldMin = 0.0;
     double m_fieldMax = 1.0;
+
+    // Streamline state
+    streamline::StreamlineResult m_streamlineResult;
+    streamline::StreamlineConfig m_streamlineConfig;
 
     // Editor state (non-owning pointers)
     EditorState* m_editorState = nullptr;
@@ -132,11 +140,13 @@ private:
     void drawMeshNodes(QPainter& painter);
     void drawMeshEdges(QPainter& painter);
     void drawDragMovePreview(QPainter& painter);
+    void drawStreamlines(QPainter& painter);
 
     QColor getColorForValue(double val) const;
     double getFieldValueForNode(int nodeIdx) const;
     double getFieldValueForElement(int elemIdx) const;
     void updateFieldRange();
+    void computeStreamlines();
 
     // Animation
     void onAnimationTick();

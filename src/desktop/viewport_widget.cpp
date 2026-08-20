@@ -45,6 +45,9 @@ void ViewportWidget::setMeshAndResults(const Mesh& mesh, const fea::SolveResult&
     m_animPausedElapsed = 0.0;
     if (m_animTimer) m_animTimer->stop();
 
+    // Clear cached streamline paths (will recompute on next toggle)
+    m_streamlineResult.paths.clear();
+
     update();
 }
 
@@ -92,6 +95,25 @@ void ViewportWidget::toggleArrows(bool show) {
 void ViewportWidget::toggleBoundary(bool show) {
     m_showBoundary = show;
     update();
+}
+
+void ViewportWidget::toggleStreamlines(bool show) {
+    m_showStreamlines = show;
+    if (m_showStreamlines && m_hasData && m_streamlineResult.paths.empty()) {
+        computeStreamlines();
+    }
+    update();
+}
+
+void ViewportWidget::computeStreamlines() {
+    if (!m_hasData || m_result.stresses.empty()) return;
+    if (m_mesh.num_quads() == 0 && m_mesh.num_tris() == 0) return;
+
+    // Run SPR recovery for smooth nodal stresses
+    auto spr = adaptivity::spr_recovery(m_mesh, m_result.stresses);
+
+    // Trace streamlines
+    m_streamlineResult = streamline::trace_all(m_mesh, spr, m_streamlineConfig);
 }
 
 void ViewportWidget::resetView() {
@@ -730,6 +752,59 @@ void ViewportWidget::drawDragMovePreview(QPainter& painter) {
 }
 
 // ------------------------------------------------------------------
+// Stress streamline visualization
+// ------------------------------------------------------------------
+void ViewportWidget::drawStreamlines(QPainter& painter) {
+    if (!m_showStreamlines || m_streamlineResult.paths.empty()) return;
+
+    auto toWidget = [&](double wx, double wy) -> QPointF {
+        double halfRange = 0.6 / m_zoom;
+        double aspect = static_cast<double>(width()) / static_cast<double>(height());
+        double wxMin = m_panX - halfRange * aspect;
+        double wxMax = m_panX + halfRange * aspect;
+        double wyMin = m_panY - halfRange;
+        double wyMax = m_panY + halfRange;
+        double px = (wx - wxMin) / (wxMax - wxMin) * width();
+        double py = (1.0 - (wy - wyMin) / (wyMax - wyMin)) * height();
+        return QPointF(px, py);
+    };
+
+    double max_abs = std::max(std::abs(m_streamlineResult.max_sigma_1),
+                              std::abs(m_streamlineResult.min_sigma_1));
+    if (max_abs < 1.0e-10) max_abs = 1.0;
+
+    for (const auto& path : m_streamlineResult.paths) {
+        if (path.x.size() < 2) continue;
+
+        // Draw path as a polyline colored by sigma_1
+        for (size_t i = 0; i + 1 < path.x.size(); ++i) {
+            double s = path.sigma_1[i];
+
+            // Map sigma_1 to color: red for tension, blue for compression
+            int r, g, b;
+            if (s >= 0.0) {
+                // Tension: white to red
+                double t = std::min(s / max_abs, 1.0);
+                r = 255;
+                g = static_cast<int>(255 * (1.0 - t));
+                b = static_cast<int>(255 * (1.0 - t));
+            } else {
+                // Compression: white to blue
+                double t = std::min(-s / max_abs, 1.0);
+                r = static_cast<int>(255 * (1.0 - t));
+                g = static_cast<int>(255 * (1.0 - t));
+                b = 255;
+            }
+
+            QPen pen(QColor(r, g, b, 200), 1.5);
+            painter.setPen(pen);
+            painter.drawLine(toWidget(path.x[i], path.y[i]),
+                             toWidget(path.x[i + 1], path.y[i + 1]));
+        }
+    }
+}
+
+// ------------------------------------------------------------------
 // Mouse events
 // ------------------------------------------------------------------
 void ViewportWidget::mousePressEvent(QMouseEvent* event) {
@@ -1186,6 +1261,9 @@ void ViewportWidget::paintEvent(QPaintEvent*) {
             }
         }
     }
+
+    // Draw stress streamlines (principal stress direction tracing)
+    drawStreamlines(painter);
 
     int barWidth = 20;
     int barHeight = height() - 40;

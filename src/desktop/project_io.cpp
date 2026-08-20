@@ -33,6 +33,7 @@ static QJsonObject serializeViewport(const ViewportState& vp) {
     obj["showEdges"] = vp.showEdges;
     obj["showArrows"] = vp.showArrows;
     obj["showBoundary"] = vp.showBoundary;
+    obj["showStreamlines"] = vp.showStreamlines;
     obj["panX"] = vp.panX;
     obj["panY"] = vp.panY;
     obj["zoom"] = vp.zoom;
@@ -233,6 +234,7 @@ static void deserializeViewport(const QJsonObject& obj, ViewportState& vp) {
     if (obj.contains("showEdges")) vp.showEdges = obj["showEdges"].toBool();
     if (obj.contains("showArrows")) vp.showArrows = obj["showArrows"].toBool();
     if (obj.contains("showBoundary")) vp.showBoundary = obj["showBoundary"].toBool();
+    if (obj.contains("showStreamlines")) vp.showStreamlines = obj["showStreamlines"].toBool();
     if (obj.contains("panX")) vp.panX = obj["panX"].toDouble();
     if (obj.contains("panY")) vp.panY = obj["panY"].toDouble();
     if (obj.contains("zoom")) vp.zoom = obj["zoom"].toDouble();

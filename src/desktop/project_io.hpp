@@ -17,6 +17,7 @@ struct ViewportState {
     bool showEdges = true;
     bool showArrows = false;
     bool showBoundary = true;
+    bool showStreamlines = false;
     double panX = 0.5;
     double panY = 0.5;
     double zoom = 1.0;

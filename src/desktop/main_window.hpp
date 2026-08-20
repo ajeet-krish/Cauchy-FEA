@@ -57,6 +57,7 @@ private slots:
     void onToggleBoundary(bool checked);
     void onPlayAnimation();
     void onResetAnimation();
+    void onToggleStreamlines(bool checked);
     void onUndo();
     void onRedo();
     void onPrimitiveSelected(int index);
@@ -122,6 +123,7 @@ private:
     // Animation actions
     QAction* m_playAction = nullptr;
     QAction* m_resetAnimAction = nullptr;
+    QAction* m_streamlineAction = nullptr;
 
     // Left dock with tabs
     QDockWidget* m_leftDock = nullptr;

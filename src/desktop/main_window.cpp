@@ -196,6 +196,8 @@ void MainWindow::createMenuBar() {
     viewMenu->addSeparator();
     viewMenu->addAction(m_playAction);
     viewMenu->addAction(m_resetAnimAction);
+    viewMenu->addSeparator();
+    viewMenu->addAction(m_streamlineAction);
 
     QMenu* helpMenu = menuBar->addMenu("&Help");
     helpMenu->addAction("About");
@@ -248,6 +250,13 @@ void MainWindow::createToolbars() {
     m_resetAnimAction = viewToolbar->addAction("Reset Anim");
     m_resetAnimAction->setToolTip("Reset animation to undeformed state");
     connect(m_resetAnimAction, &QAction::triggered, this, &MainWindow::onResetAnimation);
+
+    viewToolbar->addSeparator();
+
+    m_streamlineAction = viewToolbar->addAction("Streamlines");
+    m_streamlineAction->setCheckable(true);
+    m_streamlineAction->setToolTip("Toggle principal stress streamlines");
+    connect(m_streamlineAction, &QAction::triggered, this, &MainWindow::onToggleStreamlines);
 }
 
 void MainWindow::createStatusBar() {
@@ -451,6 +460,8 @@ void MainWindow::onLoadCase() {
     m_viewport->toggleEdges(config.viewport.showEdges);
     m_viewport->toggleArrows(config.viewport.showArrows);
     m_viewport->toggleBoundary(config.viewport.showBoundary);
+    m_viewport->toggleStreamlines(config.viewport.showStreamlines);
+    if (m_streamlineAction) m_streamlineAction->setChecked(config.viewport.showStreamlines);
 
     // Restore geometry model primitives
     if (m_geometryModel) {
@@ -594,6 +605,7 @@ void MainWindow::onSaveCase() {
     config.viewport.showEdges = m_viewport->showEdges();
     config.viewport.showArrows = m_viewport->showArrows();
     config.viewport.showBoundary = m_viewport->showBoundary();
+    config.viewport.showStreamlines = m_viewport->showStreamlines();
     config.viewport.panX = m_viewport->panX();
     config.viewport.panY = m_viewport->panY();
     config.viewport.zoom = m_viewport->zoomLevel();
@@ -664,6 +676,7 @@ void MainWindow::onQuickSave() {
     config.viewport.showEdges = m_viewport->showEdges();
     config.viewport.showArrows = m_viewport->showArrows();
     config.viewport.showBoundary = m_viewport->showBoundary();
+    config.viewport.showStreamlines = m_viewport->showStreamlines();
     config.viewport.panX = m_viewport->panX();
     config.viewport.panY = m_viewport->panY();
     config.viewport.zoom = m_viewport->zoomLevel();
@@ -748,6 +761,10 @@ void MainWindow::onPlayAnimation() {
 
 void MainWindow::onResetAnimation() {
     m_viewport->resetAnimation();
+}
+
+void MainWindow::onToggleStreamlines(bool checked) {
+    m_viewport->toggleStreamlines(checked);
 }
 
 void MainWindow::createBottomPlots() {
