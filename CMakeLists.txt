@@ -241,4 +241,24 @@ if(CRUCIBLE_FEA_DESKTOP)
     DEPENDS crucible-fea-desktop
     COMMENT "Installing Crucible-FEA to /Applications"
   )
+
+  # ------------------------------------------------------------------
+  # QOpenGLWidget Performance Benchmark
+  # ------------------------------------------------------------------
+  add_executable(FEA_GLBenchmark
+    src/desktop/benchmark_main.cpp
+    src/desktop/benchmark_gl.cpp
+    ${FEA_HEADERS}
+  )
+  target_include_directories(FEA_GLBenchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_link_libraries(FEA_GLBenchmark PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Widgets Qt6::OpenGLWidgets OpenMP::OpenMP_CXX
+  )
+
+  add_custom_target(run-benchmark
+    COMMAND FEA_GLBenchmark
+    DEPENDS FEA_GLBenchmark
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Running QOpenGLWidget performance benchmark"
+  )
 endif()
