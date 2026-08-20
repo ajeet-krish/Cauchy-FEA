@@ -39,6 +39,19 @@ public:
 
     void resetView();
 
+    // Getters for save/load
+    ContourField contourField() const { return m_field; }
+    ColormapType colormap() const { return m_colormap; }
+    double displacementScale() const { return m_dispScale; }
+    bool showUndeformed() const { return m_showUndeformed; }
+    bool showDeformed() const { return m_showDeformed; }
+    bool showEdges() const { return m_showEdges; }
+    bool showArrows() const { return m_showArrows; }
+    bool showBoundary() const { return m_showBoundary; }
+    double panX() const { return m_panX; }
+    double panY() const { return m_panY; }
+    double zoomLevel() const { return m_zoom; }
+
     // Editor integration
     void setEditorState(EditorState* state);
     void setGeometryModel(GeometryModel* model);

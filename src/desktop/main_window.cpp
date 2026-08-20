@@ -24,6 +24,8 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QImageWriter>
+#include <QShortcut>
+#include "project_io.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
@@ -109,26 +111,7 @@ MainWindow::MainWindow(QWidget* parent)
 }
 
 void MainWindow::createActions() {
-    // File actions
-    QAction* newAct = new QAction("New", this);
-    newAct->setShortcut(QKeySequence::New);
-    newAct->setStatusTip("Create a new mesh");
-
-    QAction* openAct = new QAction("Open...", this);
-    openAct->setShortcut(QKeySequence::Open);
-    openAct->setStatusTip("Open a project file");
-
-    QAction* saveAct = new QAction("Save As...", this);
-    saveAct->setShortcut(QKeySequence::SaveAs);
-    saveAct->setStatusTip("Save project to file");
-
-    QAction* exportPngAct = new QAction("Export PNG", this);
-    exportPngAct->setStatusTip("Export current view as PNG");
-    connect(exportPngAct, &QAction::triggered, this, &MainWindow::onExportPNG);
-
-    QAction* exitAct = new QAction("Exit", this);
-    exitAct->setShortcut(QKeySequence::Quit);
-    connect(exitAct, &QAction::triggered, this, &QMainWindow::close);
+    // File actions are now created directly in createMenuBar()
 
     // Undo/Redo actions
     m_undoAction = m_undoStack->createUndoAction(this, "Undo");
@@ -155,11 +138,9 @@ void MainWindow::createActions() {
             "<p>Supports Bar, Q4 (bilinear quad), Q8 (serendipity quad), and T3 (triangle) elements.</p>"
             "<p>Features: Cholesky direct solver, Conjugate Gradient iterative solver, "
             "Von Mises stress recovery, ZZ error estimator, adaptive h-refinement.</p>"
-            "<p>MIT License -- Portfolio project for mechanical/aerospace engineering roles.</p>");
+            "<p>MIT License, portfolio project for mechanical/aerospace engineering roles.</p>");
     });
 
-    // Store actions for menu building
-    Q_UNUSED(newAct) Q_UNUSED(openAct) Q_UNUSED(saveAct) Q_UNUSED(exitAct)
     Q_UNUSED(resetViewAct) Q_UNUSED(aboutAct)
 }
 
@@ -167,13 +148,34 @@ void MainWindow::createMenuBar() {
     QMenuBar* menuBar = this->menuBar();
 
     QMenu* fileMenu = menuBar->addMenu("&File");
-    fileMenu->addAction("New");
-    fileMenu->addAction("Open...");
-    fileMenu->addAction("Save As...");
+
+    QAction* newAct = fileMenu->addAction("New");
+    newAct->setShortcut(QKeySequence::New);
+    newAct->setStatusTip("Create a new mesh");
+
+    QAction* openAct = fileMenu->addAction("Open...");
+    openAct->setShortcut(QKeySequence::Open);
+    connect(openAct, &QAction::triggered, this, &MainWindow::onLoadCase);
+
+    QAction* saveAct = fileMenu->addAction("Save...");
+    saveAct->setShortcut(QKeySequence::Save);
+    connect(saveAct, &QAction::triggered, this, &MainWindow::onQuickSave);
+
+    QAction* saveAsAct = fileMenu->addAction("Save As...");
+    saveAsAct->setShortcut(QKeySequence::SaveAs);
+    connect(saveAsAct, &QAction::triggered, this, &MainWindow::onSaveCase);
+
     fileMenu->addSeparator();
-    fileMenu->addAction("Export PNG");
+
+    QAction* exportPngAct = fileMenu->addAction("Export PNG");
+    exportPngAct->setStatusTip("Export current view as PNG");
+    connect(exportPngAct, &QAction::triggered, this, &MainWindow::onExportPNG);
+
     fileMenu->addSeparator();
-    fileMenu->addAction("Exit");
+
+    QAction* exitAct = fileMenu->addAction("Exit");
+    exitAct->setShortcut(QKeySequence::Quit);
+    connect(exitAct, &QAction::triggered, this, &QMainWindow::close);
 
     QMenu* editMenu = menuBar->addMenu("&Edit");
     editMenu->addAction(m_undoAction);
@@ -408,26 +410,246 @@ void MainWindow::onLoadCase() {
         "Open Project", "", "Crucible-FEA Project (*.cauchy)");
     if (fileName.isEmpty()) return;
 
-    // Load project file (JSON-based)
-    QFile file(fileName);
-    if (!file.open(QIODevice::ReadOnly)) {
+    ProjectConfig config;
+    if (!ProjectIO::load(fileName, config)) {
         QMessageBox::warning(this, "Load Error",
-            "Could not open file: " + fileName);
+            "Could not load project file: " + QFileInfo(fileName).fileName()
+            + "\n\nThe file may be corrupted or in an unsupported format.");
         return;
     }
 
-    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-    file.close();
+    // Restore solver config
+    m_config = config.solverConfig;
 
-    if (!doc.isObject()) {
-        QMessageBox::warning(this, "Load Error", "Invalid project file format.");
+    // Restore mesh editor state from config
+    // (The mesh editor combo boxes need to be set to match the loaded config)
+
+    // Restore viewport state
+    m_viewport->setContourField(static_cast<ContourField>(config.viewport.contourField));
+    m_viewport->setColormap(static_cast<ColormapType>(config.viewport.colormap));
+    m_viewport->setDisplacementScale(config.viewport.dispScale);
+    m_viewport->toggleUndeformed(config.viewport.showUndeformed);
+    m_viewport->toggleDeformed(config.viewport.showDeformed);
+    m_viewport->toggleEdges(config.viewport.showEdges);
+    m_viewport->toggleArrows(config.viewport.showArrows);
+    m_viewport->toggleBoundary(config.viewport.showBoundary);
+
+    // Restore geometry model primitives
+    if (m_geometryModel) {
+        m_geometryModel->clear();
+        for (const auto& prim : config.geometryPrimitives) {
+            m_geometryModel->addPrimitive(prim);
+        }
+    }
+
+    // Restore BC model
+    if (m_bcModel) {
+        m_bcModel->clear();
+        for (const auto& bc : config.boundaryConditions) {
+            m_bcModel->addBC(bc);
+        }
+    }
+
+    // Store current file path for quick-save
+    m_currentFilePath = fileName;
+
+    // If we have a mesh and results, restore them
+    if (config.hasResults && config.mesh.num_nodes() > 0) {
+        m_lastMesh = config.mesh;
+        m_lastResult = config.result;
+
+        // Set mesh on viewport
+        bool is3d = config.mesh.is_3d();
+        switchViewport(is3d);
+
+        if (is3d) {
+            m_viewport3d->setMeshAndResults(config.mesh, config.result);
+        } else {
+            m_viewport->setMeshAndResults(config.mesh, config.result);
+        }
+
+        // Update plots
+        m_stressHist->setData(config.result.stresses);
+
+        EnergyBalanceData ed;
+        ed.strain_energy = fea::compute_strain_energy(config.result.K_csr, config.result.displacement);
+        ed.work_done = fea::compute_work_done(config.result.f, config.result.displacement);
+        ed.valid = true;
+        m_energyChart->setData(ed);
+
+        if (!is3d) {
+            m_dispLineChart->setData(config.mesh, config.result);
+        }
+
+        m_resultModel->setData(config.result, config.mesh, ResultTableType::DISPLACEMENT);
+        m_solverPanel->setResult(config.result);
+
+        m_statusLabel->setText(QString("Loaded: %1 (%2 nodes, %3 elements, %4 DOFs)")
+            .arg(QFileInfo(fileName).fileName())
+            .arg(config.mesh.num_nodes())
+            .arg(config.mesh.num_quads() + config.mesh.num_tris())
+            .arg(config.mesh.num_dofs()));
+    } else {
+        // Mesh-only load (no results yet)
+        if (config.mesh.num_nodes() > 0) {
+            m_viewport->setMesh(config.mesh);
+            m_toolContext->setMeshNodes(&config.mesh.nodes);
+            m_geometryPanel->updateMeshInfo(config.mesh.num_nodes(),
+                                           config.mesh.num_quads() + config.mesh.num_tris(),
+                                           static_cast<int>(config.mesh.dirichlet.size() + config.mesh.neumann.size()));
+        }
+        m_statusLabel->setText("Loaded: " + QFileInfo(fileName).fileName());
+    }
+
+    // Update panels
+    m_geometryPanel->updateWorktree();
+    m_bcPanel->updateBCList();
+
+    // Update window title
+    setWindowTitle("Crucible-FEA | " + QFileInfo(fileName).fileName());
+}
+
+void MainWindow::onSaveCase() {
+    QString fileName = QFileDialog::getSaveFileName(this,
+        "Save Project", m_currentFilePath.isEmpty()
+            ? ProjectIO::defaultProjectPath()
+            : m_currentFilePath,
+        "Crucible-FEA Project (*.cauchy)");
+    if (fileName.isEmpty()) return;
+
+    // Ensure .cauchy extension
+    if (!fileName.endsWith(".cauchy")) {
+        fileName += ".cauchy";
+    }
+
+    // Gather full project state
+    ProjectConfig config;
+    config.version = 2;
+
+    // Solver config
+    config.solverConfig = m_config;
+
+    // Material (from mesh editor or geometry panel)
+    config.material.E = m_config.E;
+    config.material.nu = m_config.nu;
+    config.material.t = m_config.t;
+    config.material.rho = 7800.0; // default steel
+    config.material.alpha = 0.0;
+
+    // Mesh (from last solve or current mesh)
+    if (m_lastMesh.num_nodes() > 0) {
+        config.mesh = m_lastMesh;
+    } else if (m_currentMesh && m_currentMesh->num_nodes() > 0) {
+        config.mesh = *m_currentMesh;
+    }
+
+    // Editor boundary conditions
+    if (m_bcModel) {
+        config.boundaryConditions = m_bcModel->bcs();
+    }
+
+    // Geometry primitives
+    if (m_geometryModel) {
+        config.geometryPrimitives = m_geometryModel->primitives();
+    }
+
+    // Viewport state
+    config.viewport.contourField = static_cast<int>(m_viewport->contourField());
+    config.viewport.colormap = static_cast<int>(m_viewport->colormap());
+    config.viewport.dispScale = m_viewport->displacementScale();
+    config.viewport.showUndeformed = m_viewport->showUndeformed();
+    config.viewport.showDeformed = m_viewport->showDeformed();
+    config.viewport.showEdges = m_viewport->showEdges();
+    config.viewport.showArrows = m_viewport->showArrows();
+    config.viewport.showBoundary = m_viewport->showBoundary();
+    config.viewport.panX = m_viewport->panX();
+    config.viewport.panY = m_viewport->panY();
+    config.viewport.zoom = m_viewport->zoomLevel();
+
+    // Results
+    config.hasResults = !m_lastResult.displacement.empty();
+    if (config.hasResults) {
+        config.result = m_lastResult;
+    }
+
+    // Write to file
+    if (!ProjectIO::save(fileName, config)) {
+        QMessageBox::warning(this, "Save Error",
+            "Could not save project to: " + fileName);
         return;
     }
 
-    QJsonObject obj = doc.object();
-    // TODO: Restore mesh, material, BC, and results from JSON
-    QMessageBox::information(this, "Load Project",
-        "Project loaded: " + QFileInfo(fileName).fileName());
+    // Update state for future quick-saves
+    m_currentFilePath = fileName;
+    setWindowTitle("Crucible-FEA | " + QFileInfo(fileName).fileName());
+    m_statusLabel->setText("Saved: " + QFileInfo(fileName).fileName());
+}
+
+void MainWindow::onQuickSave() {
+    if (m_currentFilePath.isEmpty()) {
+        // No current file; fall through to Save As dialog
+        onSaveCase();
+        return;
+    }
+
+    // Gather full project state
+    ProjectConfig config;
+    config.version = 2;
+
+    // Solver config
+    config.solverConfig = m_config;
+
+    // Material
+    config.material.E = m_config.E;
+    config.material.nu = m_config.nu;
+    config.material.t = m_config.t;
+    config.material.rho = 7800.0;
+    config.material.alpha = 0.0;
+
+    // Mesh
+    if (m_lastMesh.num_nodes() > 0) {
+        config.mesh = m_lastMesh;
+    } else if (m_currentMesh && m_currentMesh->num_nodes() > 0) {
+        config.mesh = *m_currentMesh;
+    }
+
+    // Editor boundary conditions
+    if (m_bcModel) {
+        config.boundaryConditions = m_bcModel->bcs();
+    }
+
+    // Geometry primitives
+    if (m_geometryModel) {
+        config.geometryPrimitives = m_geometryModel->primitives();
+    }
+
+    // Viewport state
+    config.viewport.contourField = static_cast<int>(m_viewport->contourField());
+    config.viewport.colormap = static_cast<int>(m_viewport->colormap());
+    config.viewport.dispScale = m_viewport->displacementScale();
+    config.viewport.showUndeformed = m_viewport->showUndeformed();
+    config.viewport.showDeformed = m_viewport->showDeformed();
+    config.viewport.showEdges = m_viewport->showEdges();
+    config.viewport.showArrows = m_viewport->showArrows();
+    config.viewport.showBoundary = m_viewport->showBoundary();
+    config.viewport.panX = m_viewport->panX();
+    config.viewport.panY = m_viewport->panY();
+    config.viewport.zoom = m_viewport->zoomLevel();
+
+    // Results
+    config.hasResults = !m_lastResult.displacement.empty();
+    if (config.hasResults) {
+        config.result = m_lastResult;
+    }
+
+    // Write to file
+    if (!ProjectIO::save(m_currentFilePath, config)) {
+        QMessageBox::warning(this, "Save Error",
+            "Could not save project to: " + m_currentFilePath);
+        return;
+    }
+
+    m_statusLabel->setText("Saved: " + QFileInfo(m_currentFilePath).fileName());
 }
 
 void MainWindow::onExportPNG() {

@@ -41,6 +41,8 @@ private slots:
     void onProgress(int percent, const QString& message);
     void onRunSolver();
     void onLoadCase();
+    void onSaveCase();
+    void onQuickSave();
     void onExportPNG();
     void onResetView();
     void onContourFieldChanged(int index);
@@ -135,4 +137,5 @@ private:
     SolveConfig m_config;
     Mesh m_lastMesh;
     fea::SolveResult m_lastResult;
+    QString m_currentFilePath;
 };
