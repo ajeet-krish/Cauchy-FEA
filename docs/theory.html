@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Theory -- Cauchy</title>
+  <title>Theory &amp; Methodology | Crucible-FEA</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -15,33 +15,41 @@
 <body>
   <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
   <div class="sidebar">
-    <div class="sidebar-brand"><a href="index.html">Cauchy</a></div>
+    <div class="sidebar-brand"><a href="index.html">Crucible-FEA</a></div>
     <nav class="sidebar-nav">
-      <div class="nav-section"><div class="nav-heading">Project</div><a href="index.html" class="nav-item">Home</a></div>
       <div class="nav-section">
-        <div class="nav-heading">Validation Cases</div>
-        <a href="cantilever.html" class="nav-item">Cantilever</a>
-        <a href="cook.html" class="nav-item">Cook's Membrane</a>
-        <a href="patch.html" class="nav-item">Patch Test</a>
-        <a href="plate_hole.html" class="nav-item">Plate + Hole</a>
-        <a href="lbracket.html" class="nav-item">L-Bracket</a>
+        <div class="nav-heading">Project</div>
+        <a href="index.html" class="nav-item">Home</a>
       </div>
       <div class="nav-section">
-        <div class="nav-heading">Application</div>
-        <a href="desktop_app.html" class="nav-item">Desktop Application</a>
+        <div class="nav-heading">Validation Cases</div>
+        <a href="cantilever.html" class="nav-item">Cantilever Beam</a>
+        <a href="cook.html" class="nav-item">Cook's Membrane</a>
+        <a href="patch.html" class="nav-item">Patch Test</a>
+        <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
+        <a href="lbracket.html" class="nav-item">L-Bracket</a>
+        <a href="michell.html" class="nav-item">Michell Truss</a>
+        <a href="thermal_cylinder.html" class="nav-item">Thick Cylinder</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">3D Benchmarks</div>
+        <a href="cantilever_3d.html" class="nav-item">3D Cantilever</a>
+        <a href="plate_hole_3d.html" class="nav-item">3D Plate + Hole</a>
+        <a href="lame_3d.html" class="nav-item">3D Lame Cylinder</a>
       </div>
       <div class="nav-section">
         <div class="nav-heading">Reference</div>
-        <a href="theory.html" class="nav-item active">Theory</a>
+        <a href="theory.html" class="nav-item active">Theory &amp; Methodology</a>
         <a href="implementation.html" class="nav-item">Implementation</a>
-        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub &nearr;</a>
+        <a href="pinn.html" class="nav-item">PINN Surrogate</a>
+        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub Repository &nearr;</a>
       </div>
     </nav>
   </div>
   <div class="main-content">
-    <h1>Theory &amp; Formulation</h1>
+    <h1>Theory &amp; Methodology</h1>
     <p class="section-intro">
-      This page covers the finite element theory implemented in Cauchy:
+      This page covers the finite element theory implemented in Crucible-FEA:
       the weak form of 2D elasticity, isoparametric shape functions,
       Gauss quadrature, element stiffness assembly, and solver algorithms.
     </p>
@@ -281,7 +289,7 @@
       $$ \sigma \cdot n = t \quad \text{on } \Gamma_t $$
     </div>
     <p class="section-intro">
-      In Cauchy, Dirichlet BCs are enforced using the penalty method, which adds a large stiffness
+      In Crucible-FEA, Dirichlet BCs are enforced using the penalty method, which adds a large stiffness
       to constrained DOFs without restructuring the matrix.
     </p>
 
@@ -298,7 +306,7 @@
       <li>p_{k+1} = r_{k+1} + beta_k * p_k</li>
     </ol>
     <p class="section-intro">
-      Cauchy uses Jacobi (diagonal) preconditioning and terminates when
+      Crucible-FEA uses Jacobi (diagonal) preconditioning and terminates when
       the residual drops below 1e-10.
     </p>
 
@@ -317,7 +325,7 @@
       superconvergent stress field that converges at a higher rate than the FE solution.
     </p>
     <p class="section-intro">
-      <strong>Marking Strategy</strong>: "Largest first" -- sort elements by error indicator
+      <strong>Marking Strategy</strong>: "Largest first", sort elements by error indicator
       descending, mark the top elements until the sum of marked errors exceeds
       theta * total_error (theta = 0.5 default).
     </p>
@@ -333,14 +341,14 @@
     </p>
     <ul>
       <li><strong>Red refinement</strong>: Split a quad into 4 equal sub-quads (add 5 nodes: center + 4 edge midpoints)</li>
-      <li><strong>Green refinement</strong>: Transition zone -- split into 2 triangles or quads to maintain conforming edges</li>
+      <li><strong>Green refinement</strong>: Transition zone, split into 2 triangles or quads to maintain conforming edges</li>
     </ul>
     <p class="section-intro">
       After refinement, elements inside geometric cutouts (e.g., the circular hole)
       are removed, and the mesh is re-conformed.
     </p>
 
-    <div class="site-footer"><p>Cauchy -- 2D Finite Element Structural Solver</p></div>
+    <div class="site-footer"><p>Crucible-FEA, 2D Finite Element Structural Solver</p></div>
   </div>
   <script>
     document.getElementById('sidebarToggle').addEventListener('click', function() {

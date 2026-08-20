@@ -2,12 +2,21 @@
 #include <QWidget>
 #include <QMouseEvent>
 #include <QWheelEvent>
+#include <QKeyEvent>
 #include <QPoint>
 #include <QColor>
+#include <memory>
 #include "fea.hpp"
 
 enum class ContourField { VON_MISES, SIGMA_XX, SIGMA_YY, SIGMA_XY, SIGMA_1, SIGMA_2, DISPLACEMENT_MAG };
 enum class ColormapType { TURBO, VIRIDIS, HOT, COOLWARM, RDBU_R };
+
+class EditorState;
+class GeometryModel;
+class BCModel;
+class SelectionModel;
+class ToolContext;
+class QTimer;
 
 class ViewportWidget : public QWidget {
     Q_OBJECT
@@ -29,19 +38,42 @@ public:
 
     void resetView();
 
+    // Editor integration
+    void setEditorState(EditorState* state);
+    void setGeometryModel(GeometryModel* model);
+    void setBCModel(BCModel* model);
+    void setSelectionModel(SelectionModel* model);
+    void setToolContext(ToolContext* context);
+
+    // Set mesh directly (for editor mode, before solve)
+    void setMesh(const Mesh& mesh);
+
+    // Coordinate conversion
+    QPointF widgetToWorld(const QPointF& widgetPos) const;
+    QPointF worldToWidget(const QPointF& worldPos) const;
+    
+    // Find nearest node to point (for context menu)
+    int findNearestNode(const QPointF& worldPos, double tolerance = 0.05) const;
+
 signals:
     void pointProbed(int nodeId, int elemId, double x, double y, double ux, double uy, double stressVal);
+    void nodeClicked(int nodeIndex, QPointF worldPos);
+    void primitiveClicked(int index);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
     Mesh m_mesh;
     fea::SolveResult m_result;
     bool m_hasData = false;
+    bool m_hasMesh = false;
 
     ContourField m_field = ContourField::VON_MISES;
     ColormapType m_colormap = ColormapType::TURBO;
@@ -57,12 +89,35 @@ private:
     double m_panY = 0.5;
     double m_zoom = 1.0;
     QPoint m_lastMousePos;
+    bool m_isPanning = false;
 
     double m_fieldMin = 0.0;
     double m_fieldMax = 1.0;
+
+    // Editor state (non-owning pointers)
+    EditorState* m_editorState = nullptr;
+    GeometryModel* m_geometryModel = nullptr;
+    BCModel* m_bcModel = nullptr;
+    SelectionModel* m_selectionModel = nullptr;
+    ToolContext* m_toolContext = nullptr;
+
+    // Geometry/BC rendering
+    void drawGeometryPrimitives(QPainter& painter);
+    void drawBCOverlay(QPainter& painter);
+    void drawSelectionHighlight(QPainter& painter);
+    void drawSnapIndicator(QPainter& painter, const QPointF& worldPos);
+    void drawForceArrow(QPainter& painter, const QPointF& pos, double fx, double fy, double angle);
+    void drawDragRectangle(QPainter& painter);
+    void drawPendingShape(QPainter& painter);
+    void drawMeshNodes(QPainter& painter);
+    void drawMeshEdges(QPainter& painter);
+    void drawDragMovePreview(QPainter& painter);
 
     QColor getColorForValue(double val) const;
     double getFieldValueForNode(int nodeIdx) const;
     double getFieldValueForElement(int elemIdx) const;
     void updateFieldRange();
+    
+    // Periodic update timer to prevent blank screen
+    QTimer* m_updateTimer = nullptr;
 };

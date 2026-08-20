@@ -3,7 +3,7 @@
 ## [Unreleased]
 ### Added
 - Qt Desktop Application structure in `src/desktop/`.
-- CMake configuration for Qt 6 desktop application (`CAUCHY_DESKTOP` option).
+- CMake configuration for Qt 6 desktop application (`CRUCIBLE_FEA_DESKTOP` option).
 - macOS `.app` bundle support (`MACOSX_BUNDLE TRUE` in CMake).
 - Install target for macOS (`cmake --install` copies to /Applications).
 - App icon (`desktop/icon.icns`) embedded in .app bundle Resources.

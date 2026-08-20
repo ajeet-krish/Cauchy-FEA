@@ -1,7 +1,7 @@
-# Project Context, Cauchy: 2D Finite Element Structural Solver
+# Project Context, Crucible-FEA: 2D Finite Element Structural Solver
 
 ## Style Rules
-- **No em dashes** in any file. Use two regular hyphens (--) instead of ---, &mdash;, &ndash;, or literal Unicode em dash.
+- **No em dashes, no double hyphens, no triple hyphens**: Never use ---, --, &mdash;, &ndash;, or literal Unicode em dash. Use normal punctuation (commas, periods, parentheses, colons) to separate clauses. For lists, use semicolons or restructure sentences.
 - **C++ code style**: 4-space indentation, K&R braces, no tabs, no trailing whitespace.
 - **Variable naming**: snake_case for local variables, PascalCase for structs/classes, SCREAMING_SNAKE_CASE for constants.
 - **Global variables**: `g_` prefix for inline globals (e.g., `g_case`, `g_analysis`, `g_nx`).
@@ -9,7 +9,6 @@
 - **Header-only pattern**: All core logic in `.hpp` files with `#pragma once`. Use `inline` for functions and variables to avoid ODR violations.
 - **Enum classes**: All enums use `enum class` with PascalCase values.
 - **JavaScript**: ES6+ modules where supported, 2-space indentation, single quotes for strings, semicolons required.
-- **No em dashes in JS/HTML**: Use `--` or `&mdash;` entity.
 
 ## Goal
 Build and deploy a 2D finite element structural solver in C++20 as a portfolio centrepiece for mechanical/aerospace engineering roles. Deliver a 6+ page HTML portfolio with per-case dedicated pages (interactive Three.js viewers, KaTeX theory, validation tables), and a production-grade GitHub repository with CI and unit tests.
@@ -259,7 +258,7 @@ for hiring managers. The desktop application is the actual working tool.
 
 ### Why Not ImGui / Tauri / Flutter
 
-| Framework | Why Not for Cauchy |
+| Framework | Why Not for Crucible-FEA |
 |-----------|-------------------|
 | Dear ImGui | No native file dialogs, no dock widgets, custom-only look, less industry recognition |
 | Rust + Tauri | C++/Rust FFI overhead makes no sense for solver-heavy app; two languages to maintain |
@@ -309,7 +308,7 @@ src/
 │
 └── desktop/
     ├── resources.qrc             # Qt resource system (icons, styles)
-    ├── cauchy.desktop            # Linux .desktop file
+    ├── crucible-fea.desktop        # Linux .desktop file
     ├── Info.plist                # macOS .plist file
     ├── icon.icns                 # macOS app icon (512x512, generated from PNG)
     └── icon.png                  # Source PNG for app icon

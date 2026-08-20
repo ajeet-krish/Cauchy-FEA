@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(Cauchy VERSION 1.0.0 LANGUAGES CXX)
+project(CrucibleFEA VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -87,28 +87,10 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(FEA_Tests
   src/fea_test.cpp
-  tests/test_c_api.cpp
-  src/fea_solver_c_api.cpp
-  src/fea_solver_c_api.h
   ${FEA_HEADERS}
 )
 target_include_directories(FEA_Tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(FEA_Tests PRIVATE GTest::gtest_main OpenMP::OpenMP_CXX)
-
-# ------------------------------------------------------------------
-# Shared library for Tauri desktop app
-# ------------------------------------------------------------------
-add_library(fea_solver_shared SHARED
-  src/fea_solver_c_api.cpp
-  ${FEA_HEADERS}
-)
-target_include_directories(fea_solver_shared PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(fea_solver_shared PRIVATE OpenMP::OpenMP_CXX)
-set_target_properties(fea_solver_shared PROPERTIES
-  POSITION_INDEPENDENT_CODE ON
-  CXX_VISIBILITY_PRESET hidden
-  VISIBILITY_INLINES_HIDDEN ON
-)
 
 # ------------------------------------------------------------------
 # Custom targets
@@ -136,9 +118,9 @@ add_custom_target(serve-docs
 # ------------------------------------------------------------------
 # Desktop Application (Qt 6, optional)
 # ------------------------------------------------------------------
-option(CAUCHY_DESKTOP "Build the Qt 6 desktop FEA application" OFF)
+option(CRUCIBLE_FEA_DESKTOP "Build the Qt 6 desktop FEA application" OFF)
 
-if(CAUCHY_DESKTOP)
+if(CRUCIBLE_FEA_DESKTOP)
   find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets WebEngineWidgets)
 
   set(CMAKE_AUTOMOC ON)
@@ -165,6 +147,16 @@ if(CAUCHY_DESKTOP)
     src/desktop/displacement_line_chart.cpp
     src/desktop/load_displacement_chart.cpp
     src/desktop/error_heatmap.cpp
+    src/desktop/editor_state.cpp
+    src/desktop/geometry_primitive.cpp
+    src/desktop/geometry_model.cpp
+    src/desktop/bc_model.cpp
+    src/desktop/selection_model.cpp
+    src/desktop/tool_context.cpp
+    src/desktop/geometry_panel.cpp
+    src/desktop/bc_panel.cpp
+    src/desktop/mesh_generator.cpp
+    src/desktop/undo_commands.cpp
   )
 
   set(DESKTOP_HEADERS
@@ -186,57 +178,67 @@ if(CAUCHY_DESKTOP)
     src/desktop/displacement_line_chart.hpp
     src/desktop/load_displacement_chart.hpp
     src/desktop/error_heatmap.hpp
+    src/desktop/editor_state.hpp
+    src/desktop/geometry_primitive.hpp
+    src/desktop/geometry_model.hpp
+    src/desktop/bc_model.hpp
+    src/desktop/selection_model.hpp
+    src/desktop/tool_context.hpp
+    src/desktop/geometry_panel.hpp
+    src/desktop/bc_panel.hpp
+    src/desktop/mesh_generator.hpp
+    src/desktop/undo_commands.hpp
   )
 
   set(DESKTOP_RESOURCES src/desktop/resources.qrc)
 
-  add_executable(cauchy-desktop ${DESKTOP_SOURCES} ${DESKTOP_HEADERS} ${DESKTOP_RESOURCES})
-  target_include_directories(cauchy-desktop PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-  target_link_libraries(cauchy-desktop PRIVATE
+  add_executable(crucible-fea-desktop ${DESKTOP_SOURCES} ${DESKTOP_HEADERS} ${DESKTOP_RESOURCES})
+  target_include_directories(crucible-fea-desktop PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_link_libraries(crucible-fea-desktop PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::OpenGLWidgets Qt6::WebEngineWidgets OpenMP::OpenMP_CXX
   )
 
   # macOS bundle
   if(APPLE)
-    set_target_properties(cauchy-desktop PROPERTIES
+    set_target_properties(crucible-fea-desktop PROPERTIES
       MACOSX_BUNDLE TRUE
       MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/desktop/Info.plist
-      MACOSX_BUNDLE_BUNDLE_NAME "Cauchy"
+      MACOSX_BUNDLE_BUNDLE_NAME "Crucible-FEA"
       MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
       MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
-      MACOSX_BUNDLE_GUI_IDENTIFIER "com.cauchy.fea2d"
+      MACOSX_BUNDLE_GUI_IDENTIFIER "com.crucible.fea2d"
       MACOSX_BUNDLE_ICON_FILE "icon.icns"
     )
-    install(TARGETS cauchy-desktop BUNDLE DESTINATION /Applications)
+    install(TARGETS crucible-fea-desktop BUNDLE DESTINATION /Applications)
 
     # Copy icon into the .app bundle Resources folder
-    add_custom_command(TARGET cauchy-desktop POST_BUILD
+    add_custom_command(TARGET crucible-fea-desktop POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_SOURCE_DIR}/desktop/icon.icns
-        $<TARGET_FILE_DIR:cauchy-desktop>/../Resources/icon.icns
+        $<TARGET_FILE_DIR:crucible-fea-desktop>/../Resources/icon.icns
       COMMENT "Copying app icon to bundle Resources"
     )
   endif()
 
   # Linux .desktop file
   if(UNIX AND NOT APPLE)
-    install(FILES desktop/cauchy.desktop
+    install(FILES desktop/crucible-fea.desktop
       DESTINATION share/applications
     )
-    install(TARGETS cauchy-desktop DESTINATION bin)
+    install(TARGETS crucible-fea-desktop DESTINATION bin)
   endif()
 
   # Convenience targets
   add_custom_target(run-desktop
-    COMMAND ./cauchy-desktop
-    DEPENDS cauchy-desktop
+    COMMAND ./crucible-fea-desktop
+    DEPENDS crucible-fea-desktop
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Running Cauchy FEA desktop app"
+    COMMENT "Running Crucible-FEA desktop app"
   )
 
   add_custom_target(install-desktop
     COMMAND cmake --install ${CMAKE_BINARY_DIR} --prefix /Applications
-    DEPENDS cauchy-desktop
-    COMMENT "Installing Cauchy FEA to /Applications"
+    DEPENDS crucible-fea-desktop
+    COMMENT "Installing Crucible-FEA to /Applications"
   )
 endif()

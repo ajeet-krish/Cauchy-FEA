@@ -2,6 +2,7 @@
 #include <QMenuBar>
 #include <QMenu>
 #include <QAction>
+#include <QActionGroup>
 #include <QToolBar>
 #include <QStatusBar>
 #include <QLabel>
@@ -26,8 +27,21 @@
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent) {
-    setWindowTitle("Cauchy FEA -- 2D/3D Finite Element Structural Solver");
+    setWindowTitle("Crucible-FEA -- 2D/3D Finite Element Structural Solver");
     resize(1400, 900);
+
+    // Undo/redo stack (created first so all editors can reference it)
+    m_undoStack = new QUndoStack(this);
+
+    // Editor components (created first so viewport can reference them)
+    m_editorState = new EditorState();
+    m_geometryModel = new GeometryModel();
+    m_bcModel = new BCModel();
+    m_selectionModel = new SelectionModel();
+    m_toolContext = new ToolContext(m_editorState, m_geometryModel,
+                                    m_bcModel, m_selectionModel, this);
+    m_toolContext->setUndoStack(m_undoStack);
+    m_meshGenerator = new MeshGenerator();
 
     // Stacked widget for 2D/3D viewport switching
     m_viewStack = new QStackedWidget(this);
@@ -37,6 +51,19 @@ MainWindow::MainWindow(QWidget* parent)
     m_viewStack->addWidget(m_viewport3d);  // index 1 = 3D
     m_viewStack->setCurrentIndex(0);
     setCentralWidget(m_viewStack);
+
+    // Wire viewport to editor components
+    m_viewport->setEditorState(m_editorState);
+    m_viewport->setGeometryModel(m_geometryModel);
+    m_viewport->setBCModel(m_bcModel);
+    m_viewport->setSelectionModel(m_selectionModel);
+    m_viewport->setToolContext(m_toolContext);
+
+    // Editor panels
+    m_geometryPanel = new GeometryPanel(m_editorState, m_geometryModel, m_bcModel, this);
+    m_geometryPanel->setUndoStack(m_undoStack);
+    m_bcPanel = new BCPanel(m_editorState, m_bcModel, m_selectionModel, this);
+    m_bcPanel->setUndoStack(m_undoStack);
 
     // Solver runner
     m_solverRunner = new SolverRunner(this);
@@ -54,31 +81,28 @@ MainWindow::MainWindow(QWidget* parent)
     m_meshEditor = new MeshEditor(this);
     m_solverPanel = new SolverPanel(this);
 
-    QDockWidget* meshDock = new QDockWidget("Mesh & Material", this);
-    meshDock->setWidget(m_meshEditor);
-    meshDock->setAllowedAreas(Qt::LeftDockWidgetArea);
-    addDockWidget(Qt::LeftDockWidgetArea, meshDock);
+    // Left dock with editor tabs (replaces the old mesh dock)
+    createLeftDock();
 
     QDockWidget* solverDock = new QDockWidget("Solver & Results", this);
     solverDock->setWidget(m_solverPanel);
     solverDock->setAllowedAreas(Qt::RightDockWidgetArea);
     addDockWidget(Qt::RightDockWidgetArea, solverDock);
 
-    // Create menus, toolbars, status bar
+    // Create menus, toolbars, status bar, plots
     createActions();
     createMenuBar();
     createToolbars();
+    createEditorToolbar();
     createStatusBar();
     createBottomPlots();
 
-    // Connect solver panel signals
+    // Connect signals
     connect(m_solverPanel, &SolverPanel::runClicked,
             this, &MainWindow::onRunSolver);
     connect(m_solverPanel, &SolverPanel::resetClicked,
             this, &MainWindow::onResetView);
-
-    // Connect viewport signals
-    Q_UNUSED(m_viewport)
+    connectEditorSignals();
 }
 
 void MainWindow::createActions() {
@@ -103,6 +127,15 @@ void MainWindow::createActions() {
     exitAct->setShortcut(QKeySequence::Quit);
     connect(exitAct, &QAction::triggered, this, &QMainWindow::close);
 
+    // Undo/Redo actions
+    m_undoAction = m_undoStack->createUndoAction(this, "Undo");
+    m_undoAction->setShortcut(QKeySequence::Undo);
+    m_undoAction->setStatusTip("Undo last action (Ctrl+Z)");
+
+    m_redoAction = m_undoStack->createRedoAction(this, "Redo");
+    m_redoAction->setShortcut(QKeySequence::Redo);
+    m_redoAction->setStatusTip("Redo last undone action (Ctrl+Shift+Z)");
+
     // View actions
     QAction* resetViewAct = new QAction("Reset View", this);
     resetViewAct->setStatusTip("Reset camera to default view");
@@ -110,10 +143,10 @@ void MainWindow::createActions() {
 
     // Help
     QAction* aboutAct = new QAction("About", this);
-    aboutAct->setStatusTip("About Cauchy FEA");
+    aboutAct->setStatusTip("About Crucible-FEA");
     connect(aboutAct, &QAction::triggered, this, []() {
-        QMessageBox::about(nullptr, "About Cauchy FEA",
-            "<h2>Cauchy FEA</h2>"
+        QMessageBox::about(nullptr, "About Crucible-FEA",
+            "<h2>Crucible-FEA</h2>"
             "<p>Version 1.0.0</p>"
             "<p>A 2D finite element structural solver for plane stress and plane strain problems.</p>"
             "<p>Supports Bar, Q4 (bilinear quad), Q8 (serendipity quad), and T3 (triangle) elements.</p>"
@@ -138,6 +171,10 @@ void MainWindow::createMenuBar() {
     fileMenu->addAction("Export PNG");
     fileMenu->addSeparator();
     fileMenu->addAction("Exit");
+
+    QMenu* editMenu = menuBar->addMenu("&Edit");
+    editMenu->addAction(m_undoAction);
+    editMenu->addAction(m_redoAction);
 
     QMenu* viewMenu = menuBar->addMenu("&View");
     viewMenu->addAction("Reset View");
@@ -211,6 +248,14 @@ void MainWindow::onSolveFinished(const fea::SolveResult& result, const Mesh& mes
         m_viewport->setMeshAndResults(mesh, result);
     }
 
+    // Wire mesh nodes to tool context for node-based operations
+    m_toolContext->setMeshNodes(&mesh.nodes);
+
+    // Update geometry panel worktree with mesh info
+    m_geometryPanel->updateMeshInfo(mesh.num_nodes(), mesh.num_quads() + mesh.num_tris(),
+                                    static_cast<int>(mesh.dirichlet.size() + mesh.neumann.size()));
+    m_geometryPanel->updateWorktree();
+
     m_resultModel->setData(result, mesh, ResultTableType::DISPLACEMENT);
     m_solverPanel->setResult(result);
 
@@ -262,32 +307,88 @@ void MainWindow::onProgress(int percent, const QString& message) {
 }
 
 void MainWindow::onRunSolver() {
-    m_config.case_type = m_meshEditor->caseType();
-    m_config.element_type = m_meshEditor->elementType();
-    m_config.plane_type = m_meshEditor->planeType();
-    m_config.nx = m_meshEditor->meshSizeX();
-    m_config.ny = m_meshEditor->meshSizeY();
-    m_config.nz = m_meshEditor->meshSizeZ();
-    m_config.use_q8 = m_meshEditor->useQ8();
-    m_config.is_3d = m_meshEditor->is3D();
-    m_config.use_cg = m_solverPanel->useCG();
-    m_config.E = m_meshEditor->youngsModulus();
-    m_config.nu = m_meshEditor->poissonsRatio();
-    m_config.t = m_meshEditor->thickness();
-    m_config.use_adaptivity = m_solverPanel->useAdaptivity();
-    m_config.adaptive_iters = m_solverPanel->adaptiveIterations();
+    // Check if we have a custom mesh from geometry editor
+    if (m_currentMesh && m_currentMesh->num_nodes() > 0) {
+        // Use custom mesh from geometry editor
+        m_config.use_cg = m_solverPanel->useCG();
+        m_config.use_adaptivity = m_solverPanel->useAdaptivity();
+        m_config.adaptive_iters = m_solverPanel->adaptiveIterations();
+        
+        // Copy BCs from BCModel to mesh
+        if (m_bcModel) {
+            m_currentMesh->dirichlet.clear();
+            m_currentMesh->neumann.clear();
+            
+            const auto& bcs = m_bcModel->bcs();
+            for (const auto& bc : bcs) {
+                if (bc.node_index < 0 || bc.node_index >= m_currentMesh->num_nodes()) continue;
+                
+                switch (bc.type) {
+                case BCType::FIXED:
+                    m_currentMesh->dirichlet.push_back({bc.node_index, 0, 0.0});
+                    m_currentMesh->dirichlet.push_back({bc.node_index, 1, 0.0});
+                    break;
+                case BCType::ROLLER_X:
+                    m_currentMesh->dirichlet.push_back({bc.node_index, 0, 0.0});
+                    break;
+                case BCType::ROLLER_Y:
+                    m_currentMesh->dirichlet.push_back({bc.node_index, 1, 0.0});
+                    break;
+                case BCType::FORCE:
+                    // Convert angle/magnitude to x/y components
+                    {
+                        double angle_rad = bc.angle * M_PI / 180.0;
+                        double magnitude = bc.value;
+                        double fx = magnitude * std::cos(angle_rad);
+                        double fy = magnitude * std::sin(angle_rad);
+                        if (std::abs(fx) > 1e-10) {
+                            m_currentMesh->neumann.push_back({bc.node_index, 0, fx});
+                        }
+                        if (std::abs(fy) > 1e-10) {
+                            m_currentMesh->neumann.push_back({bc.node_index, 1, fy});
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        
+        m_progressBar->setVisible(true);
+        m_progressBar->setValue(0);
+        m_statusLabel->setText("Running solver with custom mesh...");
+        
+        m_solverRunner->setConfig(m_config);
+        m_solverRunner->setMesh(*m_currentMesh, m_config.use_cg);
+        m_solverRunner->start();
+    } else {
+        // Use predefined case from mesh editor
+        m_config.case_type = m_meshEditor->caseType();
+        m_config.element_type = m_meshEditor->elementType();
+        m_config.plane_type = m_meshEditor->planeType();
+        m_config.nx = m_meshEditor->meshSizeX();
+        m_config.ny = m_meshEditor->meshSizeY();
+        m_config.nz = m_meshEditor->meshSizeZ();
+        m_config.use_q8 = m_meshEditor->useQ8();
+        m_config.is_3d = m_meshEditor->is3D();
+        m_config.use_cg = m_solverPanel->useCG();
+        m_config.E = m_meshEditor->youngsModulus();
+        m_config.nu = m_meshEditor->poissonsRatio();
+        m_config.t = m_meshEditor->thickness();
+        m_config.use_adaptivity = m_solverPanel->useAdaptivity();
+        m_config.adaptive_iters = m_solverPanel->adaptiveIterations();
 
-    m_progressBar->setVisible(true);
-    m_progressBar->setValue(0);
-    m_statusLabel->setText("Running solver...");
+        m_progressBar->setVisible(true);
+        m_progressBar->setValue(0);
+        m_statusLabel->setText("Running solver...");
 
-    m_solverRunner->setConfig(m_config);
-    m_solverRunner->start();
+        m_solverRunner->setConfig(m_config);
+        m_solverRunner->start();
+    }
 }
 
 void MainWindow::onLoadCase() {
     QString fileName = QFileDialog::getOpenFileName(this,
-        "Open Project", "", "Cauchy Project (*.cauchy)");
+        "Open Project", "", "Crucible-FEA Project (*.cauchy)");
     if (fileName.isEmpty()) return;
 
     // Load project file (JSON-based)
@@ -398,4 +499,252 @@ void MainWindow::createBottomPlots() {
     plotsDock->setWidget(m_plotTabs);
     plotsDock->setAllowedAreas(Qt::BottomDockWidgetArea);
     addDockWidget(Qt::BottomDockWidgetArea, plotsDock);
+}
+
+void MainWindow::createEditorToolbar() {
+    m_editorToolbar = addToolBar("Editor");
+    m_editorToolbar->setObjectName("EditorToolbar");
+
+    // Undo/Redo buttons
+    m_editorToolbar->addAction(m_undoAction);
+    m_editorToolbar->addAction(m_redoAction);
+    m_editorToolbar->addSeparator();
+
+    // Select tool
+    m_selectAction = m_editorToolbar->addAction("Select");
+    m_selectAction->setCheckable(true);
+    m_selectAction->setShortcut(Qt::Key_V);
+    m_selectAction->setToolTip("Select and move objects (V)");
+
+    // Drawing tools
+    m_drawRectAction = m_editorToolbar->addAction("Rectangle");
+    m_drawRectAction->setCheckable(true);
+    m_drawRectAction->setShortcut(Qt::Key_R);
+    m_drawRectAction->setToolTip("Draw rectangle (R)");
+
+    m_drawLineAction = m_editorToolbar->addAction("Line");
+    m_drawLineAction->setCheckable(true);
+    m_drawLineAction->setShortcut(Qt::Key_L);
+    m_drawLineAction->setToolTip("Draw line (L)");
+
+    m_drawCircleAction = m_editorToolbar->addAction("Circle");
+    m_drawCircleAction->setCheckable(true);
+    m_drawCircleAction->setShortcut(Qt::Key_C);
+    m_drawCircleAction->setToolTip("Draw circle (C)");
+
+    m_editorToolbar->addSeparator();
+
+    // BC tools
+    m_fixedAction = m_editorToolbar->addAction("Fixed");
+    m_fixedAction->setCheckable(true);
+    m_fixedAction->setShortcut(Qt::Key_F);
+    m_fixedAction->setToolTip("Apply fixed BC (F)");
+
+    m_rollerXAction = m_editorToolbar->addAction("Roller X");
+    m_rollerXAction->setCheckable(true);
+    m_rollerXAction->setShortcut(Qt::Key_X);
+    m_rollerXAction->setToolTip("Apply roller X BC (X)");
+
+    m_rollerYAction = m_editorToolbar->addAction("Roller Y");
+    m_rollerYAction->setCheckable(true);
+    m_rollerYAction->setShortcut(Qt::Key_Y);
+    m_rollerYAction->setToolTip("Apply roller Y BC (Y)");
+
+    m_forceAction = m_editorToolbar->addAction("Force");
+    m_forceAction->setCheckable(true);
+    m_forceAction->setShortcut(Qt::Key_P);
+    m_forceAction->setToolTip("Apply force (P)");
+
+    // Make actions exclusive
+    QActionGroup* toolGroup = new QActionGroup(this);
+    toolGroup->addAction(m_selectAction);
+    toolGroup->addAction(m_drawRectAction);
+    toolGroup->addAction(m_drawLineAction);
+    toolGroup->addAction(m_drawCircleAction);
+    toolGroup->addAction(m_fixedAction);
+    toolGroup->addAction(m_rollerXAction);
+    toolGroup->addAction(m_rollerYAction);
+    toolGroup->addAction(m_forceAction);
+    toolGroup->setExclusive(true);
+
+    // Default to select mode
+    m_selectAction->setChecked(true);
+}
+
+void MainWindow::createLeftDock() {
+    m_leftDock = new QDockWidget("Editor", this);
+    m_leftDock->setObjectName("LeftDock");
+    m_leftDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+
+    m_leftTabs = new QTabWidget(this);
+    m_leftTabs->addTab(m_geometryPanel, "Geometry");
+    m_leftTabs->addTab(m_bcPanel, "Boundary Conditions");
+
+    m_leftDock->setWidget(m_leftTabs);
+    addDockWidget(Qt::LeftDockWidgetArea, m_leftDock);
+}
+
+void MainWindow::connectEditorSignals() {
+    // Toolbar actions -> EditorState + ToolContext
+    connect(m_selectAction, &QAction::triggered, this, [this]() {
+        m_editorState->current_mode = ToolMode::SELECT;
+        m_toolContext->modeChanged(ToolMode::SELECT);
+        m_statusLabel->setText("Tool: Select");
+    });
+    connect(m_drawRectAction, &QAction::triggered, this, [this]() {
+        m_editorState->current_mode = ToolMode::DRAW_RECT;
+        m_toolContext->modeChanged(ToolMode::DRAW_RECT);
+        m_statusLabel->setText("Tool: Draw Rectangle");
+    });
+    connect(m_drawLineAction, &QAction::triggered, this, [this]() {
+        m_editorState->current_mode = ToolMode::DRAW_LINE;
+        m_toolContext->modeChanged(ToolMode::DRAW_LINE);
+        m_statusLabel->setText("Tool: Draw Line");
+    });
+    connect(m_drawCircleAction, &QAction::triggered, this, [this]() {
+        m_editorState->current_mode = ToolMode::DRAW_CIRCLE;
+        m_toolContext->modeChanged(ToolMode::DRAW_CIRCLE);
+        m_statusLabel->setText("Tool: Draw Circle");
+    });
+    connect(m_fixedAction, &QAction::triggered, this, [this]() {
+        m_editorState->current_mode = ToolMode::ASSIGN_FIXED;
+        m_toolContext->modeChanged(ToolMode::ASSIGN_FIXED);
+        m_statusLabel->setText("Tool: Fixed BC");
+    });
+    connect(m_rollerXAction, &QAction::triggered, this, [this]() {
+        m_editorState->current_mode = ToolMode::ASSIGN_ROLLER_X;
+        m_toolContext->modeChanged(ToolMode::ASSIGN_ROLLER_X);
+        m_statusLabel->setText("Tool: Roller X BC");
+    });
+    connect(m_rollerYAction, &QAction::triggered, this, [this]() {
+        m_editorState->current_mode = ToolMode::ASSIGN_ROLLER_Y;
+        m_toolContext->modeChanged(ToolMode::ASSIGN_ROLLER_Y);
+        m_statusLabel->setText("Tool: Roller Y BC");
+    });
+    connect(m_forceAction, &QAction::triggered, this, [this]() {
+        m_editorState->current_mode = ToolMode::APPLY_FORCE;
+        m_toolContext->modeChanged(ToolMode::APPLY_FORCE);
+        m_statusLabel->setText("Tool: Apply Force");
+    });
+
+    // BCPanel -> EditorState
+    connect(m_bcPanel, &BCPanel::toolChanged, this, [this](ToolMode mode) {
+        m_editorState->current_mode = mode;
+        updateToolbarState();
+    });
+
+    // ToolContext -> Viewport (trigger repaint on geometry/BC changes)
+    connect(m_toolContext, &ToolContext::geometryChanged,
+            m_viewport, QOverload<>::of(&QWidget::update));
+    connect(m_toolContext, &ToolContext::statusMessage,
+            m_statusLabel, &QLabel::setText);
+
+    // Viewport -> BCPanel (node selection feedback)
+    connect(m_viewport, &ViewportWidget::nodeClicked,
+            m_bcPanel, &BCPanel::onNodeSelected);
+
+    // ToolContext -> BCPanel (node selection feedback)
+    connect(m_toolContext, &ToolContext::nodeSelected,
+            m_bcPanel, &BCPanel::onNodeSelected);
+
+    // ToolContext -> GeometryPanel (primitive selection feedback)
+    connect(m_toolContext, &ToolContext::primitiveSelected,
+            this, &MainWindow::onPrimitiveSelected);
+
+    // GeometryPanel -> viewport update
+    connect(m_geometryPanel, &GeometryPanel::primitiveSelected,
+            m_viewport, QOverload<>::of(&QWidget::update));
+
+    // GeometryPanel mesh generation request
+    connect(m_geometryPanel, &GeometryPanel::meshRequested, this, [this](int nx, int ny) {
+        // Store mesh dimensions for solver
+        m_config.nx = nx;
+        m_config.ny = ny;
+        
+        // Generate mesh from geometry model
+        if (m_geometryModel->primitiveCount() == 0) {
+            QMessageBox::warning(this, "No Geometry", 
+                "Please draw geometry before generating mesh.");
+            return;
+        }
+        
+        // Get material properties from geometry panel
+        Material mat;
+        mat.E = m_geometryPanel->youngsModulus();
+        mat.nu = m_geometryPanel->poissonsRatio();
+        mat.t = m_geometryPanel->thickness();
+        PlaneType plane = m_geometryPanel->planeType();
+        
+        // Generate mesh
+        auto mesh = m_meshGenerator->generate(*m_geometryModel, mat, nx, ny, plane);
+        
+        if (mesh && mesh->num_nodes() > 0) {
+            // Store mesh in viewport
+            m_viewport->setMesh(*mesh);
+            m_toolContext->setMeshNodes(&mesh->nodes);
+            
+            // Update worktree with mesh info
+            m_geometryPanel->updateMeshInfo(mesh->num_nodes(), 
+                                           mesh->num_quads() + mesh->num_tris(),
+                                           m_meshGenerator->findBoundaryNodes(*mesh).size());
+            
+            // Update status
+            m_statusLabel->setText(QString("Mesh generated: %1 nodes, %2 elements")
+                .arg(mesh->num_nodes())
+                .arg(mesh->num_quads() + mesh->num_tris()));
+            
+            // Store mesh for solver
+            m_currentMesh = std::move(mesh);
+        } else {
+            QMessageBox::warning(this, "Mesh Generation Failed", 
+                "Failed to generate mesh from geometry.");
+        }
+    });
+
+    // GeometryPanel delete request -> refresh viewport
+    connect(m_geometryPanel, &GeometryPanel::deleteRequested,
+            m_viewport, QOverload<>::of(&QWidget::update));
+}
+
+void MainWindow::updateToolbarState() {
+    // Sync toolbar checked state with current editor mode
+    switch (m_editorState->current_mode) {
+        case ToolMode::SELECT:         m_selectAction->setChecked(true); break;
+        case ToolMode::DRAW_RECT:      m_drawRectAction->setChecked(true); break;
+        case ToolMode::DRAW_LINE:      m_drawLineAction->setChecked(true); break;
+        case ToolMode::DRAW_CIRCLE:    m_drawCircleAction->setChecked(true); break;
+        case ToolMode::ASSIGN_FIXED:   m_fixedAction->setChecked(true); break;
+        case ToolMode::ASSIGN_ROLLER_X: m_rollerXAction->setChecked(true); break;
+        case ToolMode::ASSIGN_ROLLER_Y: m_rollerYAction->setChecked(true); break;
+        case ToolMode::APPLY_FORCE:    m_forceAction->setChecked(true); break;
+        default:                       m_selectAction->setChecked(true); break;
+    }
+    m_statusLabel->setText("Tool: " + m_editorState->currentToolName());
+}
+
+void MainWindow::onUndo() {
+    if (m_undoStack->canUndo()) {
+        m_undoStack->undo();
+        m_statusLabel->setText("Undo: " + m_undoStack->undoText());
+        // Refresh editor panels after undo
+        m_geometryPanel->updateWorktree();
+        m_bcPanel->updateBCList();
+        m_viewport->update();
+    }
+}
+
+void MainWindow::onRedo() {
+    if (m_undoStack->canRedo()) {
+        m_undoStack->redo();
+        m_statusLabel->setText("Redo: " + m_undoStack->redoText());
+        // Refresh editor panels after redo
+        m_geometryPanel->updateWorktree();
+        m_bcPanel->updateBCList();
+        m_viewport->update();
+    }
+}
+
+void MainWindow::onPrimitiveSelected(int index) {
+    m_geometryPanel->selectPrimitiveInTree(index);
+    m_viewport->update();
 }

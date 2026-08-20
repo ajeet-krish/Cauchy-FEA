@@ -5,9 +5,9 @@
 
 CauchyApp::CauchyApp(int& argc, char** argv)
     : QApplication(argc, argv) {
-    setApplicationName("Cauchy FEA");
+    setApplicationName("Crucible-FEA");
     setApplicationVersion("1.0.0");
-    setOrganizationName("Cauchy Structural Solver");
+    setOrganizationName("Crucible-FEA Structural Solver");
 
     setStyle(QStyleFactory::create("Fusion"));
     setupTheme();

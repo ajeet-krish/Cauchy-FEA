@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Cauchy FEA
-Comment=2D Finite Element Structural Solver
-Exec=cauchy-desktop %f
+Name=Crucible-FEA
+Comment=2D/3D Finite Element Structural Solver
+Exec=crucible-fea-desktop %f
 Terminal=false
 Categories=Science;Engineering;Physics;
 Keywords=FEA;FEM;Finite Element;Structural;Stress;Engineering;

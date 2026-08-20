@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Implementation -- Cauchy</title>
+  <title>Implementation, Crucible-FEA</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -11,37 +11,249 @@
 </head>
 <body>
   <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+
   <div class="sidebar">
-    <div class="sidebar-brand"><a href="index.html">Cauchy</a></div>
+    <div class="sidebar-brand"><a href="index.html">Crucible-FEA</a></div>
     <nav class="sidebar-nav">
-      <div class="nav-section"><div class="nav-heading">Project</div><a href="index.html" class="nav-item">Home</a></div>
       <div class="nav-section">
-        <div class="nav-heading">Validation Cases</div>
-        <a href="cantilever.html" class="nav-item">Cantilever</a>
-        <a href="cook.html" class="nav-item">Cook's Membrane</a>
-        <a href="patch.html" class="nav-item">Patch Test</a>
-        <a href="plate_hole.html" class="nav-item">Plate + Hole</a>
-        <a href="lbracket.html" class="nav-item">L-Bracket</a>
+        <div class="nav-heading">Project</div>
+        <a href="index.html" class="nav-item">Home</a>
       </div>
       <div class="nav-section">
-        <div class="nav-heading">Application</div>
-        <a href="desktop_app.html" class="nav-item">Desktop Application</a>
+        <div class="nav-heading">Validation Cases</div>
+        <a href="cantilever.html" class="nav-item">Cantilever Beam</a>
+        <a href="cook.html" class="nav-item">Cook's Membrane</a>
+        <a href="patch.html" class="nav-item">Patch Test</a>
+        <a href="plate_hole.html" class="nav-item">Plate with Hole</a>
+        <a href="lbracket.html" class="nav-item">L-Bracket</a>
+        <a href="michell.html" class="nav-item">Michell Truss</a>
+        <a href="thermal_cylinder.html" class="nav-item">Thick Cylinder</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">3D Benchmarks</div>
+        <a href="cantilever_3d.html" class="nav-item">3D Cantilever</a>
+        <a href="plate_hole_3d.html" class="nav-item">3D Plate + Hole</a>
+        <a href="lame_3d.html" class="nav-item">3D Lame Cylinder</a>
       </div>
       <div class="nav-section">
         <div class="nav-heading">Reference</div>
-        <a href="theory.html" class="nav-item">Theory</a>
+        <a href="theory.html" class="nav-item">Theory &amp; Methodology</a>
         <a href="implementation.html" class="nav-item active">Implementation</a>
-        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub &nearr;</a>
+        <a href="pinn.html" class="nav-item">PINN Surrogate</a>
+        <a href="https://github.com/ajeet-krish/fea-2d" class="nav-item" target="_blank">GitHub Repository &nearr;</a>
       </div>
     </nav>
   </div>
+
   <div class="main-content">
     <h1>Implementation</h1>
     <p class="section-intro">
-      Cauchy is a header-only C++20 codebase with 7 core headers,
-      6 validation entry points, and 19 Google Test cases. The architecture
+      Crucible-FEA is a header-only C++20 codebase with 9 core headers,
+      6 validation entry points, and 22 Google Test cases. The architecture
       mirrors the LBM-2D solver for consistency across the portfolio.
     </p>
+
+    <div class="callout" style="margin-bottom: 2rem;">
+      <p>
+        <strong>Source Code:</strong>
+        <a href="https://github.com/ajeet-krish/fea-2d" target="_blank" style="color: var(--accent-orange);">github.com/ajeet-krish/fea-2d &nearr;</a><br>
+        MIT License. C++20, CMake 3.15+, Google Test. Cross-platform (macOS, Linux).
+      </p>
+    </div>
+
+    <h2>Simulation Overview</h2>
+    <p style="color: var(--fg-dim); font-size: 0.88em; margin-bottom: 1rem;">
+      All 7 validation cases solved with the same C++20 solver core. Each case targets a specific aspect of structural mechanics
+      and validates against analytical or reference solutions. Mesh convergence studies are run at 5 resolutions (8x8 through 128x128).
+    </p>
+
+    <table class="overview-table">
+      <thead>
+        <tr>
+          <th>Case</th>
+          <th>Elements</th>
+          <th>Mesh</th>
+          <th>DOFs</th>
+          <th>Material</th>
+          <th>Plane</th>
+          <th>Max Disp.</th>
+          <th>Max Stress</th>
+          <th>Validates</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="case-name"><a href="cantilever.html">Cantilever Beam</a></td>
+          <td><span class="tag tag-q8">Q8</span> 256</td>
+          <td>32x8</td>
+          <td>1,698</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>0.139 mm</td>
+          <td>8.20 MPa</td>
+          <td>PL^3/(3EI) deflection, My/I stress</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="cook.html">Cook's Membrane</a></td>
+          <td><span class="tag tag-q8">Q8</span> 1,024</td>
+          <td>32x32</td>
+          <td>6,402</td>
+          <td>Aluminum (E=1 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>9.50 mm</td>
+          <td>0.21 MPa</td>
+          <td>Shear-bending coupling, ~13.68 mm reference</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="patch.html">Patch Test</a></td>
+          <td><span class="tag tag-q4">Q4</span> 16</td>
+          <td>4x4</td>
+          <td>50</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>1.00 mm</td>
+          <td>208 MPa</td>
+          <td>Constant stress recovery (element pass/fail)</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="plate_hole.html">Plate with Hole</a></td>
+          <td><span class="tag tag-q8">Q8</span> 15,551</td>
+          <td>128x128</td>
+          <td>94,332</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>0.028 mm</td>
+          <td>7.66 MPa</td>
+          <td>Kirsch SCF~3.0 at circular hole edge</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="lbracket.html">L-Bracket</a></td>
+          <td><span class="tag tag-q4">Q4</span> 12,159</td>
+          <td>128x128</td>
+          <td>24,832</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>0.001 mm</td>
+          <td>0.45 MPa</td>
+          <td>Re-entrant corner singularity, mesh refinement</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="michell.html">Michell Truss</a></td>
+          <td><span class="tag tag-bar">Bar</span> 3</td>
+          <td>3 bars</td>
+          <td>6</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-stress">Stress</span></td>
+          <td>0.044 mm</td>
+          <td>N/A</td>
+          <td>Bar element assembly, hand calculation check</td>
+        </tr>
+        <tr>
+          <td class="case-name"><a href="thermal_cylinder.html">Thick Cylinder</a></td>
+          <td><span class="tag tag-q4">Q4</span> 13,108</td>
+          <td>128x128</td>
+          <td>26,730</td>
+          <td>Steel (E=200 GPa)</td>
+          <td><span class="tag tag-strain">Strain</span></td>
+          <td>0.007 mm</td>
+          <td>1.80 MPa</td>
+          <td>Lame solution, internal pressure + thermal</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="color: var(--fg-muted); font-size: 0.78em; margin-top: 0.5rem;">
+      <strong>Element types:</strong>
+      <span class="tag tag-bar">Bar</span> 2-node truss,
+      <span class="tag tag-q4">Q4</span> 4-node bilinear quad (2x2 Gauss),
+      <span class="tag tag-q8">Q8</span> 8-node serendipity (3x3 Gauss).
+      All cases use steel (E=200 GPa, nu=0.3) unless noted. Convergence studies run at 8, 16, 32, 64, 128 resolution.
+    </p>
+
+    <h2>Key Features</h2>
+
+    <div class="feature-grid">
+
+      <div class="feature-item">
+        <h4>Bar + Q4 + Q8 Elements</h4>
+        <p>Two-node truss, 4-node bilinear quad, and 8-node serendipity quad with full Gauss integration (2x2 for Q4, 3x3 for Q8).</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Dual Solvers</h4>
+        <p>Cholesky direct solver for small/medium systems. Conjugate Gradient with auto-selected preconditioner (IC(0), SSOR, Block Jacobi) for large sparse systems.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Sparse Assembly</h4>
+        <p>COO format for natural element assembly, converted to CSR for fast matrix-vector products.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Stress Recovery</h4>
+        <p>Element-centered stress, node-averaged smoothing, Von Mises and principal stresses. Q8 uses 2x2 Gauss averaging.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>ZZ Error Estimator</h4>
+        <p>Zienkiewicz-Zhu superconvergent patch recovery (SPR) for a posteriori error estimation. Drives adaptive mesh refinement.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Adaptive h-Refinement</h4>
+        <p>Red-green refinement with element marking. Concentrates DOFs where error is highest, achieving 10-14x node reduction.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Mesh Convergence</h4>
+        <p>h-refinement studies with GCI (Grid Convergence Index) per ASME V&amp;V 20-2009.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>OpenMP Parallel</h4>
+        <p>Element assembly and stress recovery loops parallelized with OpenMP.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Shear Locking Fix</h4>
+        <p>Selective Reduced Integration (SRI) and B-Bar methods eliminate Q4 shear locking in bending-dominated problems.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Contact Mechanics</h4>
+        <p>Node-to-surface frictionless contact with penalty constraint enforcement. Master-slave formulation with gap function detection.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Geometric Nonlinearity</h4>
+        <p>Total Lagrangian Newton-Raphson with Green-Lagrange strain, consistent tangent stiffness, and load stepping.</p>
+      </div>
+
+      <div class="feature-item">
+        <h4>Dynamic Analysis</h4>
+        <p>Newmark-beta time integration, consistent mass matrices, Rayleigh damping, and subspace iteration modal analysis.</p>
+      </div>
+
+    </div>
+
+    <h2>Architecture</h2>
+
+    <table class="module-table">
+      <thead>
+        <tr><th>Module</th><th>Purpose</th><th>Key Types</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>fea_types.hpp</code></td><td>Core types, enums, globals</td><td>Material, Node, Mesh, CaseType</td></tr>
+        <tr><td><code>elements.hpp</code></td><td>Element stiffness matrices</td><td>BarElement, Q4Element, Q8Element, T3Element</td></tr>
+        <tr><td><code>sparse.hpp</code></td><td>Sparse matrix formats</td><td>COOMatrix, CSRMatrix, DenseMatrix</td></tr>
+        <tr><td><code>solver.hpp</code></td><td>Linear solvers</td><td>CholeskySolver, CGSolver</td></tr>
+        <tr><td><code>mesh.hpp</code></td><td>Mesh generation</td><td>generate_structured_quad, generate_structured_quad8, generate_lbracket</td></tr>
+        <tr><td><code>postprocess.hpp</code></td><td>Stress recovery, JSON output</td><td>ElementStress, write_meta_json</td></tr>
+        <tr><td><code>adaptivity.hpp</code></td><td>ZZ error estimator, adaptive refinement</td><td>SPRResult, ElementError, refine_mesh, adaptive_loop</td></tr>
+        <tr><td><code>convergence.hpp</code></td><td>GCI computation, h-refinement</td><td>GCIResult, run_study</td></tr>
+        <tr><td><code>fea.hpp</code></td><td>Assembly + solve pipeline</td><td>assemble, solve, compute_strain_energy</td></tr>
+      </tbody>
+    </table>
 
     <h2>Module Reference</h2>
     <table class="module-table">
@@ -95,6 +307,434 @@
       </p>
     </div>
 
+    <h2>Quick Start</h2>
+    <div class="callout">
+      <p>
+        <code>./build/FEA_Cantilever 32</code>, cantilever beam (32x8 mesh)<br>
+        <code>./build/FEA_Cook 32</code>, Cook's membrane (32x32 mesh)<br>
+        <code>./build/FEA_PlateHole 16 --q8</code>, plate with hole (Q8 elements)<br>
+        <code>./build/FEA_AdaptHole 8 --iters 4</code>, adaptive refinement<br>
+        <code>./build/FEA_Tests</code>, run 22 Google Test cases
+      </p>
+    </div>
+
+    <!-- ================================================================
+         ENGINEERING DESIGN PROCESS (Desktop App)
+         ================================================================ -->
+
+    <h2>Engineering Design Process</h2>
+
+    <h3>Problem Statement</h3>
+    <p class="section-intro">
+      Commercial FEA tools like Abaqus and ANSYS are powerful, but their
+      black-box nature hides implementation details. A native desktop
+      application provides direct access to the solver internals, custom
+      visualization of intermediate results, and a transparent workflow
+      for educational and prototyping use. The goal is not to replace
+      commercial tools, but to build a working application that
+      demonstrates the full FEA pipeline from mesh generation to stress
+      recovery.
+    </p>
+
+    <h3>Why Qt 6?</h3>
+    <p class="section-intro">
+      The GUI framework choice was driven by three constraints: direct
+      C++ solver linkage (no IPC overhead), native look and feel, and
+      cross-platform packaging. Qt 6 satisfies all three. The comparison
+      below shows why alternatives were rejected.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Framework</th>
+          <th>Why Not for Crucible-FEA</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Dear ImGui</td>
+          <td>No native file dialogs, no dock widgets, custom-only look, less industry recognition</td>
+        </tr>
+        <tr>
+          <td>Rust + Tauri</td>
+          <td>C++/Rust FFI overhead makes no sense for a solver-heavy app; two languages to maintain</td>
+        </tr>
+        <tr>
+          <td>Flutter</td>
+          <td>Dart/C++ FFI adds complexity; Material Design looks like a phone app on desktop</td>
+        </tr>
+        <tr>
+          <td>wxWidgets</td>
+          <td>Sparse documentation, no built-in plotting, manual packaging on macOS</td>
+        </tr>
+        <tr>
+          <td>GTK</td>
+          <td>Poor macOS/Windows support, C API is painful from C++, tiny scientific ecosystem</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Solver Integration</h3>
+    <p class="section-intro">
+      The desktop application links directly to the existing header-only
+      solver. A <code>SolveConfig</code> struct is populated from the GUI,
+      passed to <code>run_case()</code>, and the returned
+      <code>SolveResult</code> struct feeds into visualization models.
+      No JSON serialization, no process spawning, no IPC, direct struct
+      passing at function-call speed.
+    </p>
+
+    <div class="eq-box" style="text-align: left; font-size: 0.85em;">
+      <pre><code>struct SolveConfig {
+    CaseType case_type;
+    ElementType element_type;
+    PlaneType plane_type;
+    int nx, ny;
+    Material material;
+    std::vector&lt;BoundaryCondition&gt; boundary_conditions;
+    SolverType solver_type;
+    double cg_tolerance;
+    int cg_max_iterations;
+    bool use_adaptivity;
+    int adaptive_iterations;
+};
+
+struct SolveResult {
+    bool success;
+    std::string error_message;
+    Mesh mesh;
+    std::vector&lt;NodeDisplacement&gt; displacements;
+    std::vector&lt;ElementStress&gt; stresses;
+    double max_displacement;
+    double strain_energy;
+    // ... convergence data, timing, etc.
+};</code></pre>
+    </div>
+
+    <h3>Async Execution</h3>
+    <p class="section-intro">
+      Solver runs execute on a dedicated <code>QThread</code>. The main
+      thread remains responsive, the progress bar updates, the cancel
+      button works, and the viewport stays interactive. The thread emits
+      <code>finished(SolveResult)</code> when complete, and the UI
+      switches to the results view automatically.
+    </p>
+
+    <h3>Visualization Strategy</h3>
+    <p class="section-intro">
+      All rendering uses <code>QPainter</code> on CPU. For a 2D FEA tool
+      with meshes under 100K elements, CPU rendering is more than
+      sufficient. It avoids GPU driver dependencies, works on headless
+      systems, and produces deterministic output. The tradeoff is acceptable
+      for the target use case: engineering analysis, not real-time gaming.
+    </p>
+
+    <h3>Cross-Platform Packaging</h3>
+    <p class="section-intro">
+      CMake builds a native <code>.app</code> bundle on macOS, a
+      <code>.desktop</code> entry on Linux, and an NSIS installer on
+      Windows. The same build system produces all three artifacts from a
+      single CMakeLists.txt. No separate build scripts per platform.
+    </p>
+
+    <!-- ================================================================
+         DESKTOP APP ARCHITECTURE DEEP-DIVE
+         ================================================================ -->
+
+    <h2>Desktop App Architecture</h2>
+
+    <h3>System Architecture</h3>
+
+    <div class="eq-box" style="text-align: left; font-size: 0.8em; line-height: 1.6;">
+      <pre><code>+-------------------------------------------------------------+
+|                      Crucible-FEA Desktop                         |
++-------------------------------------------------------------+
+|                                                             |
+|  +------------------+   +------------------+   +----------+ |
+|  |   Mesh Editor    |   |  2D Viewport     |   | Solver   | |
+|  |   (Left Dock)    |   |  (Center)        |   | Panel    | |
+|  |                  |   |                  |   | (Right)  | |
+|  |  - nx, ny        |   |  - QPainter      |   |          | |
+|  |  - Element type  |   |  - Mesh wire     |   | - Cholesky| |
+|  |  - Grading       |   |  - Deformed shape|   | - CG     | |
+|  |  - Quality       |   |  - Contours      |   | - Progress| |
+|  +------------------+   |  - Arrows        |   | - Cancel  | |
+|                         |  - Probes        |   +----------+ |
+|  +------------------+   +------------------+                  |
+|  |  BC Editor       |          |               +----------+  |
+|  |  Material Props  |          |               | Analysis |  |
+|  |  (Left Dock)     |          |               | Plots    |  |
+|  +------------------+          |               | (Bottom) |  |
+|                                |               | - 6 tabs |  |
+|                     +----------+----------+    +----------+  |
+|                     |   Qt Signal/Slot    |                  |
+|                     |   Communication     |                  |
+|                     +----------+----------+                  |
+|                                |                             |
+|                     +----------+----------+                  |
+|                     |   Solver Runner     |                  |
+|                     |   (QThread)         |                  |
+|                     |   - Assembly        |                  |
+|                     |   - Solve           |                  |
+|                     |   - Postprocess     |                  |
+|                     +----------+----------+                  |
+|                                |                             |
+|                     +----------+----------+                  |
+|                     |   Solver Backend    |                  |
+|                     |   (Header-only C++) |                  |
+|                     |   - fea.hpp         |                  |
+|                     |   - elements.hpp    |                  |
+|                     |   - sparse.hpp      |                  |
+|                     |   - solver.hpp      |                  |
+|                     |   - mesh.hpp        |                  |
+|                     +---------------------+                  |
++-------------------------------------------------------------+</code></pre>
+    </div>
+
+    <h3>Component Breakdown</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>File</th>
+          <th>Responsibility</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Application Entry</td>
+          <td><code>main.cpp</code></td>
+          <td>QApplication setup, style, window creation</td>
+        </tr>
+        <tr>
+          <td>Main Window</td>
+          <td><code>main_window.hpp/cpp</code></td>
+          <td>QMainWindow with menu, toolbar, dock layout</td>
+        </tr>
+        <tr>
+          <td>Mesh Editor</td>
+          <td><code>mesh_editor.hpp/cpp</code></td>
+          <td>Mesh generation parameters, quality display</td>
+        </tr>
+        <tr>
+          <td>BC Editor</td>
+          <td><code>bc_editor.hpp/cpp</code></td>
+          <td>Boundary condition assignment and editing</td>
+        </tr>
+        <tr>
+          <td>Viewport</td>
+          <td><code>viewport_widget.hpp/cpp</code></td>
+          <td>2D rendering with QPainter, pan/zoom, overlays</td>
+        </tr>
+        <tr>
+          <td>Solver Panel</td>
+          <td><code>solver_panel.hpp/cpp</code></td>
+          <td>Solver settings, progress, results summary</td>
+        </tr>
+        <tr>
+          <td>Solver Runner</td>
+          <td><code>solver_runner.hpp/cpp</code></td>
+          <td>QThread wrapper for async solver execution</td>
+        </tr>
+        <tr>
+          <td>Result Model</td>
+          <td><code>result_model.hpp/cpp</code></td>
+          <td>QAbstractItemModel for stress/displacement tables</td>
+        </tr>
+        <tr>
+          <td>Project I/O</td>
+          <td><code>project_io.hpp/cpp</code></td>
+          <td>Save/load .cauchy JSON project files</td>
+        </tr>
+        <tr>
+          <td>Convergence Chart</td>
+          <td><code>convergence_chart.hpp/cpp</code></td>
+          <td>Log-log mesh refinement convergence plot</td>
+        </tr>
+        <tr>
+          <td>Stress Histogram</td>
+          <td><code>stress_histogram.hpp/cpp</code></td>
+          <td>Element stress distribution histogram</td>
+        </tr>
+        <tr>
+          <td>Energy Balance</td>
+          <td><code>energy_balance_chart.hpp/cpp</code></td>
+          <td>Strain energy vs work done bar chart</td>
+        </tr>
+        <tr>
+          <td>Probe Tool</td>
+          <td><code>probe_tool.hpp/cpp</code></td>
+          <td>Click-to-probe stress/displacement at any point</td>
+        </tr>
+        <tr>
+          <td>Mesh Quality Overlay</td>
+          <td><code>mesh_quality_overlay.hpp/cpp</code></td>
+          <td>Aspect ratio / Jacobian heatmap overlay</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Data Flow</h3>
+
+    <div class="eq-box" style="text-align: left; font-size: 0.82em; line-height: 1.7;">
+      <pre><code>User Input
+    |
+    v
+Mesh Editor / BC Editor / Material Props
+    |
+    v
+SolveConfig (struct)
+    |
+    v
+SolverRunner (QThread)  -->  run_case(config)
+    |                            |
+    |                            v
+    |                       Solver Backend (fea.hpp)
+    |                            |
+    |                            v
+    |                       SolveResult (struct)
+    |                            |
+    v                            v
+Result Model  <-----------  UI Update
+    |
+    v
+Viewport / Analysis Plots / Probe Tool</code></pre>
+    </div>
+
+    <h3>Thread Model</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Thread</th>
+          <th>Responsibility</th>
+          <th>Communication</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Main Thread (UI)</td>
+          <td>Event loop, rendering, user input, menu actions</td>
+          <td>Receives signals from solver thread</td>
+        </tr>
+        <tr>
+          <td>Solver Thread (QThread)</td>
+          <td>Assembly, solve, postprocess, convergence</td>
+          <td>Emits progress(int), finished(SolveResult), error(QString)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="section-intro">
+      The solver thread is short-lived: created when the user clicks
+      "Solve," destroyed when results are received. No shared state
+      between threads, the solver reads from a const SolveConfig and
+      returns a new SolveResult. The UI thread never blocks.
+    </p>
+
+    <!-- ================================================================
+         TECHNICAL SPECIFICATIONS (Desktop App)
+         ================================================================ -->
+
+    <h2>Desktop App Technical Specifications</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Specification</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Framework</td>
+          <td>Qt 6 (QWidgets)</td>
+        </tr>
+        <tr>
+          <td>Language</td>
+          <td>C++20</td>
+        </tr>
+        <tr>
+          <td>Solver</td>
+          <td>Header-only, linked directly (no IPC)</td>
+        </tr>
+        <tr>
+          <td>Rendering</td>
+          <td>QPainter (CPU), no GPU dependency</td>
+        </tr>
+        <tr>
+          <td>Async Execution</td>
+          <td>QThread with progress signals</td>
+        </tr>
+        <tr>
+          <td>Project Format</td>
+          <td>JSON (.cauchy), human-readable</td>
+        </tr>
+        <tr>
+          <td>Packaging</td>
+          <td>MACOSX_BUNDLE, .desktop, NSIS</td>
+        </tr>
+        <tr>
+          <td>Build System</td>
+          <td>CMake with AUTOMOC / AUTORCC / AUTOUIC</td>
+        </tr>
+        <tr>
+          <td>Export Resolution</td>
+          <td>1920x1080 PNG</td>
+        </tr>
+        <tr>
+          <td>Colormaps</td>
+          <td>Scientific: turbo, viridis, RdBu_r (never rainbow)</td>
+        </tr>
+        <tr>
+          <td>License</td>
+          <td>MIT (consistent with solver backend)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ================================================================
+         DESKTOP APP BUILD & INSTALL
+         ================================================================ -->
+
+    <h2>Desktop App Build &amp; Install</h2>
+
+    <p class="section-intro">
+      One command builds, installs, and launches the application:
+    </p>
+
+    <div class="eq-box" style="text-align: left; font-size: 0.85em;">
+      <pre><code>./build-desktop.sh</code></pre>
+    </div>
+
+    <p class="section-intro">
+      Under the hood, this script runs:
+    </p>
+
+    <div class="eq-box" style="text-align: left; font-size: 0.8em;">
+      <pre><code># Build
+cmake -B build-desktop -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build-desktop -j$(nproc)
+
+# Install (macOS: copies to /Applications)
+cmake --install build-desktop
+
+# Launch
+open /Applications/Crucible-FEA.app  # macOS
+# or: ./build-desktop/bin/Crucible-FEA  # Linux</code></pre>
+    </div>
+
+    <p class="section-intro">
+      Prerequisites: Qt 6 (Homebrew on macOS, apt on Linux), C++20
+      compiler (Clang 14+ or GCC 12+), CMake 3.20+.
+    </p>
+
+    <!-- ================================================================
+         ADAPTIVE REFINEMENT PIPELINE
+         ================================================================ -->
+
     <h2>Adaptive Refinement Pipeline</h2>
     <p class="section-intro">
       The adaptivity module (<code>adaptivity.hpp</code>) implements:
@@ -104,7 +744,7 @@
       <li><strong>Error Indicators</strong>: Element-wise = integral of |recovered - FE stress|^2</li>
       <li><strong>Marking</strong>: "Largest first" strategy with threshold theta (0.5 default)</li>
       <li><strong>Red-Green Refinement</strong>: Split marked Q4 elements into 4 (red) or 2 (green), add midside nodes</li>
-      <li><strong>Adaptive Loop</strong>: Solve -> recover -> estimate -> mark -> refine -> repeat</li>
+      <li><strong>Adaptive Loop</strong>: Solve, recover, estimate, mark, refine, repeat</li>
     </ol>
 
     <div class="callout">
@@ -114,6 +754,8 @@
         <code>output/adapt_hole_adaptive_convergence.json</code> for visualization.
       </p>
     </div>
+
+    <h2>Google Test Suite</h2>
     <p class="section-intro">
       22 Google Test cases across 10 test suites:
     </p>
@@ -140,7 +782,194 @@
       cross-platform compatibility.
     </p>
 
-    <div class="site-footer"><p>Cauchy -- 2D Finite Element Structural Solver</p></div>
+    <!-- ================================================================
+         COMPARISON WITH COMMERCIAL TOOLS
+         ================================================================ -->
+
+    <h2>Comparison with Commercial Tools</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Crucible-FEA Desktop</th>
+          <th>Abaqus</th>
+          <th>ANSYS</th>
+          <th>CalculiX</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Price</td>
+          <td style="color: var(--green);">Free (MIT)</td>
+          <td>$20K+/year</td>
+          <td>$20K+/year</td>
+          <td>Free (GPL)</td>
+        </tr>
+        <tr>
+          <td>Source Code</td>
+          <td style="color: var(--green);">Open source</td>
+          <td>Closed</td>
+          <td>Closed</td>
+          <td>Open source</td>
+        </tr>
+        <tr>
+          <td>Element Types</td>
+          <td>Q4, Q8, Bar, T3</td>
+          <td>200+ elements</td>
+          <td>200+ elements</td>
+          <td>~30 elements</td>
+        </tr>
+        <tr>
+          <td>3D Support</td>
+          <td style="color: var(--amber);">In progress</td>
+          <td style="color: var(--green);">Full 3D</td>
+          <td style="color: var(--green);">Full 3D</td>
+          <td style="color: var(--green);">Full 3D</td>
+        </tr>
+        <tr>
+          <td>Nonlinear</td>
+          <td style="color: var(--amber);">Planned</td>
+          <td style="color: var(--green);">Full</td>
+          <td style="color: var(--green);">Full</td>
+          <td>Partial</td>
+        </tr>
+        <tr>
+          <td>GUI</td>
+          <td style="color: var(--green);">Native Qt 6</td>
+          <td style="color: var(--green);">Full GUI</td>
+          <td style="color: var(--green);">Full GUI</td>
+          <td style="color: var(--amber);">Pre/post only</td>
+        </tr>
+        <tr>
+          <td>Adaptive Refinement</td>
+          <td style="color: var(--green);">ZZ estimator</td>
+          <td style="color: var(--green);">Built-in</td>
+          <td style="color: var(--green);">Built-in</td>
+          <td>Manual</td>
+        </tr>
+        <tr>
+          <td>API / Scripting</td>
+          <td>JSON + CLI</td>
+          <td>Python (Abaqus API)</td>
+          <td>APDL / Python</td>
+          <td>Keywords</td>
+        </tr>
+        <tr>
+          <td>Target Audience</td>
+          <td>Learning / Portfolio</td>
+          <td>Industry / Research</td>
+          <td>Industry / Research</td>
+          <td>Academic</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <p>
+        Crucible-FEA Desktop is not a commercial FEA replacement. It is a
+        portfolio piece that demonstrates understanding of element
+        formulation, sparse assembly, solver implementation, and
+        engineering visualization, skills directly transferable to
+        commercial tool development at companies like SpaceX, Lockheed
+        Martin, or ANSYS.
+      </p>
+    </div>
+
+    <!-- ================================================================
+         VERIFICATION CHECKLIST
+         ================================================================ -->
+
+    <h2>Desktop App Verification Checklist</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Item</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>Solver runs asynchronously without blocking UI</td>
+        </tr>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>Mesh generation produces correct mesh for all 6 cases</td>
+        </tr>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>BC editor assigns and persists boundary conditions correctly</td>
+        </tr>
+        <tr>
+          <td style="color: var(--amber);">In Progress</td>
+          <td>Results visualization matches web viewer output</td>
+        </tr>
+        <tr>
+          <td style="color: var(--amber);">In Progress</td>
+          <td>Convergence study produces correct GCI and order of convergence</td>
+        </tr>
+        <tr>
+          <td style="color: var(--amber);">Planned</td>
+          <td>Project save/load round-trips correctly</td>
+        </tr>
+        <tr>
+          <td style="color: var(--amber);">Planned</td>
+          <td>Error handling shows user-friendly messages for invalid inputs</td>
+        </tr>
+        <tr>
+          <td style="color: var(--amber);">Planned</td>
+          <td>Probe tool reads correct stress/displacement values at clicked points</td>
+        </tr>
+        <tr>
+          <td style="color: var(--amber);">Planned</td>
+          <td>Mesh quality overlay correctly identifies invalid elements</td>
+        </tr>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>Cross-platform build passes on macOS</td>
+        </tr>
+        <tr>
+          <td style="color: var(--amber);">Planned</td>
+          <td>Installer packages build correctly for all target platforms</td>
+        </tr>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>All existing 22 Google Test cases still pass</td>
+        </tr>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>Stress histogram displays sigma_xx, sigma_yy, von_mises distributions</td>
+        </tr>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>Energy balance chart shows strain energy vs work done</td>
+        </tr>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>Displacement line chart plots uy along top edge</td>
+        </tr>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>Load-displacement chart accumulates across multiple solves</td>
+        </tr>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>Error heatmap renders per-element ZZ error indicators</td>
+        </tr>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>Convergence chart wired into bottom dock</td>
+        </tr>
+        <tr>
+          <td style="color: var(--green);">Done</td>
+          <td>macOS .app bundle builds and launches correctly</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="site-footer"><p>Crucible-FEA, 2D Finite Element Structural Solver</p></div>
   </div>
   <script>
     document.getElementById('sidebarToggle').addEventListener('click', function() {

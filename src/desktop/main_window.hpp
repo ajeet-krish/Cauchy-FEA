@@ -2,6 +2,7 @@
 #include <QMainWindow>
 #include <QDockWidget>
 #include <QProgressBar>
+#include <QUndoStack>
 #include "viewport_widget.hpp"
 #include "viewport_3d.hpp"
 #include "mesh_editor.hpp"
@@ -14,8 +15,17 @@
 #include "displacement_line_chart.hpp"
 #include "load_displacement_chart.hpp"
 #include "error_heatmap.hpp"
+#include "editor_state.hpp"
+#include "geometry_model.hpp"
+#include "bc_model.hpp"
+#include "selection_model.hpp"
+#include "tool_context.hpp"
+#include "geometry_panel.hpp"
+#include "bc_panel.hpp"
+#include "mesh_generator.hpp"
 
 class QStackedWidget;
+class QActionGroup;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -42,14 +52,21 @@ private slots:
     void onToggleBoundary(bool checked);
     void onPlayAnimation();
     void onResetAnimation();
+    void onUndo();
+    void onRedo();
+    void onPrimitiveSelected(int index);
 
 private:
     void createActions();
     void createMenuBar();
     void createToolbars();
+    void createEditorToolbar();
+    void createLeftDock();
     void createStatusBar();
     void createBottomPlots();
+    void connectEditorSignals();
     void switchViewport(bool is3d);
+    void updateToolbarState();
 
     QStackedWidget* m_viewStack = nullptr;
     ViewportWidget* m_viewport = nullptr;
@@ -61,6 +78,39 @@ private:
     QProgressBar* m_progressBar = nullptr;
     QLabel* m_statusLabel = nullptr;
     QLabel* m_scaleLabel = nullptr;
+
+    // Undo/redo stack
+    QUndoStack* m_undoStack = nullptr;
+
+    // Editor components
+    EditorState* m_editorState = nullptr;
+    GeometryModel* m_geometryModel = nullptr;
+    BCModel* m_bcModel = nullptr;
+    SelectionModel* m_selectionModel = nullptr;
+    ToolContext* m_toolContext = nullptr;
+    MeshGenerator* m_meshGenerator = nullptr;
+    std::unique_ptr<Mesh> m_currentMesh;
+
+    // Editor panels
+    GeometryPanel* m_geometryPanel = nullptr;
+    BCPanel* m_bcPanel = nullptr;
+
+    // Editor toolbar actions
+    QToolBar* m_editorToolbar = nullptr;
+    QAction* m_undoAction = nullptr;
+    QAction* m_redoAction = nullptr;
+    QAction* m_selectAction = nullptr;
+    QAction* m_drawRectAction = nullptr;
+    QAction* m_drawLineAction = nullptr;
+    QAction* m_drawCircleAction = nullptr;
+    QAction* m_fixedAction = nullptr;
+    QAction* m_rollerXAction = nullptr;
+    QAction* m_rollerYAction = nullptr;
+    QAction* m_forceAction = nullptr;
+
+    // Left dock with tabs
+    QDockWidget* m_leftDock = nullptr;
+    QTabWidget* m_leftTabs = nullptr;
 
     // Plot widgets
     QTabWidget* m_plotTabs = nullptr;

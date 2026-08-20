@@ -5,13 +5,13 @@
 
 AboutDialog::AboutDialog(QWidget* parent)
     : QDialog(parent) {
-    setWindowTitle("About Cauchy FEA");
+    setWindowTitle("About Crucible-FEA");
     setModal(true);
     resize(400, 300);
 
     auto* layout = new QVBoxLayout(this);
 
-    auto* title = new QLabel("<h2>Cauchy FEA</h2>", this);
+    auto* title = new QLabel("<h2>Crucible-FEA</h2>", this);
     title->setAlignment(Qt::AlignCenter);
     layout->addWidget(title);
 

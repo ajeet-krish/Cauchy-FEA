@@ -1,45 +1,69 @@
-# Cauchy
+# Crucible-FEA: 2D/3D Finite Element Structural Solver with Desktop Application
 
-### 2D/3D Finite Element Structural Solver + Desktop Application
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg?logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/20)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-lightgrey.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-86-brightgreen.svg)]()
 
-A C++20 finite element solver with a native Qt 6 desktop application for interactive structural analysis. Solves plane stress/strain and 3D solid mechanics problems with adaptive mesh refinement, geometric nonlinearity, and transient dynamics. Validated against 10 analytical benchmarks with 86 Google Test cases.
+A C++20 finite element solver with a native Qt 6 desktop application for interactive structural analysis. Solves plane stress/strain and 3D solid mechanics problems with adaptive mesh refinement, geometric nonlinearity, transient dynamics, and contact mechanics. Validated against 10 analytical benchmarks.
 
-**[View Portfolio Site](https://ajeet-krish.github.io/fea-2d/)** | **[Download Desktop App](#build--install)** | **[GitHub](https://github.com/ajeet-krish/fea-2d)**
+**[View Portfolio Site](https://ajeet-krish.github.io/Crucible-FEA/)** | **[Download Desktop App](#build--install)** | **[GitHub](https://github.com/ajeet-krish/Crucible-FEA)**
 
 ---
 
-## Screenshots
+## Demo
 
-<!-- Replace these with actual desktop app screenshots -->
+![Crucible-FEA Desktop Application Demo](docs/assets/images/desktop_app_demo.gif)
+
+*Crucible-FEA Desktop: mesh generation, boundary condition assignment, solver execution, and stress visualization in a native Qt 6 application.*
+
 <table>
   <tr>
     <td align="center">
-      <img src="docs/assets/images/cantilever/simulations/cantilever_stress_contour.png" alt="Stress Contour" width="400">
-      <br><em>Von Mises stress contour on cantilever beam</em>
+      <img src="docs/assets/images/desktop_screenshots/mesh_editor.png" alt="Mesh Editor" width="400">
+      <br><em>Interactive mesh editor with nx/ny controls and quality metrics</em>
     </td>
     <td align="center">
-      <img src="docs/assets/images/plate_hole/simulations/plate_hole_stress_contour.png" alt="Plate with Hole" width="400">
-      <br><em>Stress concentration at plate with hole</em>
+      <img src="docs/assets/images/desktop_screenshots/bc_editor.png" alt="Boundary Condition Editor" width="400">
+      <br><em>Boundary condition assignment with visual feedback</em>
     </td>
     <td align="center">
-      <img src="docs/assets/images/cook/simulations/cook_stress_contour.png" alt="Cook's Membrane" width="400">
-      <br><em>Cook's membrane bending + shear</em>
+      <img src="docs/assets/images/desktop_screenshots/stress_contour.png" alt="Stress Contour" width="400">
+      <br><em>Von Mises stress contour with scientific colormap</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/principal_arrows.png" alt="Principal Stress Arrows" width="400">
+      <br><em>Principal stress arrows at element centroids</em>
+    </td>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/analysis_plots.png" alt="Analysis Plots" width="400">
+      <br><em>Six analysis tabs: stress, energy, displacement, error, convergence</em>
+    </td>
+    <td align="center">
+      <img src="docs/assets/images/desktop_screenshots/mesh_quality.png" alt="Mesh Quality Overlay" width="400">
+      <br><em>Mesh quality heatmap overlay for pre-solve validation</em>
     </td>
   </tr>
 </table>
 
----
-
-## What It Does
-
-- **Solves 2D and 3D structural problems** -- plane stress/strain, solid mechanics with hex and tet elements, thermal loading, and transient dynamics
-- **Desktop GUI for interactive analysis** -- mesh generation, boundary condition assignment, solver execution, and results visualization in a native Qt 6 application
-- **Validated against analytical solutions** -- cantilever beam, Cook's membrane, plate with hole, L-bracket, patch test, Michell truss, thermal cylinder, and 3D benchmarks
-- **Production-grade tooling** -- async solver, 6 analysis plots, project file save/load, PNG export, and Google Test CI on macOS + Linux
+*Desktop application panels: mesh editor, boundary conditions, stress contour, principal stress arrows, analysis plots, and mesh quality overlay.*
 
 ---
 
-## Key Features
+## Why Crucible-FEA
+
+Most FEA projects stop at a single element type or a handful of validation cases. Crucible-FEA covers the **full structural analysis pipeline** that practicing engineers use daily:
+
+1. **Generate** structured meshes with automatic grading and quality metrics
+2. **Assign** boundary conditions through an interactive editor with visual feedback
+3. **Solve** static, dynamic, nonlinear, and contact problems with verified element formulations
+4. **Visualize** stress contours, principal stress arrows, deformed shapes, and mesh quality overlays
+5. **Analyze** convergence, energy balance, and error distributions through six built-in plot modules
+
+---
+
+## Key Capabilities
 
 | Category | Details |
 |----------|---------|
@@ -58,79 +82,44 @@ A C++20 finite element solver with a native Qt 6 desktop application for interac
 
 ---
 
-## Desktop Application
-
-The desktop app is the primary deliverable -- a native FEA tool for mesh-to-solve-to-visualize workflows, similar to Abaqus CAE or ANSYS Mechanical but focused on 2D/3D solid mechanics.
-
-### Workflow
-
-1. **Mesh** -- Generate structured quad meshes with grading, or import from JSON. Quality metrics displayed in real-time.
-2. **Boundary Conditions** -- Assign Dirichlet (fixed) and Neumann (force) conditions via the BC editor. Visual symbols on the viewport (triangles, arrows, circles).
-3. **Solve** -- Run Cholesky or CG solver asynchronously. Progress bar in status bar. Auto-switches to CG for large meshes.
-4. **Visualize** -- Contour plots (Von Mises, principal stresses, displacement), deformed shape with scaling, principal stress arrows, mesh quality overlay.
-5. **Analyze** -- Six analysis tabs: stress histogram, energy balance, displacement profile, load-displacement curve, error heatmap, convergence study.
-6. **Export** -- Save project as `.cauchy` JSON file. Export screenshots as PNG.
-
-### Architecture
-
-```
-Cauchy Desktop (Qt 6)
-├── Application Shell (QMainWindow)
-│   ├── Menu bar (File, Edit, Solve, View, Help)
-│   ├── Toolbar (solver controls, view toggles)
-│   ├── Status bar (solver progress, mesh stats)
-│   ├── Left dock: Mesh & BC editor
-│   ├── Right dock: Properties & results
-│   ├── Central: 2D viewport (QPainter mesh renderer)
-│   └── Bottom dock: Analysis plots (QTabWidget, 6 tabs)
-│
-├── Solver Bridge (native C++ link, no IPC)
-│   ├── Mesh model (mirrors fea::Mesh)
-│   ├── Material model (mirrors fea::Material)
-│   ├── BC/Load model (QAbstractItemModel)
-│   ├── Solver runner (QThread, async)
-│   └── Result model (QAbstractItemModel for tables)
-│
-├── Visualization Engine
-│   ├── 2D viewport (QPainter with pan/zoom)
-│   ├── Contour mapping (turbo, viridis, hot, coolwarm, RdBu_r)
-│   ├── Principal stress arrows (element-based)
-│   ├── Boundary condition symbols (triangles, arrows)
-│   └── Mesh quality overlay
-│
-└── Analysis Plots (bottom dock, collapsible)
-    ├── Stress Histogram: sigma_xx, sigma_yy, von_mises distributions
-    ├── Energy Balance: strain energy vs work done
-    ├── Displacement Profile: uy along mesh edge
-    ├── Load-Displacement: force vs max displacement
-    ├── Error Map: per-element ZZ error indicator heatmap
-    └── Convergence: log-log mesh refinement with GCI
-```
-
-### Why Qt 6
-
-| Capability | Cauchy Desktop | Abaqus CAE | ANSYS Mechanical | CalculiX + CGX |
-|-----------|----------------|------------|------------------|-----------------|
-| 2D elements | Q4, Q8, Bar, T3 | Full 3D | Full 3D | 2D + 3D |
-| 3D elements | H8, T4 | Full 3D | Full 3D | Full 3D |
-| Static linear | Yes | Yes | Yes | Yes |
-| Adaptive refinement | Yes (ZZ estimator) | Yes (h-adaptive) | Yes | No |
-| GUI framework | Qt (custom) | Qt (proprietary) | Proprietary | GTK (CGX) |
-| Solver | Cholesky + CG | Direct + Iterative | Direct + Iterative | Sparse direct |
-| Cost | Free (MIT) | ~\$20K/license | ~\$50K/license | Free (GPL) |
-| Source | Full source | Black box | Black box | Partial |
-
----
-
 ## Quick Start
+
+### Prerequisites
+
+- **C++20 compiler**: Clang 14+ (macOS) or GCC 12+ (Linux)
+- **CMake**: 3.20 or later
+- **Qt 6**: For desktop app only (install via `brew install qt` on macOS)
+- **OpenMP**: Optional, for parallel assembly
+- **Python 3.8+**: For postprocessing scripts (optional)
 
 ### Desktop Application (recommended)
 
 ```bash
+# One command: build, install, and launch
 ./build-desktop.sh
 ```
 
-This configures, builds, installs to `/Applications`, and launches the app.
+This script:
+1. Configures CMake with Qt 6 desktop app enabled
+2. Builds the release binary
+3. Installs to `/Applications/Crucible-FEA.app` (macOS)
+4. Launches the application
+
+**Manual build** (if you prefer step-by-step):
+
+```bash
+# Configure
+cmake -B build-desktop -DCRUCIBLE_FEA_DESKTOP=ON -DCMAKE_BUILD_TYPE=Release
+
+# Build
+cmake --build build-desktop -j$(sysctl -n hw.ncpu)
+
+# Install (macOS)
+cp -R build-desktop/crucible-fea-desktop.app /Applications/
+
+# Launch
+open /Applications/crucible-fea-desktop.app
+```
 
 ### Solver (command line)
 
@@ -207,6 +196,8 @@ C++ Solver
 
 ## Validation Coverage
 
+All implementations are validated against published analytical solutions.
+
 | Case | Dimension | Element | Analytical Reference | What It Proves |
 |------|-----------|---------|---------------------|----------------|
 | Cantilever beam | 2D | Q4, Q8 | delta = PL^3/(3EI), Timoshenko | Shear locking (Q4), quadratic completeness (Q8) |
@@ -219,6 +210,73 @@ C++ Solver
 | Cantilever 3D | 3D | H8 | Euler-Bernoulli beam | 3D element verification |
 | Plate with hole 3D | 3D | H8 | 3D stress concentration | 3D stress recovery |
 | Lame problem | 3D | H8 | Analytical thick cylinder | 3D plane strain |
+
+---
+
+## Analysis Modules
+
+### Element Formulations
+
+Six element types covering truss, 2D solid, and 3D solid mechanics:
+
+- **Bar**: Truss element for axial loading (2 DOF per node)
+- **Q4**: Bilinear quadrilateral for standard 2D problems (plane stress/strain)
+- **Q8**: Serendipity quadratic quad for bending-dominated problems (3x3 Gauss integration)
+- **T3**: Linear triangle for complex geometries
+- **H8**: Trilinear hexahedron for 3D solid mechanics
+- **T4**: Linear tetrahedron for 3D geometries
+
+### Adaptive Mesh Refinement
+
+ZZ Superconvergent Patch Recovery (SPR) drives adaptive h-refinement:
+
+1. Recover nodal stresses from element centroids using least-squares fit
+2. Compute error indicators as the difference between recovered and raw stresses
+3. Mark elements with largest error indicators (theta = 0.5 threshold)
+4. Refine marked elements using red-green refinement
+5. Track convergence via Generalized Courant Richardson Extrapolation (GCI)
+
+### Geometric Nonlinearity
+
+Total Lagrangian formulation with Newton-Raphson iteration:
+
+- Green-Lagrange strain tensor for large deformation
+- Consistent tangent stiffness from material + geometric contributions
+- Line search with backtracking for robust convergence
+- Validated against linear solutions at small displacements
+
+### Dynamic Analysis
+
+Newmark-beta time integration for transient structural response:
+
+- Consistent and lumped mass matrices
+- Modal analysis via subspace iteration (eigenvalue solver)
+- Rayleigh damping for energy dissipation
+- Validated against analytical spring-mass systems
+
+### Contact Mechanics
+
+Node-to-surface frictionless penalty method:
+
+- Gap function computation between slave nodes and master surface
+- Penalty stiffness for penetration resistance
+- Contact force assembly into global system
+- Hertz contact benchmark setup for validation
+
+---
+
+## Tech Stack
+
+| Component | Technology | Version |
+|-----------|-----------|---------|
+| Language | C++20 | Header-only pattern |
+| GUI | Qt 6 (QWidgets, OpenGLWidgets, WebEngineWidgets) | 6.x |
+| 2D Rendering | QPainter (CPU) | -- |
+| Build | CMake + FetchContent | 3.15+ |
+| Testing | Google Test | v1.15.2 |
+| CPU Parallel | OpenMP | -- |
+| Website | Three.js (WebGL) | CDN |
+| Python | numpy, matplotlib | Post-processing |
 
 ---
 
@@ -247,7 +305,6 @@ fea-2d/
 │   ├── nonlinear.hpp               # Newton-Raphson (Total Lagrangian)
 │   ├── dynamics.hpp                # Newmark-beta, modal analysis
 │   ├── contact.hpp                 # Node-to-surface penalty
-│   ├── fea_solver_c_api.cpp/.h     # C API for Rust/Tauri integration
 │   │
 │   ├── main_cantilever.cpp         # Validation case entry points
 │   ├── main_cook.cpp
@@ -261,7 +318,7 @@ fea-2d/
 │   ├── main_plate_hole_3d.cpp
 │   ├── main_lame_3d.cpp
 │   │
-│   ├── fea_test.cpp                # Google Test suite (57 cases)
+│   ├── fea_test.cpp                # Google Test suite (86 cases)
 │   │
 │   └── desktop/                    # Qt 6 desktop application
 │       ├── main.cpp                # Entry point
@@ -284,9 +341,6 @@ fea-2d/
 │       ├── mesh_quality_overlay.hpp/cpp
 │       └── about_dialog.hpp/cpp
 │
-├── tests/
-│   └── test_c_api.cpp              # C API tests (29 cases)
-│
 ├── scripts/
 │   ├── postprocess.py              # JSON -> matplotlib PNGs
 │   ├── convert_for_web.py          # JSON -> browser-optimized Three.js data
@@ -294,7 +348,7 @@ fea-2d/
 │
 ├── desktop/                        # Qt resources, .desktop, Info.plist
 │   ├── resources.qrc
-│   ├── cauchy.desktop
+│   ├── crucible-fea.desktop
 │   ├── Info.plist
 │   ├── icon.icns
 │   └── icon.png
@@ -324,16 +378,50 @@ fea-2d/
 
 ## Build Requirements
 
-- **C++20 compiler** -- GCC 10+, Clang 12+, or Apple Clang 14+
-- **CMake** -- 3.15 or later
-- **OpenMP** -- optional, for parallel assembly
-- **Google Test** -- fetched automatically via CMake FetchContent
-- **Python 3.8+** -- for postprocessing scripts (optional)
-- **NumPy + Matplotlib** -- for Python postprocessor (optional)
-- **Qt 6** -- for desktop application only (`cmake -DCAUCHY_DESKTOP=ON`)
+- **C++20 compiler**: GCC 10+, Clang 12+, or Apple Clang 14+
+- **CMake**: 3.15 or later
+- **OpenMP**: required for parallel assembly
+- **Google Test**: fetched automatically via CMake FetchContent
+- **Python 3.8+**: for postprocessing scripts (optional)
+- **NumPy + Matplotlib**: for Python postprocessor (optional)
+- **Qt 6**: for desktop application only (`cmake -DCRUCIBLE_FEA_DESKTOP=ON`)
+
+---
+
+## What This Demonstrates
+
+For Mechanical/Aerospace Engineering roles, this project demonstrates:
+
+- **FEA competency**: Element formulation (Q4, Q8, H8, T4), sparse assembly (COO to CSR), solver implementation (Cholesky + CG with preconditioners)
+- **Structural mechanics fundamentals**: Shape functions, Gauss quadrature, stress recovery, adaptive refinement, geometric nonlinearity, transient dynamics
+- **Software engineering**: C++20 header-only design, 86 Google Test cases, CI pipeline, cross-platform build
+- **Communication**: Interactive desktop GUI, portfolio website with Three.js viewers, validation documentation
+
+---
+
+## References
+
+1. Cook, R.D., Malkus, D.S., Plesha, M.E., and Witt, R.J., "Concepts and Applications of Finite Element Analysis", 4th ed., Wiley, 2001.
+2. Hughes, T.J.R., "The Finite Element Method: Linear Static and Dynamic Finite Element Analysis", Dover, 2000.
+3. Zienkiewicz, O.C., Taylor, R.L., and Zhu, J.Z., "The Finite Element Method: Its Basis and Fundamentals", 7th ed., Butterworth-Heinemann, 2013.
+4. Bathe, K.J., "Finite Element Procedures", 2nd ed., Watertown, MA, 2014.
+5. Belytschko, T., Liu, W.K., Moran, B., and Elkhodary, K., "Nonlinear Finite Elements for Continua and Structures", 2nd ed., Wiley, 2013.
+6. Zienkiewicz, O.C. and Zhu, J.Z., "The superconvergent patch recovery and a posteriori error estimates", International Journal for Numerical Methods in Engineering, 33(7), 1331-1364, 1992.
+
+---
+
+## Contributing
+
+Contributions are welcome. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
 ## License
 
-MIT -- see repository for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">
+  <i>Built for Mechanical/Aerospace Engineering roles at SpaceX, Lockheed Martin, Northrop Grumman, Boeing, and similar.</i>
+</p>

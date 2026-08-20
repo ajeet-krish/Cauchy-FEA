@@ -1,17 +1,43 @@
 #include "viewport_widget.hpp"
+#include "editor_state.hpp"
+#include "geometry_model.hpp"
+#include "geometry_primitive.hpp"
+#include "bc_model.hpp"
+#include "selection_model.hpp"
+#include "tool_context.hpp"
 #include <QPainter>
+#include <QPainterPath>
+#include <QTimer>
+#include <QMenu>
 #include <cmath>
 
 ViewportWidget::ViewportWidget(QWidget* parent)
-    : QWidget(parent) {}
+    : QWidget(parent) {
+    setMouseTracking(true);
+    setFocusPolicy(Qt::StrongFocus);
+    
+    // Periodic update timer to prevent blank screen
+    m_updateTimer = new QTimer(this);
+    connect(m_updateTimer, &QTimer::timeout, this, [this]() {
+        update();
+    });
+    m_updateTimer->start(100); // Update every 100ms
+}
 
 void ViewportWidget::setMeshAndResults(const Mesh& mesh, const fea::SolveResult& result) {
     m_mesh = mesh;
     m_result = result;
     m_hasData = true;
+    m_hasMesh = true;
     m_panX = 0.5;
     m_panY = 0.5;
     m_zoom = 1.0;
+    update();
+}
+
+void ViewportWidget::setMesh(const Mesh& mesh) {
+    m_mesh = mesh;
+    m_hasMesh = true;
     update();
 }
 
@@ -60,6 +86,77 @@ void ViewportWidget::resetView() {
     m_panY = 0.5;
     m_zoom = 1.0;
     update();
+}
+
+// ------------------------------------------------------------------
+// Editor integration setters
+// ------------------------------------------------------------------
+void ViewportWidget::setEditorState(EditorState* state) {
+    m_editorState = state;
+}
+
+void ViewportWidget::setGeometryModel(GeometryModel* model) {
+    m_geometryModel = model;
+}
+
+void ViewportWidget::setBCModel(BCModel* model) {
+    m_bcModel = model;
+}
+
+void ViewportWidget::setSelectionModel(SelectionModel* model) {
+    m_selectionModel = model;
+}
+
+void ViewportWidget::setToolContext(ToolContext* context) {
+    m_toolContext = context;
+}
+
+// ------------------------------------------------------------------
+// Coordinate conversion
+// ------------------------------------------------------------------
+QPointF ViewportWidget::widgetToWorld(const QPointF& widgetPos) const {
+    double halfRange = 0.6 / m_zoom;
+    double aspect = static_cast<double>(width()) / static_cast<double>(height());
+    double wxMin = m_panX - halfRange * aspect;
+    double wxMax = m_panX + halfRange * aspect;
+    double wyMin = m_panY - halfRange;
+    double wyMax = m_panY + halfRange;
+    double wx = wxMin + (widgetPos.x() / width()) * (wxMax - wxMin);
+    double wy = wyMax - (widgetPos.y() / height()) * (wyMax - wyMin);
+    return QPointF(wx, wy);
+}
+
+QPointF ViewportWidget::worldToWidget(const QPointF& worldPos) const {
+    double halfRange = 0.6 / m_zoom;
+    double aspect = static_cast<double>(width()) / static_cast<double>(height());
+    double wxMin = m_panX - halfRange * aspect;
+    double wxMax = m_panX + halfRange * aspect;
+    double wyMin = m_panY - halfRange;
+    double wyMax = m_panY + halfRange;
+    double px = (worldPos.x() - wxMin) / (wxMax - wxMin) * width();
+    double py = (1.0 - (worldPos.y() - wyMin) / (wyMax - wyMin)) * height();
+    return QPointF(px, py);
+}
+
+int ViewportWidget::findNearestNode(const QPointF& worldPos, double tolerance) const {
+    if (m_mesh.num_nodes() == 0) return -1;
+    
+    int nearest = -1;
+    double min_dist = tolerance * tolerance;
+    
+    for (int i = 0; i < m_mesh.num_nodes(); ++i) {
+        const auto& node = m_mesh.nodes[i];
+        double dx = worldPos.x() - node.x;
+        double dy = worldPos.y() - node.y;
+        double dist_sq = dx * dx + dy * dy;
+        
+        if (dist_sq < min_dist) {
+            min_dist = dist_sq;
+            nearest = i;
+        }
+    }
+    
+    return nearest;
 }
 
 QColor ViewportWidget::getColorForValue(double val) const {
@@ -176,12 +273,14 @@ void ViewportWidget::updateFieldRange() {
     m_fieldMax = -1e30;
 
     if (m_field == ContourField::DISPLACEMENT_MAG) {
+        // Displacement is a nodal field
         for (int i = 0; i < m_mesh.num_nodes(); ++i) {
             double val = getFieldValueForNode(i);
             m_fieldMin = std::min(m_fieldMin, val);
             m_fieldMax = std::max(m_fieldMax, val);
         }
-    } else {
+    } else if (!m_result.stresses.empty()) {
+        // Stress is an element field
         for (size_t i = 0; i < m_result.stresses.size(); ++i) {
             double val = getFieldValueForElement(static_cast<int>(i));
             m_fieldMin = std::min(m_fieldMin, val);
@@ -189,19 +288,476 @@ void ViewportWidget::updateFieldRange() {
         }
     }
 
-    if (m_fieldMin == m_fieldMax) {
-        m_fieldMin -= 0.5;
-        m_fieldMax += 0.5;
+    if (m_fieldMin >= m_fieldMax) {
+        m_fieldMin = 0.0;
+        m_fieldMax = 1.0;
     }
 }
 
+// ------------------------------------------------------------------
+// Geometry primitive rendering
+// ------------------------------------------------------------------
+void ViewportWidget::drawGeometryPrimitives(QPainter& painter) {
+    if (!m_geometryModel) return;
+
+    const auto& prims = m_geometryModel->primitives();
+    for (int i = 0; i < static_cast<int>(prims.size()); ++i) {
+        bool selected = (m_editorState && m_editorState->selected_primitive_index == i);
+
+        std::visit([&](const auto& p) {
+            using T = std::decay_t<decltype(p)>;
+
+            if constexpr (std::is_same_v<T, RectPrimitive>) {
+                double left   = p.x;
+                double right  = p.x + p.width;
+                double bottom = p.y;
+                double top    = p.y + p.height;
+                if (left > right) std::swap(left, right);
+                if (bottom > top) std::swap(bottom, top);
+
+                QPointF tl = worldToWidget(QPointF(left, top));
+                QPointF br = worldToWidget(QPointF(right, bottom));
+                QRectF rect(tl, br);
+
+                QPen pen(selected ? QColor(0x00, 0xff, 0xff) : QColor(0x58, 0xa6, 0xff),
+                         selected ? 2.0 : 1.0);
+                painter.setPen(pen);
+                painter.setBrush(QBrush(QColor(0x58, 0xa6, 0xff, 30)));
+                painter.drawRect(rect);
+
+            } else if constexpr (std::is_same_v<T, LinePrimitive>) {
+                QPointF p1 = worldToWidget(QPointF(p.x1, p.y1));
+                QPointF p2 = worldToWidget(QPointF(p.x2, p.y2));
+
+                QPen pen(selected ? QColor(0x00, 0xff, 0xff) : QColor(0x3f, 0xb9, 0x50),
+                         selected ? 2.0 : 1.5);
+                painter.setPen(pen);
+                painter.drawLine(p1, p2);
+
+            } else if constexpr (std::is_same_v<T, CirclePrimitive>) {
+                QPointF center = worldToWidget(QPointF(p.cx, p.cy));
+                // Approximate radius in screen pixels
+                QPointF edge = worldToWidget(QPointF(p.cx + p.radius, p.cy));
+                double radius_px = std::abs(edge.x() - center.x());
+
+                QPen pen(selected ? QColor(0x00, 0xff, 0xff) : QColor(0xf0, 0x88, 0x3e),
+                         selected ? 2.0 : 1.0);
+                painter.setPen(pen);
+                painter.setBrush(QBrush(QColor(0xf0, 0x88, 0x3e, 30)));
+                painter.drawEllipse(center, radius_px, radius_px);
+            }
+        }, prims[i]);
+    }
+}
+
+// ------------------------------------------------------------------
+// BC overlay rendering
+// ------------------------------------------------------------------
+void ViewportWidget::drawBCOverlay(QPainter& painter) {
+    if (!m_bcModel) return;
+
+    // Get mesh nodes for coordinate lookup
+    const auto& bcs = m_bcModel->bcs();
+    for (const auto& bc : bcs) {
+        if (bc.node_index < 0 || bc.node_index >= m_mesh.num_nodes()) continue;
+
+        const auto& node = m_mesh.nodes[bc.node_index];
+        QPointF pos = worldToWidget(QPointF(node.x, node.y));
+
+        switch (bc.type) {
+        case BCType::FIXED: {
+            // Yellow triangle pointing down (fixed support)
+            double s = 0.015;
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QBrush(QColor(0xff, 0xff, 0x00, 230)));
+            QPolygonF tri;
+            tri << pos
+                << worldToWidget(QPointF(node.x - s, node.y - s * 1.5))
+                << worldToWidget(QPointF(node.x + s, node.y - s * 1.5));
+            painter.drawPolygon(tri);
+            break;
+        }
+        case BCType::ROLLER_X: {
+            // Circle (roller in X, fixed in Y)
+            double s = 0.012;
+            painter.setPen(QPen(QColor(0x00, 0xaa, 0xff, 230), 1.5));
+            painter.setBrush(Qt::NoBrush);
+            QPointF center = pos;
+            double radius = std::abs(worldToWidget(QPointF(s, 0)).x() - worldToWidget(QPointF(0, 0)).x());
+            painter.drawEllipse(center, radius, radius);
+            break;
+        }
+        case BCType::ROLLER_Y: {
+            // Circle (roller in Y, fixed in X)
+            double s = 0.012;
+            painter.setPen(QPen(QColor(0x00, 0xaa, 0xff, 230), 1.5));
+            painter.setBrush(Qt::NoBrush);
+            QPointF center = pos;
+            double radius = std::abs(worldToWidget(QPointF(s, 0)).x() - worldToWidget(QPointF(0, 0)).x());
+            painter.drawEllipse(center, radius, radius);
+            break;
+        }
+        case BCType::FORCE: {
+            // Green/red arrow for force - use angle from BC
+            double angle_rad = bc.angle * M_PI / 180.0;
+            double len = 0.04;
+            QPointF tip = worldToWidget(QPointF(
+                node.x + len * std::cos(angle_rad),
+                node.y + len * std::sin(angle_rad)));
+
+            painter.setPen(QPen(QColor(0x00, 0xff, 0x00), 2));
+            painter.drawLine(pos, tip);
+
+            // Arrowhead
+            double head_len = 0.01;
+            double head_angle = 0.4;
+            QPointF h1 = worldToWidget(QPointF(
+                node.x + (len - head_len) * std::cos(angle_rad - head_angle),
+                node.y + (len - head_len) * std::sin(angle_rad - head_angle)));
+            QPointF h2 = worldToWidget(QPointF(
+                node.x + (len - head_len) * std::cos(angle_rad + head_angle),
+                node.y + (len - head_len) * std::sin(angle_rad + head_angle)));
+
+            QPolygonF arrow;
+            arrow << tip << h1 << h2;
+            painter.setBrush(QBrush(QColor(0x00, 0xff, 0x00)));
+            painter.setPen(Qt::NoPen);
+            painter.drawPolygon(arrow);
+            break;
+        }
+        }
+    }
+}
+
+// ------------------------------------------------------------------
+// Selection highlight
+// ------------------------------------------------------------------
+void ViewportWidget::drawSelectionHighlight(QPainter& painter) {
+    if (!m_selectionModel || !m_mesh.num_nodes()) return;
+
+    const auto& selected = m_selectionModel->selectedNodes();
+    if (selected.empty()) return;
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QBrush(QColor(0x00, 0xff, 0xff, 180)));
+
+    for (int node_idx : selected) {
+        if (node_idx < 0 || node_idx >= m_mesh.num_nodes()) continue;
+        const auto& node = m_mesh.nodes[node_idx];
+        QPointF pos = worldToWidget(QPointF(node.x, node.y));
+
+        double radius = 4.0;
+        painter.drawEllipse(pos, radius, radius);
+    }
+}
+
+// ------------------------------------------------------------------
+// Snap indicator
+// ------------------------------------------------------------------
+void ViewportWidget::drawSnapIndicator(QPainter& painter, const QPointF& worldPos) {
+    QPointF pos = worldToWidget(worldPos);
+    painter.setPen(QPen(QColor(0x00, 0xff, 0xff, 120), 1, Qt::DashLine));
+    painter.setBrush(Qt::NoBrush);
+
+    double snap_size = 8.0;
+    painter.drawEllipse(pos, snap_size, snap_size);
+}
+
+// ------------------------------------------------------------------
+// Force arrow with label
+// ------------------------------------------------------------------
+void ViewportWidget::drawForceArrow(QPainter& painter, const QPointF& pos,
+                                     double fx, double fy, double angle) {
+    Q_UNUSED(fx)
+    Q_UNUSED(fy)
+    Q_UNUSED(angle)
+
+    QPointF widgetPos = worldToWidget(pos);
+    painter.setPen(QPen(QColor(0x00, 0xff, 0x00), 2));
+    painter.setBrush(QBrush(QColor(0x00, 0xff, 0x00, 180)));
+
+    // Draw a simple arrow marker
+    double arrow_size = 6.0;
+    QPolygonF arrow;
+    arrow << QPointF(widgetPos.x(), widgetPos.y() - arrow_size)
+          << QPointF(widgetPos.x() - arrow_size * 0.5, widgetPos.y())
+          << QPointF(widgetPos.x() + arrow_size * 0.5, widgetPos.y());
+    painter.drawPolygon(arrow);
+}
+
+// ------------------------------------------------------------------
+// Drag selection rectangle
+// ------------------------------------------------------------------
+void ViewportWidget::drawDragRectangle(QPainter& painter) {
+    if (!m_editorState || !m_editorState->is_selecting) return;
+
+    QPointF tl = worldToWidget(m_editorState->selection_start);
+    QPointF br = worldToWidget(m_editorState->selection_end);
+
+    QRectF rect(tl, br);
+    painter.setPen(QPen(QColor(0x00, 0xff, 0xff, 150), 1, Qt::DashLine));
+    painter.setBrush(QBrush(QColor(0x00, 0xff, 0xff, 20)));
+    painter.drawRect(rect);
+}
+
+// ------------------------------------------------------------------
+// Pending shape preview (while drawing)
+// ------------------------------------------------------------------
+void ViewportWidget::drawPendingShape(QPainter& painter) {
+    if (!m_editorState || !m_editorState->is_drawing) return;
+
+    QPointF start = worldToWidget(m_editorState->draw_start);
+    QPointF current = worldToWidget(m_editorState->draw_current);
+
+    painter.setPen(QPen(QColor(0x00, 0xff, 0xff, 180), 1.5, Qt::DashLine));
+    painter.setBrush(Qt::NoBrush);
+
+    switch (m_editorState->current_mode) {
+    case ToolMode::DRAW_RECT: {
+        QRectF rect(start, current);
+        painter.drawRect(rect);
+        break;
+    }
+    case ToolMode::DRAW_LINE: {
+        painter.drawLine(start, current);
+        break;
+    }
+    case ToolMode::DRAW_CIRCLE: {
+        double dx = current.x() - start.x();
+        double dy = current.y() - start.y();
+        double radius = std::sqrt(dx * dx + dy * dy);
+        painter.drawEllipse(start, radius, radius);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+// ------------------------------------------------------------------
+// Mesh node visualization (editor mode, before solve)
+// ------------------------------------------------------------------
+void ViewportWidget::drawMeshNodes(QPainter& painter) {
+    if (!m_hasMesh || m_hasData) return;
+    if (m_mesh.num_nodes() == 0) return;
+
+    // Determine which nodes are boundary (have BCs)
+    bool hasBCs = m_bcModel && m_bcModel->bcCount() > 0;
+
+    for (int i = 0; i < m_mesh.num_nodes(); ++i) {
+        const auto& node = m_mesh.nodes[i];
+        QPointF pos = worldToWidget(QPointF(node.x, node.y));
+
+        // Check if this node has a BC
+        bool isBoundary = hasBCs && m_bcModel->hasBC(i);
+
+        // Check if selected
+        bool isSelected = m_selectionModel && m_selectionModel->isNodeSelected(i);
+
+        if (isSelected) {
+            painter.setPen(QPen(QColor(0x00, 0xff, 0xff), 1.5));
+            painter.setBrush(QBrush(QColor(0x00, 0xff, 0xff, 200)));
+            painter.drawEllipse(pos, 4.0, 4.0);
+        } else if (isBoundary) {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QBrush(QColor(0xff, 0x44, 0x44, 200)));
+            painter.drawEllipse(pos, 2.5, 2.5);
+        } else {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QBrush(QColor(0x55, 0x88, 0xff, 160)));
+            painter.drawEllipse(pos, 2.0, 2.0);
+        }
+    }
+}
+
+// ------------------------------------------------------------------
+// Mesh edge visualization (editor mode, before solve)
+// ------------------------------------------------------------------
+void ViewportWidget::drawMeshEdges(QPainter& painter) {
+    if (!m_hasMesh || m_hasData) return;
+    if (m_mesh.num_quads() == 0 && m_mesh.num_tris() == 0) return;
+
+    painter.setPen(QPen(QColor(0x44, 0x55, 0x66, 120), 0.5));
+    painter.setBrush(Qt::NoBrush);
+
+    for (int e = 0; e < m_mesh.num_quads(); ++e) {
+        const auto& elem = m_mesh.quad_elements[e];
+        for (int i = 0; i < 4; ++i) {
+            int n0 = elem[i];
+            int n1 = elem[(i + 1) % 4];
+            painter.drawLine(
+                worldToWidget(QPointF(m_mesh.nodes[n0].x, m_mesh.nodes[n0].y)),
+                worldToWidget(QPointF(m_mesh.nodes[n1].x, m_mesh.nodes[n1].y)));
+        }
+    }
+
+    for (int e = 0; e < m_mesh.num_tris(); ++e) {
+        const auto& elem = m_mesh.tri_elements[e];
+        for (int i = 0; i < 3; ++i) {
+            int n0 = elem[i];
+            int n1 = elem[(i + 1) % 3];
+            painter.drawLine(
+                worldToWidget(QPointF(m_mesh.nodes[n0].x, m_mesh.nodes[n0].y)),
+                worldToWidget(QPointF(m_mesh.nodes[n1].x, m_mesh.nodes[n1].y)));
+        }
+    }
+}
+
+// ------------------------------------------------------------------
+// Drag-move preview (shows where the primitive will land)
+// ------------------------------------------------------------------
+void ViewportWidget::drawDragMovePreview(QPainter& painter) {
+    if (!m_editorState || !m_editorState->is_dragging) return;
+    if (m_editorState->selected_primitive_index < 0) return;
+    if (!m_geometryModel) return;
+
+    int idx = m_editorState->selected_primitive_index;
+    if (idx >= m_geometryModel->primitiveCount()) return;
+
+    double dx = m_editorState->drag_current.x() - m_editorState->drag_start.x();
+    double dy = m_editorState->drag_current.y() - m_editorState->drag_start.y();
+
+    const auto& prims = m_geometryModel->primitives();
+    const auto& prim = prims[idx];
+
+    painter.setPen(QPen(QColor(0x00, 0xff, 0xff, 100), 1.0, Qt::DashDotLine));
+    painter.setBrush(QBrush(QColor(0x00, 0xff, 0xff, 15)));
+
+    std::visit([&](const auto& p) {
+        using T = std::decay_t<decltype(p)>;
+        if constexpr (std::is_same_v<T, RectPrimitive>) {
+            double left   = p.x + dx;
+            double right  = p.x + p.width + dx;
+            double bottom = p.y + dy;
+            double top    = p.y + p.height + dy;
+            if (left > right) std::swap(left, right);
+            if (bottom > top) std::swap(bottom, top);
+            QPointF tl = worldToWidget(QPointF(left, top));
+            QPointF br = worldToWidget(QPointF(right, bottom));
+            painter.drawRect(QRectF(tl, br));
+        } else if constexpr (std::is_same_v<T, LinePrimitive>) {
+            QPointF p1 = worldToWidget(QPointF(p.x1 + dx, p.y1 + dy));
+            QPointF p2 = worldToWidget(QPointF(p.x2 + dx, p.y2 + dy));
+            painter.drawLine(p1, p2);
+        } else if constexpr (std::is_same_v<T, CirclePrimitive>) {
+            QPointF center = worldToWidget(QPointF(p.cx + dx, p.cy + dy));
+            QPointF edge = worldToWidget(QPointF(p.cx + p.radius + dx, p.cy + dy));
+            double radius_px = std::abs(edge.x() - center.x());
+            painter.drawEllipse(center, radius_px, radius_px);
+        }
+    }, prim);
+}
+
+// ------------------------------------------------------------------
+// Mouse events
+// ------------------------------------------------------------------
 void ViewportWidget::mousePressEvent(QMouseEvent* event) {
     m_lastMousePos = event->pos();
+
+    // Middle mouse button always pans (regardless of tool mode)
+    if (event->button() == Qt::MiddleButton) {
+        m_isPanning = true;
+        return;
+    }
+
+    // Right mouse button: show context menu or pan
+    if (event->button() == Qt::RightButton) {
+        // Check if right-clicked on an object
+        QPointF worldPos = widgetToWorld(event->pos());
+        
+        // Check if right-clicked on a primitive
+        if (m_geometryModel && m_editorState) {
+            int prim_idx = m_geometryModel->findNearestPrimitive(worldPos, 0.05);
+            if (prim_idx >= 0) {
+                // Select the primitive
+                m_editorState->selected_primitive_index = prim_idx;
+                m_editorState->selected_node_index = -1;
+                update();
+                
+                // Show context menu
+                QMenu contextMenu(this);
+                contextMenu.addAction("Edit Properties", this, [this, prim_idx]() {
+                    emit primitiveClicked(prim_idx);
+                });
+                contextMenu.addAction("Delete", this, [this]() {
+                    m_toolContext->deleteSelected();
+                    update();
+                });
+                contextMenu.exec(event->globalPosition().toPoint());
+                return;
+            }
+        }
+        
+        // Check if right-clicked on a BC node
+        if (m_bcModel && m_mesh.num_nodes() > 0) {
+            int node_idx = findNearestNode(worldPos, 0.05);
+            if (node_idx >= 0 && m_bcModel->hasBC(node_idx)) {
+                // Select the BC node
+                m_editorState->selected_node_index = node_idx;
+                m_editorState->selected_primitive_index = -1;
+                update();
+                
+                // Show context menu
+                QMenu contextMenu(this);
+                contextMenu.addAction("Edit BC", this, [this, node_idx]() {
+                    // TODO: Show BC edit dialog
+                    // For now, just select the node
+                    if (m_toolContext) {
+                        m_toolContext->nodeSelected(node_idx);
+                    }
+                });
+                contextMenu.addAction("Delete BC", this, [this, node_idx]() {
+                    m_toolContext->deleteSelected();
+                    update();
+                });
+                contextMenu.exec(event->globalPosition().toPoint());
+                return;
+            }
+        }
+        
+        // Default: pan
+        m_isPanning = true;
+        return;
+    }
+
+    // Left mouse button: route to ToolContext if available
+    if (event->button() == Qt::LeftButton && m_toolContext && m_editorState) {
+        QPointF worldPos = widgetToWorld(event->pos());
+        m_toolContext->handleMousePress(event, worldPos);
+        update();
+        return;
+    }
+
+    // Default pan behavior (left button when no tool context)
+    if (event->button() == Qt::LeftButton) {
+        m_lastMousePos = event->pos();
+    }
 }
 
 void ViewportWidget::mouseMoveEvent(QMouseEvent* event) {
-    QPoint delta = event->pos() - m_lastMousePos;
+    // Handle panning with middle or right mouse button
+    if (m_isPanning) {
+        QPoint delta = event->pos() - m_lastMousePos;
+        double halfRange = 0.6 / m_zoom;
+        double aspect = static_cast<double>(width()) / static_cast<double>(height());
+        m_panX -= static_cast<double>(delta.x()) * halfRange * aspect / width();
+        m_panY += static_cast<double>(delta.y()) * halfRange / height();
+        m_lastMousePos = event->pos();
+        update();
+        return;
+    }
+
+    // Route to ToolContext if available (for left button only)
+    if (m_toolContext && m_editorState && (event->buttons() & Qt::LeftButton)) {
+        QPointF worldPos = widgetToWorld(event->pos());
+        m_toolContext->handleMouseMove(event, worldPos);
+        update();
+        return;
+    }
+
+    // Default pan behavior (left button when no tool context)
     if (event->buttons() & Qt::LeftButton) {
+        QPoint delta = event->pos() - m_lastMousePos;
         double halfRange = 0.6 / m_zoom;
         double aspect = static_cast<double>(width()) / static_cast<double>(height());
         m_panX -= static_cast<double>(delta.x()) * halfRange * aspect / width();
@@ -211,6 +767,59 @@ void ViewportWidget::mouseMoveEvent(QMouseEvent* event) {
     update();
 }
 
+void ViewportWidget::mouseReleaseEvent(QMouseEvent* event) {
+    // Stop panning on middle or right button release
+    if (event->button() == Qt::MiddleButton || event->button() == Qt::RightButton) {
+        m_isPanning = false;
+        return;
+    }
+
+    // Route left button release to ToolContext if available
+    if (event->button() == Qt::LeftButton && m_toolContext && m_editorState) {
+        QPointF worldPos = widgetToWorld(event->pos());
+        m_toolContext->handleMouseRelease(event, worldPos);
+        update();
+        return;
+    }
+}
+
+void ViewportWidget::mouseDoubleClickEvent(QMouseEvent* event) {
+    // Route to ToolContext if available
+    if (m_toolContext && m_editorState) {
+        QPointF worldPos = widgetToWorld(event->pos());
+        m_toolContext->handleMouseDoubleClick(event, worldPos);
+        update();
+    }
+}
+
+void ViewportWidget::keyPressEvent(QKeyEvent* event) {
+    // Delete key removes selected object
+    if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
+        if (m_toolContext && m_editorState) {
+            m_toolContext->deleteSelected();
+            update();
+            return;
+        }
+    }
+    
+    // Escape key clears selection and returns to pan mode
+    if (event->key() == Qt::Key_Escape) {
+        if (m_editorState) {
+            m_editorState->current_mode = ToolMode::PAN_ZOOM;
+            m_editorState->selected_primitive_index = -1;
+            m_editorState->selected_node_index = -1;
+            m_editorState->selected_edge_index = -1;
+            if (m_selectionModel) {
+                m_selectionModel->clearSelection();
+            }
+            update();
+            return;
+        }
+    }
+    
+    QWidget::keyPressEvent(event);
+}
+
 void ViewportWidget::wheelEvent(QWheelEvent* event) {
     double factor = (event->angleDelta().y() > 0) ? 1.15 : 1.0 / 1.15;
     m_zoom *= factor;
@@ -218,15 +827,51 @@ void ViewportWidget::wheelEvent(QWheelEvent* event) {
     update();
 }
 
+// ------------------------------------------------------------------
+// Paint event
+// ------------------------------------------------------------------
 void ViewportWidget::paintEvent(QPaintEvent*) {
+    // Guard against invalid widget size
+    if (width() <= 0 || height() <= 0) return;
+
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.fillRect(rect(), QColor(0x0d, 0x11, 0x17));
 
-    if (!m_hasData) {
+    // Draw geometry primitives if in editor mode
+    if (m_geometryModel && m_editorState) {
+        drawGeometryPrimitives(painter);
+        drawPendingShape(painter);
+        drawDragRectangle(painter);
+        drawDragMovePreview(painter);
+        drawSelectionHighlight(painter);
+
+        if (m_bcModel) {
+            drawBCOverlay(painter);
+        }
+
+        // Draw mesh nodes/edges when mesh exists (editor mode, before solve)
+        if (m_hasMesh && !m_hasData) {
+            drawMeshEdges(painter);
+            drawMeshNodes(painter);
+        }
+
+        if (!m_hasData && !m_hasMesh) {
+            painter.setPen(QColor(0x8b, 0x94, 0x9e));
+            painter.setFont(QFont("JetBrains Mono", 12));
+            painter.drawText(rect(), Qt::AlignCenter, "Draw geometry or generate a mesh to begin");
+            return;
+        }
+    }
+
+    if (!m_hasData && !m_hasMesh) {
         painter.setPen(QColor(0x8b, 0x94, 0x9e));
         painter.setFont(QFont("JetBrains Mono", 12));
         painter.drawText(rect(), Qt::AlignCenter, "Load a case or mesh to begin");
+        return;
+    }
+
+    if (!m_hasData) {
         return;
     }
 
@@ -270,10 +915,7 @@ void ViewportWidget::paintEvent(QPaintEvent*) {
     if (m_showDeformed && !m_result.displacement.empty()) {
         for (int e = 0; e < m_mesh.num_quads(); ++e) {
             const auto& elem = m_mesh.quad_elements[e];
-            double val = getFieldValueForElement(e);
-            QColor c = getColorForValue(val);
             painter.setPen(Qt::NoPen);
-            painter.setBrush(QBrush(c));
             QPolygonF poly;
             for (int i = 0; i < 4; ++i) {
                 int n = elem[i];
@@ -282,15 +924,20 @@ void ViewportWidget::paintEvent(QPaintEvent*) {
                 poly << worldToWidget(m_mesh.nodes[n].x + ux * m_dispScale,
                                        m_mesh.nodes[n].y + uy * m_dispScale);
             }
+            // Use average nodal value for element color
+            double val = 0.0;
+            for (int i = 0; i < 4; ++i) {
+                val += getFieldValueForNode(elem[i]);
+            }
+            val /= 4.0;
+            QColor c = getColorForValue(val);
+            painter.setBrush(QBrush(c));
             painter.drawPolygon(poly);
         }
 
         for (int e = 0; e < m_mesh.num_tris(); ++e) {
             const auto& elem = m_mesh.tri_elements[e];
-            double val = getFieldValueForElement(e);
-            QColor c = getColorForValue(val);
             painter.setPen(Qt::NoPen);
-            painter.setBrush(QBrush(c));
             QPolygonF poly;
             for (int i = 0; i < 3; ++i) {
                 int n = elem[i];
@@ -299,6 +946,14 @@ void ViewportWidget::paintEvent(QPaintEvent*) {
                 poly << worldToWidget(m_mesh.nodes[n].x + ux * m_dispScale,
                                        m_mesh.nodes[n].y + uy * m_dispScale);
             }
+            // Use average nodal value for element color
+            double val = 0.0;
+            for (int i = 0; i < 3; ++i) {
+                val += getFieldValueForNode(elem[i]);
+            }
+            val /= 3.0;
+            QColor c = getColorForValue(val);
+            painter.setBrush(QBrush(c));
             painter.drawPolygon(poly);
         }
     }
