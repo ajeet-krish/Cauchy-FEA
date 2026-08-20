@@ -158,6 +158,7 @@ if(CRUCIBLE_FEA_DESKTOP)
     src/desktop/bc_panel.cpp
     src/desktop/mesh_generator.cpp
     src/desktop/undo_commands.cpp
+    src/desktop/element_inspector_panel.cpp
   )
 
   set(DESKTOP_HEADERS
@@ -192,6 +193,7 @@ if(CRUCIBLE_FEA_DESKTOP)
     src/desktop/bc_panel.hpp
     src/desktop/mesh_generator.hpp
     src/desktop/undo_commands.hpp
+    src/desktop/element_inspector_panel.hpp
   )
 
   set(DESKTOP_RESOURCES src/desktop/resources.qrc)

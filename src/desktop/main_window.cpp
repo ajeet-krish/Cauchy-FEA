@@ -95,6 +95,15 @@ MainWindow::MainWindow(QWidget* parent)
     solverDock->setAllowedAreas(Qt::RightDockWidgetArea);
     addDockWidget(Qt::RightDockWidgetArea, solverDock);
 
+    // Element inspector panel (right dock, below solver)
+    m_inspectorPanel = new ElementInspectorPanel(this);
+    QDockWidget* inspectorDock = new QDockWidget("Element Inspector", this);
+    inspectorDock->setWidget(m_inspectorPanel);
+    inspectorDock->setAllowedAreas(Qt::RightDockWidgetArea);
+    addDockWidget(Qt::RightDockWidgetArea, inspectorDock);
+    tabifyDockWidget(solverDock, inspectorDock);
+    inspectorDock->setVisible(false);
+
     // Create menus, toolbars, status bar, plots
     createActions();
     createMenuBar();
@@ -987,6 +996,20 @@ void MainWindow::connectEditorSignals() {
     // GeometryPanel delete request -> refresh viewport
     connect(m_geometryPanel, &GeometryPanel::deleteRequested,
             m_viewport, QOverload<>::of(&QWidget::update));
+
+    // Viewport element double-click -> inspector panel
+    connect(m_viewport, &ViewportWidget::elementDoubleClicked, this, [this](int elemIndex) {
+        if (m_lastResult.displacement.empty()) return;
+        m_inspectorPanel->inspectElement(elemIndex, m_lastMesh, m_lastResult);
+        // Show the inspector dock if hidden
+        for (QDockWidget* dock : findChildren<QDockWidget*>()) {
+            if (dock->widget() == m_inspectorPanel) {
+                dock->setVisible(true);
+                dock->raise();
+                break;
+            }
+        }
+    });
 }
 
 void MainWindow::updateToolbarState() {

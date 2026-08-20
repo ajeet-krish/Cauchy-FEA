@@ -17,6 +17,7 @@
 #include "error_heatmap.hpp"
 #include "analytical_panel.hpp"
 #include "probe_tool.hpp"
+#include "element_inspector_panel.hpp"
 #include "editor_state.hpp"
 #include "geometry_model.hpp"
 #include "bc_model.hpp"
@@ -135,6 +136,7 @@ private:
     ErrorHeatmap* m_errorHeatmap = nullptr;
     ConvergenceChart* m_convChart = nullptr;
     AnalyticalPanel* m_analyticalPanel = nullptr;
+    ElementInspectorPanel* m_inspectorPanel = nullptr;
 
     SolveConfig m_config;
     Mesh m_lastMesh;

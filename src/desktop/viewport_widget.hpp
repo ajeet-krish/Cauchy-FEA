@@ -78,6 +78,7 @@ signals:
     void pointProbed(int nodeId, int elemId, double x, double y, double ux, double uy, double stressVal);
     void nodeClicked(int nodeIndex, QPointF worldPos);
     void primitiveClicked(int index);
+    void elementDoubleClicked(int elemIndex);
 
 protected:
     void paintEvent(QPaintEvent* event) override;

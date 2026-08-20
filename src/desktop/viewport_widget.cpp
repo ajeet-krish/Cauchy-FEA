@@ -871,6 +871,67 @@ void ViewportWidget::mouseDoubleClickEvent(QMouseEvent* event) {
         m_toolContext->handleMouseDoubleClick(event, worldPos);
         update();
     }
+
+    // Find element under cursor for drill-down inspector
+    if (m_hasData) {
+        QPointF worldPos = widgetToWorld(event->pos());
+
+        // Point-in-polygon test for quad elements
+        for (int e = 0; e < m_mesh.num_quads(); ++e) {
+            const auto& elem = m_mesh.quad_elements[e];
+            double px = worldPos.x();
+            double py = worldPos.y();
+
+            // Winding number algorithm for convex quad
+            bool inside = true;
+            for (int i = 0; i < 4; ++i) {
+                int j = (i + 1) % 4;
+                double ex0 = m_mesh.nodes[elem[i]].x;
+                double ey0 = m_mesh.nodes[elem[i]].y;
+                double ex1 = m_mesh.nodes[elem[j]].x;
+                double ey1 = m_mesh.nodes[elem[j]].y;
+
+                // Cross product of edge and point-to-vertex
+                double cross = (ex1 - ex0) * (py - ey0) - (ey1 - ey0) * (px - ex0);
+                if (cross < 0.0) {
+                    inside = false;
+                    break;
+                }
+            }
+            if (inside) {
+                emit elementDoubleClicked(e);
+                update();
+                return;
+            }
+        }
+
+        // Point-in-polygon test for tri elements (cross-product winding)
+        for (int e = 0; e < m_mesh.num_tris(); ++e) {
+            const auto& elem = m_mesh.tri_elements[e];
+            double px = worldPos.x();
+            double py = worldPos.y();
+
+            bool inside = true;
+            for (int i = 0; i < 3; ++i) {
+                int j = (i + 1) % 3;
+                double ex0 = m_mesh.nodes[elem[i]].x;
+                double ey0 = m_mesh.nodes[elem[i]].y;
+                double ex1 = m_mesh.nodes[elem[j]].x;
+                double ey1 = m_mesh.nodes[elem[j]].y;
+
+                double cross = (ex1 - ex0) * (py - ey0) - (ey1 - ey0) * (px - ex0);
+                if (cross < 0.0) {
+                    inside = false;
+                    break;
+                }
+            }
+            if (inside) {
+                emit elementDoubleClicked(m_mesh.num_quads() + e);
+                update();
+                return;
+            }
+        }
+    }
 }
 
 void ViewportWidget::keyPressEvent(QKeyEvent* event) {
